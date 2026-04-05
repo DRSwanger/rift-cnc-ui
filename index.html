@@ -1454,18 +1454,15 @@ async function machineStop() {
 
 async function machineEStop() {
   if (lastMachineState === 'estopped') {
-    // Clear E-stop — reset controller back to idle
-    await fetch(`${API_URL}/api/reset`, { method: 'PUT' });
-    document.getElementById('btn-estop').textContent = '⛔ E-Stop';
+    // Clear E-stop
+    await fetch(`${API_URL}/api/clear`, { method: 'PUT' });
   } else {
     // Trigger E-stop
-    await fetch(`${API_URL}/api/stop`, { method: 'PUT' });
-    await fetch(`${API_URL}/api/reset`, { method: 'PUT' });
+    await fetch(`${API_URL}/api/estop`, { method: 'PUT' });
     resumeState = null;
     resumeStateLocked = false;
     document.getElementById('btn-resume').style.display = 'none';
     setMachineState('estopped');
-    document.getElementById('btn-estop').textContent = '✅ Clear E-Stop';
   }
 }
 
