@@ -942,6 +942,7 @@
 const WS_URL  = `ws://${location.host}/websocket`;
 const API_URL = ``; // relative URLs — proxy handles routing to controller
 const SAFE_Z  = 50; // mm to retract before repositioning on resume
+const ENABLE_RESUME = false; // set true to re-enable resume-from-stop feature
 let jogStep = 10;
 let state   = {};
 let ws;
@@ -1082,7 +1083,7 @@ function updateUI(data) {
   }
 
   // Keep a live resume snapshot while running/paused — track peak line seen
-  if (!resumeStateLocked && (lastMachineState === 'running' || lastMachineState === 'paused') && (state.line || 0) > 0) {
+  if (ENABLE_RESUME && !resumeStateLocked && (lastMachineState === 'running' || lastMachineState === 'paused') && (state.line || 0) > 0) {
     const snap = {
       line:     state.line,
       // Store WCS coordinates (ABS - offset) — resume GCode uses G90 (WCS absolute)
@@ -1141,30 +1142,29 @@ function setMachineState(s) {
     pauseBtn.innerHTML = '⏸ Pause';
   }
 
-  // Show Resume after a stop — only show/update when transitioning FROM running/paused
-  const hasResume = resumeState && resumeState.line > 0 &&
-                    (gcodeLines.length === 0 || gcodeLines.length > resumeState.line);
   const wasActive = lastMachineState === 'running' || lastMachineState === 'paused';
   // Reset relay display when program ends or E-stopped — WS delta may not reflect actual off state
   if ((s === 'idle' || s === 'error' || s === 'estopped') && (wasActive || s === 'estopped')) {
     setLoadState(0, false);
     setLoadState(1, false);
   }
-  if ((s === 'idle' || s === 'error') && hasResume && wasActive) {
-    // Only update the line number once, when first shown — don't let jog cycles overwrite it
-    document.getElementById('resume-line-num').textContent = Math.max(0, resumeState.line - 1);
-    resumeBtn.style.display = '';
-  } else if (s === 'running') {
-    resumeBtn.style.display = 'none';
-  }
-  // If resume is pending, update Stop button to offer cancel on second click
-  const stopBtn = document.getElementById('btn-stop');
-  if (resumeStateLocked && hasResume && s !== 'running') {
-    stopBtn.textContent = '■ Stop / Cancel Resume';
-    stopBtn.title = 'Click again to cancel the resume point and start fresh';
-  } else {
-    stopBtn.textContent = '■ Stop';
-    stopBtn.title = '';
+  if (ENABLE_RESUME) {
+    const hasResume = resumeState && resumeState.line > 0 &&
+                      (gcodeLines.length === 0 || gcodeLines.length > resumeState.line);
+    if ((s === 'idle' || s === 'error') && hasResume && wasActive) {
+      document.getElementById('resume-line-num').textContent = Math.max(0, resumeState.line - 1);
+      resumeBtn.style.display = '';
+    } else if (s === 'running') {
+      resumeBtn.style.display = 'none';
+    }
+    const stopBtn = document.getElementById('btn-stop');
+    if (resumeStateLocked && hasResume && s !== 'running') {
+      stopBtn.textContent = '■ Stop / Cancel Resume';
+      stopBtn.title = 'Click again to cancel the resume point and start fresh';
+    } else {
+      stopBtn.textContent = '■ Stop';
+      stopBtn.title = '';
+    }
   }
 
   lastMachineState = s;
@@ -1415,10 +1415,12 @@ async function toggleLoad(idx) {
 
 // ── MACHINE CONTROLS ──
 async function machineStart() {
-  resumeState = null;
-  peakResumeState = null;
-  resumeStateLocked = false;
-  document.getElementById('btn-resume').style.display = 'none';
+  if (ENABLE_RESUME) {
+    resumeState = null;
+    peakResumeState = null;
+    resumeStateLocked = false;
+    document.getElementById('btn-resume').style.display = 'none';
+  }
   await fetch(`${API_URL}/api/start`, { method: 'PUT' });
 }
 
@@ -1432,22 +1434,23 @@ async function machinePause() {
 }
 
 async function machineStop() {
-  // Second click when resume is pending — offer to cancel it
-  if (resumeStateLocked && resumeState) {
-    if (!confirm('Cancel the resume point and clear it?\n\nOK = clear resume (fresh start)\nCancel = keep resume available')) return;
-    resumeState = null;
-    resumeStateLocked = false;
-    document.getElementById('btn-resume').style.display = 'none';
-    document.getElementById('btn-stop').textContent = '■ Stop';
-    return;
-  }
-
-  if (!confirm('Stop the machine? You can resume from this line later.')) return;
-  // Use the peak snapshot (highest line seen during run) — controller may have already
-  // sent a lower line number before the stop click
-  if (peakResumeState && peakResumeState.line > 0) {
-    resumeState = { ...peakResumeState, wasPaused: false };
-    resumeStateLocked = true;
+  if (ENABLE_RESUME) {
+    // Second click when resume is pending — offer to cancel it
+    if (resumeStateLocked && resumeState) {
+      if (!confirm('Cancel the resume point and clear it?\n\nOK = clear resume (fresh start)\nCancel = keep resume available')) return;
+      resumeState = null;
+      resumeStateLocked = false;
+      document.getElementById('btn-resume').style.display = 'none';
+      document.getElementById('btn-stop').textContent = '■ Stop';
+      return;
+    }
+    if (!confirm('Stop the machine? You can resume from this line later.')) return;
+    if (peakResumeState && peakResumeState.line > 0) {
+      resumeState = { ...peakResumeState, wasPaused: false };
+      resumeStateLocked = true;
+    }
+  } else {
+    if (!confirm('Stop the machine?')) return;
   }
   await fetch(`${API_URL}/api/stop`, { method: 'PUT' });
 }
@@ -1459,9 +1462,11 @@ async function machineEStop() {
   } else {
     // Trigger E-stop
     await fetch(`${API_URL}/api/estop`, { method: 'PUT' });
-    resumeState = null;
-    resumeStateLocked = false;
-    document.getElementById('btn-resume').style.display = 'none';
+    if (ENABLE_RESUME) {
+      resumeState = null;
+      resumeStateLocked = false;
+      document.getElementById('btn-resume').style.display = 'none';
+    }
     setMachineState('estopped');
   }
 }
