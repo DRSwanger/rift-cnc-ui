@@ -175,11 +175,12 @@
   .hz-btn:active { transform: scale(0.94); }
   .hz-btn.all { grid-column: span 1; background: var(--surface); border-color: var(--accent); color: var(--accent); }
   .hz-btn.zero-all { border-color: var(--yellow); color: var(--yellow); background: var(--surface); }
-  .state-idle    { background: #1a2a1a; color: var(--green);  border-color: var(--green); }
-  .state-running { background: #1a2a00; color: var(--yellow); border-color: var(--yellow); animation: pulse 1s infinite; }
-  .state-paused  { background: #2a1a00; color: var(--accent2); border-color: var(--accent2); }
-  .state-error   { background: #2a0000; color: var(--red);    border-color: var(--red); }
-  .state-connecting { background: #1a1a2a; color: var(--muted); border-color: var(--muted); }
+  .state-idle       { background: #1a2a1a; color: var(--green);  border-color: var(--green); }
+  .state-running    { background: #1a2a00; color: var(--yellow); border-color: var(--yellow); animation: pulse 1s infinite; }
+  .state-paused     { background: #2a1a00; color: var(--accent2); border-color: var(--accent2); }
+  .state-error      { background: #2a0000; color: var(--red);    border-color: var(--red); }
+  .state-estopped   { background: #3a0000; color: #ff4444;       border-color: #ff4444; animation: pulse 0.5s infinite; }
+  .state-connecting { background: #1a1a2a; color: var(--muted);  border-color: var(--muted); }
 
   @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.6; } }
 
@@ -1037,19 +1038,23 @@ function updateUI(data) {
   }
 
   // Load relay states — mist=water pump (idx 0), flood=vacuum (idx 1); 0=off, 1=on
-  if ('mist'  in data) setLoadState(0, data.mist  > 0);
-  if ('flood' in data) setLoadState(1, data.flood > 0);
+  // Suppress while estopped — WS state dump may carry stale on values
+  if (lastMachineState !== 'estopped') {
+    if ('mist'  in data) setLoadState(0, data.mist  > 0);
+    if ('flood' in data) setLoadState(1, data.flood > 0);
+  }
 
   // Machine state — use cycle as primary source, xx as fallback
   if ('cycle' in data || 'xx' in data || 'st' in data) {
     const cycle = state.cycle || '';
     const xx    = (state.xx || '').toUpperCase();
     let ms;
-    if      (cycle === 'run'     || xx === 'RUNNING')  ms = 'running';
-    else if (cycle === 'holding' || xx === 'HOLDING')  ms = 'paused';
-    else if (cycle === 'homing'  || xx === 'HOMING')   ms = 'running';
-    else if (cycle === 'jogging' || xx === 'JOGGING')  ms = 'idle';
-    else if (xx === 'ERROR' || xx === 'ALARM')         ms = 'error';
+    if      (cycle === 'run'     || xx === 'RUNNING')   ms = 'running';
+    else if (cycle === 'holding' || xx === 'HOLDING')   ms = 'paused';
+    else if (cycle === 'homing'  || xx === 'HOMING')    ms = 'running';
+    else if (cycle === 'jogging' || xx === 'JOGGING')   ms = 'idle';
+    else if (xx === 'ESTOPPED')                         ms = 'estopped';
+    else if (xx === 'ERROR' || xx === 'ALARM')          ms = 'error';
     else                                                ms = 'idle';
     setMachineState(ms);
   }
@@ -1119,7 +1124,7 @@ function updateUI(data) {
 
 function setMachineState(s) {
   const el = document.getElementById('machine-state');
-  const labels = { idle:'Idle', running:'Running', paused:'Paused', error:'Error', connecting:'Connecting' };
+  const labels = { idle:'Idle', running:'Running', paused:'Paused', error:'Error', estopped:'E-Stop', connecting:'Connecting' };
   el.textContent = labels[s] || s;
   el.className = `state-${s}`;
 
@@ -1137,8 +1142,8 @@ function setMachineState(s) {
   const hasResume = resumeState && resumeState.line > 0 &&
                     (gcodeLines.length === 0 || gcodeLines.length > resumeState.line);
   const wasActive = lastMachineState === 'running' || lastMachineState === 'paused';
-  // Reset relay display when program ends — controller sends M9 on stop but WS delta may not arrive
-  if ((s === 'idle' || s === 'error') && wasActive) {
+  // Reset relay display when program ends or E-stopped — WS delta may not reflect actual off state
+  if ((s === 'idle' || s === 'error' || s === 'estopped') && (wasActive || s === 'estopped')) {
     setLoadState(0, false);
     setLoadState(1, false);
   }
