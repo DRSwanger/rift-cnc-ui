@@ -1127,6 +1127,9 @@ function setMachineState(s) {
   const labels = { idle:'Idle', running:'Running', paused:'Paused', error:'Error', estopped:'E-Stop', connecting:'Connecting' };
   el.textContent = labels[s] || s;
   el.className = `state-${s}`;
+  // Sync E-Stop button label with state
+  const estopBtn = document.getElementById('btn-estop');
+  if (estopBtn) estopBtn.textContent = s === 'estopped' ? '✅ Clear E-Stop' : '⛔ E-Stop';
 
   const resumeBtn = document.getElementById('btn-resume');
   const pauseBtn  = document.getElementById('btn-pause');
@@ -1450,12 +1453,20 @@ async function machineStop() {
 }
 
 async function machineEStop() {
-  await fetch(`${API_URL}/api/stop`, { method: 'PUT' });
-  await fetch(`${API_URL}/api/reset`, { method: 'PUT' });
-  resumeState = null;
-  resumeStateLocked = false;
-  document.getElementById('btn-resume').style.display = 'none';
-  setMachineState('error');
+  if (lastMachineState === 'estopped') {
+    // Clear E-stop — reset controller back to idle
+    await fetch(`${API_URL}/api/reset`, { method: 'PUT' });
+    document.getElementById('btn-estop').textContent = '⛔ E-Stop';
+  } else {
+    // Trigger E-stop
+    await fetch(`${API_URL}/api/stop`, { method: 'PUT' });
+    await fetch(`${API_URL}/api/reset`, { method: 'PUT' });
+    resumeState = null;
+    resumeStateLocked = false;
+    document.getElementById('btn-resume').style.display = 'none';
+    setMachineState('estopped');
+    document.getElementById('btn-estop').textContent = '✅ Clear E-Stop';
+  }
 }
 
 // ── RESUME JOB ──
