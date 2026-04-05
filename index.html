@@ -1038,11 +1038,11 @@ function updateUI(data) {
     document.getElementById('stat-speed').textContent = (+spd).toFixed(0);
   }
 
-  // Load relay states — mist=water pump (idx 0), flood=vacuum (idx 1); 0=off, 1=on
+  // Load relay states — bbctrl uses {n}oa (output active): 1oa=L1, 2oa=L2
   // Suppress while estopped — WS state dump may carry stale on values
   if (lastMachineState !== 'estopped') {
-    if ('mist'  in data) setLoadState(0, data.mist  > 0);
-    if ('flood' in data) setLoadState(1, data.flood > 0);
+    if ('1oa' in data) setLoadState(0, !!data['1oa']);
+    if ('2oa' in data) setLoadState(1, !!data['2oa']);
   }
 
   // Machine state — use cycle as primary source, xx as fallback
