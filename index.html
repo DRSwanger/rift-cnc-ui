@@ -869,7 +869,7 @@
       <div class="step-btn" onclick="setStep(50)">50</div>
     </div>
 
-    <div class="section-title">Home Axes</div>
+    <div class="section-title">Home Axis</div>
     <div class="axis-grid">
       <button class="hz-btn all" onclick="homeAxis('all')">All</button>
       <button class="hz-btn" onclick="homeAxis('x')">X</button>
@@ -877,7 +877,7 @@
       <button class="hz-btn" onclick="homeAxis('z')">Z</button>
     </div>
 
-    <div class="section-title">Zero Axes</div>
+    <div class="section-title">Zero Axis</div>
     <div class="axis-grid">
       <button class="hz-btn zero-all" onclick="zeroAxis('all')">All</button>
       <button class="hz-btn" onclick="zeroAxis('x')">X</button>
@@ -1137,6 +1137,11 @@ function setMachineState(s) {
   const hasResume = resumeState && resumeState.line > 0 &&
                     (gcodeLines.length === 0 || gcodeLines.length > resumeState.line);
   const wasActive = lastMachineState === 'running' || lastMachineState === 'paused';
+  // Reset relay display when program ends — controller sends M9 on stop but WS delta may not arrive
+  if ((s === 'idle' || s === 'error') && wasActive) {
+    setLoadState(0, false);
+    setLoadState(1, false);
+  }
   if ((s === 'idle' || s === 'error') && hasResume && wasActive) {
     // Only update the line number once, when first shown — don't let jog cycles overwrite it
     document.getElementById('resume-line-num').textContent = Math.max(0, resumeState.line - 1);
@@ -1351,9 +1356,6 @@ async function homeAxis(axis) {
   const idxMap = { x: 0, y: 1, z: 2 };
   let alreadyHomed = false;
 
-  // Debug — remove after confirming field names
-  alert(`DEBUG homed fields:\n0homed=${JSON.stringify(state['0homed'])}\n1homed=${JSON.stringify(state['1homed'])}\n2homed=${JSON.stringify(state['2homed'])}\n\nAll homed keys: ${Object.keys(state).filter(k=>k.includes('homed')).map(k=>k+'='+state[k]).join(', ')}`);
-
   if (axis === 'all') {
     alreadyHomed = state['0homed'] > 0 && state['1homed'] > 0;
   } else {
@@ -1367,8 +1369,13 @@ async function homeAxis(axis) {
     if (!confirm(`${axis === 'all' ? 'All axes are' : axis.toUpperCase() + ' is'} already homed.\n\nRe-home ${label}? The machine will move to its limit switches.`)) return;
   }
 
-  const path = axis === 'all' ? '/api/home' : `/api/home/${axis}`;
-  await fetch(`${API_URL}${path}`, { method: 'PUT' });
+  if (axis === 'all') {
+    await fetch(`${API_URL}/api/home`, { method: 'PUT' });
+  } else {
+    // bbctrl individual axis home via GCode G28.2
+    const ax = axis.toUpperCase();
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(`G28.2 ${ax}0`);
+  }
 }
 
 function zeroAxis(axis) {
