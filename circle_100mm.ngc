@@ -1,0 +1,35 @@
+(100mm Circle Profile - 18mm Deep)
+(Feed: 2000mm/min  Spindle: 18000 RPM)
+(Pass depth: 4mm  Passes: 5  [4/8/12/16/18mm])
+(Tool start: X50 Y0 - edge of circle, center at X0 Y0)
+G21          (metric)
+G90          (absolute)
+G17          (XY plane)
+M3 S18000    (spindle on CW 18000 RPM)
+G0 Z5        (safe height)
+G0 X50 Y0    (rapid to start point)
+
+(Pass 1 - Z-4mm)
+G1 Z-4 F500
+G2 X50 Y0 I-50 J0 F2000
+
+(Pass 2 - Z-8mm)
+G1 Z-8 F500
+G2 X50 Y0 I-50 J0 F2000
+
+(Pass 3 - Z-12mm)
+G1 Z-12 F500
+G2 X50 Y0 I-50 J0 F2000
+
+(Pass 4 - Z-16mm)
+G1 Z-16 F500
+G2 X50 Y0 I-50 J0 F2000
+
+(Pass 5 - Z-18mm final)
+G1 Z-18 F500
+G2 X50 Y0 I-50 J0 F2000
+
+G0 Z5        (retract)
+G0 X0 Y0     (return to origin)
+M5           (spindle off)
+M30          (end of program)

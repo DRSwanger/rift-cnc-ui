@@ -1,0 +1,1938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Alien Woodshop CNC</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root {
+    --bg:       #111318;
+    --surface:  #1c1f27;
+    --surface2: #252830;
+    --border:   #2e3340;
+    --accent:   #00d4ff;
+    --accent2:  #ff6b35;
+    --green:    #4efd71;
+    --yellow:   #fbff00;
+    --red:      #ff4444;
+    --text:     #e8eaf0;
+    --muted:    #7a7f8e;
+    --font:     'Segoe UI', system-ui, sans-serif;
+    --radius:   10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    height: 100dvh;
+    display: grid;
+    grid-template-rows: auto auto 1fr auto;
+    overflow: hidden;
+  }
+
+  /* ── STATUS BAR ── */
+  #status-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 12px 24px;
+  }
+
+  .status-logo {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .status-logo-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .status-logo img {
+    height: 64px;
+    width: auto;
+    border-radius: 8px;
+  }
+  .status-logo-name {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+    line-height: 1;
+  }
+  .status-conn-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 2px;
+  }
+  .status-conn-text {
+    font-size: 14px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+
+  /* ── DRO ROW ── */
+  #dro-bar {
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 14px;
+    flex-wrap: wrap;
+  }
+
+  /* ── DRO STAT CARDS ── */
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 14px;
+    min-width: 90px;
+  }
+  .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+  .stat-value { font-size: 42px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; font-family: 'Courier New', monospace; }
+  .stat-value.x { color: #ff6b6b; }
+  .stat-value.y { color: #6bff9e; }
+  .stat-value.z { color: #6bb5ff; }
+  .stat-value.feed { color: var(--yellow); font-size: 22px; }
+  .stat-value.speed { color: var(--accent); font-size: 22px; }
+  .stat-sub { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; letter-spacing: 0.5px; font-family: 'Courier New', monospace; }
+
+  /* Load toggle buttons — same shape as .stat, clickable */
+  .load-btn {
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .load-btn:hover { filter: brightness(1.35); }
+  .load-btn:active { transform: scale(0.96); }
+  .load-val { font-size: 22px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .load-btn.on { background: rgba(78,253,113,0.12); border-color: var(--green); }
+  .load-btn.on .load-val { color: var(--green); }
+
+  #machine-state {
+    padding: 10px 24px;
+    border-radius: 30px;
+    font-size: 18px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border: 1px solid;
+    margin-left: auto;
+  }
+
+  /* ── E-STOP ── */
+  #btn-estop {
+    background: #8b0000;
+    color: #fff;
+    border: 2px solid #ff2222;
+    border-radius: var(--radius);
+    padding: 14px 32px;
+    font-size: 20px;
+    font-weight: 900;
+    cursor: pointer;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    transition: all 0.1s;
+    box-shadow: 0 0 16px rgba(255,40,40,0.4);
+    flex-shrink: 0;
+  }
+  #btn-estop:hover { background: #cc0000; box-shadow: 0 0 28px rgba(255,40,40,0.7); }
+  #btn-estop:active { transform: scale(0.96); }
+
+  /* ── HOME / ZERO BUTTONS ── */
+  .axis-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 4px;
+  }
+  .hz-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 8px 4px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.1s;
+  }
+  .hz-btn:hover { filter: brightness(1.4); }
+  .hz-btn:active { transform: scale(0.94); }
+  .hz-btn.all { grid-column: span 1; background: var(--surface); border-color: var(--accent); color: var(--accent); }
+  .hz-btn.zero-all { border-color: var(--yellow); color: var(--yellow); background: var(--surface); }
+  .state-idle    { background: #1a2a1a; color: var(--green);  border-color: var(--green); }
+  .state-running { background: #1a2a00; color: var(--yellow); border-color: var(--yellow); animation: pulse 1s infinite; }
+  .state-paused  { background: #2a1a00; color: var(--accent2); border-color: var(--accent2); }
+  .state-error   { background: #2a0000; color: var(--red);    border-color: var(--red); }
+  .state-connecting { background: #1a1a2a; color: var(--muted); border-color: var(--muted); }
+
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.6; } }
+
+  /* ── MAIN LAYOUT ── */
+  #main {
+    display: grid;
+    grid-template-columns: 280px 1fr 300px;
+    overflow: hidden;
+  }
+
+  @media (max-width: 900px) {
+    #main { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+    #sidebar, #gcode-panel { display: none; }
+    #sidebar.mobile-active, #gcode-panel.mobile-active { display: flex; }
+  }
+
+  /* ── SIDEBAR ── */
+  #sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+    overflow-y: auto;
+  }
+
+  .section-title {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 8px 4px 4px;
+  }
+
+  /* Macro buttons */
+  .macro-btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .macro-btn:hover { filter: brightness(1.3); transform: translateX(2px); }
+  .macro-btn:active { transform: scale(0.97); }
+  .macro-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* File selector */
+  #file-select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  /* Jog controls */
+  .jog-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px;
+  }
+  .jog-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 16px 4px;
+    font-size: 22px;
+    cursor: pointer;
+    transition: all 0.1s;
+    text-align: center;
+  }
+  .jog-btn:hover { background: var(--border); }
+  .jog-btn:active { background: var(--accent); color: var(--bg); transform: scale(0.94); }
+  .jog-btn.center { font-size: 10px; font-weight: 700; }
+
+  .jog-z {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .step-btns {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .step-btn {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 5px 2px;
+    font-size: 11px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.1s;
+  }
+  .step-btn.active, .step-btn:hover { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
+  /* ── CENTER - 3D VIEW ── */
+  #view-panel {
+    overflow: hidden;
+    background: #0d0f14;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #canvas-wrap {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  #three-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  #view-overlay {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .view-btn {
+    background: rgba(28,31,39,0.85);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    backdrop-filter: blur(4px);
+  }
+  .view-btn:hover { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
+  #selected-file-label {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(28,31,39,0.85);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    color: var(--muted);
+    backdrop-filter: blur(4px);
+    max-width: 70%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #selected-file-label span { color: var(--text); font-weight: 600; }
+
+  /* ── FILE LOAD PROGRESS ── */
+  #file-load-bar-wrap {
+    position: absolute;
+    bottom: 46px;
+    left: 10px;
+    right: 10px;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    display: none;
+  }
+  #file-load-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.1s;
+  }
+  #file-load-bar-wrap.indeterminate #file-load-bar {
+    width: 40%;
+    animation: indeterminate 1.2s ease-in-out infinite;
+  }
+  @keyframes indeterminate {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(300%); }
+  }
+
+  /* ── FILE ROW ── */
+  .file-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .file-row select { flex: 1; min-width: 0; }
+  .file-del-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 0 8px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 14px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  .file-del-btn:hover { border-color: #e05252; color: #e05252; }
+
+  /* ── GCODE PANEL ── */
+  #gcode-panel {
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #gcode-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  #gcode-header span { color: var(--accent); font-weight: 600; }
+
+  #gcode-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+  }
+
+  .gcode-line {
+    padding: 2px 14px;
+    display: flex;
+    gap: 10px;
+    line-height: 1.6;
+    border-left: 3px solid transparent;
+  }
+  .gcode-line:hover { background: var(--surface2); }
+  .gcode-line.current {
+    background: rgba(0, 212, 255, 0.08);
+    border-left-color: var(--accent);
+  }
+  .gcode-line.rapid { color: #ff6b6b; }
+  .gcode-line.cut { color: #6bffb5; }
+  .gcode-line.spindle { color: var(--accent); font-weight: 600; }
+  .gcode-line.coolant { color: #01d4f9; font-weight: 600; }
+  .gcode-line.comment { color: var(--muted); font-style: italic; }
+  .line-num { color: var(--muted); min-width: 32px; text-align: right; user-select: none; }
+
+  /* Speed highlights */
+  .spindle-speed { color: var(--accent); font-weight: 700; }
+  .feed-rate { color: var(--yellow); }
+
+  /* ── BOTTOM BAR ── */
+  #bottom-bar {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+  }
+
+  .ctrl-btn {
+    padding: 12px 22px;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .ctrl-btn:active { transform: scale(0.96); }
+  .btn-start { background: rgba(78,253,113,0.15); color: var(--green); border-color: var(--green); }
+  .btn-start:hover { background: var(--green); color: #000; }
+  .btn-pause { background: rgba(251,255,0,0.1); color: var(--yellow); border-color: var(--yellow); }
+  .btn-pause:hover { background: var(--yellow); color: #000; }
+  .btn-stop   { background: rgba(255,68,68,0.12); color: #ff8888; border-color: #ff6666; }
+  .btn-stop:hover  { background: #ff4444; color: #fff; }
+  .btn-resume { background: rgba(0,212,255,0.12); color: var(--accent); border-color: var(--accent); animation: pulse 1.5s infinite; }
+  .btn-resume:hover { background: var(--accent); color: #000; animation: none; }
+
+  .ctrl-btn:hover { filter: none; }
+  .ctrl-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  #progress-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  #progress-label { font-size: 11px; color: var(--muted); }
+  #progress-bar-bg {
+    background: var(--surface2);
+    border-radius: 4px;
+    height: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  #progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--green));
+    border-radius: 4px;
+    transition: width 0.5s;
+    width: 0%;
+  }
+
+  /* Mobile tab bar */
+  #mobile-tabs {
+    display: none;
+  }
+  @media (max-width: 900px) {
+    #mobile-tabs {
+      display: flex;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .mob-tab {
+      flex: 1;
+      padding: 10px;
+      text-align: center;
+      font-size: 11px;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    .mob-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  }
+
+  /* ── FILE MANAGER MODAL ── */
+  #fm-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  #fm-overlay.open { display: flex; }
+
+  #fm-modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    width: min(680px, 95vw);
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  }
+
+  #fm-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #fm-header h2 { font-size: 16px; font-weight: 700; flex: 1; }
+  #fm-close {
+    background: none; border: none; color: var(--muted);
+    font-size: 20px; cursor: pointer; line-height: 1;
+    padding: 4px 8px; border-radius: 6px;
+  }
+  #fm-close:hover { background: var(--surface2); color: var(--text); }
+
+  #fm-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 20px;
+    font-size: 12px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  .fm-crumb { cursor: pointer; color: var(--accent); }
+  .fm-crumb:hover { text-decoration: underline; }
+  .fm-crumb-sep { color: var(--border); }
+
+  #fm-toolbar {
+    display: flex;
+    gap: 8px;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  .fm-tool-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .fm-tool-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  #fm-new-folder-row {
+    display: none;
+    gap: 6px;
+    padding: 8px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #fm-new-folder-row.open { display: flex; }
+  #fm-folder-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+  }
+  #fm-folder-input:focus { outline: none; border-color: var(--accent); }
+
+  /* Upload drop zone */
+  #fm-dropzone {
+    margin: 10px 20px;
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  #fm-dropzone.drag-over { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.05); }
+  #fm-dropzone:hover { border-color: var(--muted); }
+  #fm-file-input { display: none; }
+
+  /* File list */
+  #fm-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 12px;
+  }
+
+  .fm-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    transition: background 0.1s;
+  }
+  .fm-item:hover { background: var(--surface2); }
+  .fm-icon { font-size: 16px; flex-shrink: 0; width: 22px; text-align: center; }
+  .fm-name { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fm-name.folder { color: var(--accent); cursor: pointer; font-weight: 600; }
+  .fm-name.folder:hover { text-decoration: underline; }
+  .fm-size { font-size: 11px; color: var(--muted); min-width: 60px; text-align: right; flex-shrink: 0; }
+  .fm-actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .fm-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  .fm-btn:hover { background: var(--surface2); color: var(--text); }
+  .fm-btn.load:hover { border-color: var(--green); color: var(--green); }
+  .fm-btn.del:hover  { border-color: var(--red); color: var(--red); }
+  .fm-empty { padding: 24px; text-align: center; color: var(--muted); font-size: 13px; }
+
+  /* Bulk select */
+  .fm-cb { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; flex-shrink: 0; }
+  #fm-bulk-bar {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 20px;
+    background: rgba(0,212,255,0.07);
+    border-bottom: 1px solid var(--accent);
+    font-size: 12px;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  #fm-bulk-bar.visible { display: flex; }
+  #fm-bulk-del {
+    margin-left: auto;
+    background: none;
+    border: 1px solid var(--red);
+    color: var(--red);
+    border-radius: 7px;
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #fm-bulk-del:hover { background: rgba(224,82,82,0.12); }
+
+  #fm-status {
+    padding: 8px 20px;
+    font-size: 11px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    min-height: 30px;
+    flex-shrink: 0;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* Connection dot */
+  #conn-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+  }
+  #conn-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  #conn-dot.error { background: var(--red); }
+
+</style>
+</head>
+<body>
+
+<!-- STATUS BAR -->
+<div id="status-bar">
+  <div class="status-logo">
+    <div class="status-logo-row">
+      <img src="https://images.squarespace-cdn.com/content/v1/66c5d13cb8783313c3c7da82/e4cc24b6-efc3-4317-b8c5-83db3cc25c6a/Color+logo+with+background.png" alt="AlienWoodshop">
+      <span class="status-logo-name">AlienWoodshop CNC</span>
+    </div>
+    <div class="status-conn-row">
+      <div id="conn-dot"></div>
+      <span class="status-conn-text" id="conn-text">Connecting…</span>
+      <span style="margin-left:10px;font-size:10px;opacity:0.6;cursor:pointer" onclick="changeHost()">⚙ IP</span>
+    </div>
+  </div>
+
+  <div id="machine-state" class="state-connecting">Connecting</div>
+  <button id="btn-estop" onclick="machineEStop()">⛔ E-Stop</button>
+</div>
+
+<!-- DRO BAR -->
+<div id="dro-bar">
+  <button class="stat load-btn" id="load-0" onclick="toggleLoad(0)">
+    <div class="stat-label">Water Pump</div>
+    <div class="load-val" id="load-0-val">OFF</div>
+  </button>
+  <button class="stat load-btn" id="load-1" onclick="toggleLoad(1)">
+    <div class="stat-label">Vacuum</div>
+    <div class="load-val" id="load-1-val">OFF</div>
+  </button>
+
+  <div class="stat"><div class="stat-label">X · WCS</div><div class="stat-value x" id="dro-wcs-x">—</div><div class="stat-sub">ABS <span id="dro-abs-x">—</span> &nbsp;OFF <span id="dro-off-x">—</span></div></div>
+  <div class="stat"><div class="stat-label">Y · WCS</div><div class="stat-value y" id="dro-wcs-y">—</div><div class="stat-sub">ABS <span id="dro-abs-y">—</span> &nbsp;OFF <span id="dro-off-y">—</span></div></div>
+  <div class="stat"><div class="stat-label">Z · WCS</div><div class="stat-value z" id="dro-wcs-z">—</div><div class="stat-sub">ABS <span id="dro-abs-z">—</span> &nbsp;OFF <span id="dro-off-z">—</span></div></div>
+
+  <div class="stat"><div class="stat-label">Feed mm/min</div><div class="stat-value feed" id="stat-feed-mmpm">—</div><div class="stat-sub">Override <span id="stat-feed">—</span>%</div></div>
+  <div class="stat"><div class="stat-label">Spindle RPM</div><div class="stat-value speed" id="stat-speed">—</div></div>
+</div>
+
+<!-- FILE MANAGER MODAL -->
+<div id="fm-overlay" onclick="if(event.target===this)closeFileManager()">
+  <div id="fm-modal">
+    <div id="fm-header">
+      <h2>📁 File Manager</h2>
+      <button id="fm-close" onclick="closeFileManager()">✕</button>
+    </div>
+    <div id="fm-breadcrumb"></div>
+    <div id="fm-toolbar">
+      <label class="fm-tool-btn" for="fm-file-input">⬆ Upload Files</label>
+      <input type="file" id="fm-file-input" multiple accept=".ngc,.nc,.gcode,.tap,.txt"
+             onchange="fmUploadFiles(this.files)">
+      <button class="fm-tool-btn" onclick="fmToggleNewFolder()">📁 New Folder</button>
+      <button class="fm-tool-btn" onclick="fmToggleSelectAll()" id="fm-select-all-btn">☐ Select All</button>
+    </div>
+    <div id="fm-bulk-bar">
+      <span id="fm-sel-count">0 selected</span>
+      <button id="fm-bulk-del" onclick="fmBulkDelete()">🗑 Delete Selected</button>
+    </div>
+    <div id="fm-new-folder-row">
+      <input id="fm-folder-input" type="text" placeholder="Folder name…"
+             onkeydown="if(event.key==='Enter')fmCreateFolder()">
+      <button class="fm-tool-btn" onclick="fmCreateFolder()">Create</button>
+      <button class="fm-tool-btn" onclick="fmToggleNewFolder()">Cancel</button>
+    </div>
+    <div id="fm-dropzone" onclick="document.getElementById('fm-file-input').click()">
+      ⬆ Drop .ngc / .gcode files here, or click to browse
+    </div>
+    <div id="fm-list"></div>
+    <div id="fm-status"></div>
+  </div>
+</div>
+
+<!-- MOBILE TABS -->
+<div id="mobile-tabs">
+  <div class="mob-tab active" onclick="showMobileTab('view')">3D View</div>
+  <div class="mob-tab" onclick="showMobileTab('gcode')">GCode</div>
+  <div class="mob-tab" onclick="showMobileTab('jog')">Jog</div>
+  <div class="mob-tab" onclick="showMobileTab('macros')">Macros</div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+
+    <div class="section-title">File</div>
+    <div class="file-row">
+      <select id="file-select" onchange="selectFile(this.value)">
+        <option value="">— Select file —</option>
+      </select>
+      <button class="file-del-btn" onclick="deleteSelectedFile()" title="Delete selected file">🗑</button>
+    </div>
+    <button class="hz-btn" style="width:100%;padding:10px;font-size:12px;" onclick="openFileManager()">📁 File Manager</button>
+
+    <div class="section-title">Jog XY</div>
+    <div class="jog-grid">
+      <div></div>
+      <button class="jog-btn" onclick="jog('Y', 1)">▲</button>
+      <div></div>
+      <button class="jog-btn" onclick="jog('X', -1)">◀</button>
+      <button class="jog-btn center" onclick="goToXYOrigin()" title="Move to XY work zero" style="cursor:pointer;font-size:10px;color:var(--accent);font-weight:700;">XY Origin</button>
+      <button class="jog-btn" onclick="jog('X', 1)">▶</button>
+      <div></div>
+      <button class="jog-btn" onclick="jog('Y', -1)">▼</button>
+      <div></div>
+    </div>
+
+    <div class="section-title">Jog Z</div>
+    <div class="jog-z">
+      <button class="jog-btn" onclick="jog('Z', 1)" style="width:100%">▲ Z+</button>
+      <button class="jog-btn" onclick="jog('Z', -1)" style="width:100%">▼ Z−</button>
+    </div>
+
+    <div class="section-title">Step Size (mm)</div>
+    <div class="step-btns">
+      <div class="step-btn" onclick="setStep(0.1)">0.1</div>
+      <div class="step-btn" onclick="setStep(1)">1</div>
+      <div class="step-btn active" onclick="setStep(10)">10</div>
+      <div class="step-btn" onclick="setStep(50)">50</div>
+    </div>
+
+    <div class="section-title">Home Axes</div>
+    <div class="axis-grid">
+      <button class="hz-btn all" onclick="homeAxis('all')">All</button>
+      <button class="hz-btn" onclick="homeAxis('x')">X</button>
+      <button class="hz-btn" onclick="homeAxis('y')">Y</button>
+      <button class="hz-btn" onclick="homeAxis('z')">Z</button>
+    </div>
+
+    <div class="section-title">Zero Axes</div>
+    <div class="axis-grid">
+      <button class="hz-btn zero-all" onclick="zeroAxis('all')">All</button>
+      <button class="hz-btn" onclick="zeroAxis('x')">X</button>
+      <button class="hz-btn" onclick="zeroAxis('y')">Y</button>
+      <button class="hz-btn" onclick="zeroAxis('z')">Z</button>
+    </div>
+
+    <div class="section-title">Macros</div>
+    <div id="macro-buttons"></div>
+
+  </div>
+
+  <!-- 3D VIEW -->
+  <div id="view-panel">
+
+    <div id="canvas-wrap">
+      <canvas id="three-canvas"></canvas>
+      <div id="view-overlay">
+        <button class="view-btn" onclick="resetCamera()">⟳ Reset View</button>
+        <button class="view-btn" onclick="viewTop()">Top</button>
+        <button class="view-btn" onclick="viewFront()">Front</button>
+        <button class="view-btn" onclick="viewIso()">Iso</button>
+      </div>
+      <div id="file-load-bar-wrap"><div id="file-load-bar"></div></div>
+      <div id="selected-file-label">No file selected</div>
+    </div>
+
+  </div>
+
+  <!-- GCODE PANEL -->
+  <div id="gcode-panel">
+    <div id="gcode-header">
+      GCode Viewer
+      <span id="gcode-line-info">—</span>
+    </div>
+    <div id="gcode-content">
+      <div style="padding:20px; color: var(--muted); text-align:center; font-family: var(--font);">
+        Select a file to view GCode
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- BOTTOM BAR -->
+<div id="bottom-bar">
+  <button class="ctrl-btn btn-start"  id="btn-start"  onclick="machineStart()">▶ Start</button>
+  <button class="ctrl-btn btn-pause"  id="btn-pause"  onclick="machinePause()">⏸ Pause</button>
+  <button class="ctrl-btn btn-stop"   id="btn-stop"   onclick="machineStop()">■ Stop</button>
+  <button class="ctrl-btn btn-resume" id="btn-resume" onclick="resumeJob()" style="display:none">↩ Resume Line <span id="resume-line-num">—</span></button>
+
+  <div id="progress-wrap">
+    <div id="progress-label">Idle</div>
+    <div id="progress-bar-bg"><div id="progress-bar"></div></div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ──
+// Connect to the proxy (same origin) — proxy forwards to the CNC controller
+const WS_URL  = `ws://${location.host}/websocket`;
+const API_URL = ``; // relative URLs — proxy handles routing to controller
+const SAFE_Z  = 50; // mm to retract before repositioning on resume
+let jogStep = 10;
+let state   = {};
+let ws;
+let gcodeLines = [];
+let totalLines = 0;
+let lastMachineState = 'idle';
+
+// Resume state — snapshot saved on pause or stop
+let resumeState     = null;  // { line, x, y, z, speed, feed, filename, wasPaused }
+let peakResumeState = null;  // highest-line snapshot seen during run (used on Stop)
+let resumeStateLocked = false;
+let jobStartTime = null;  // Date.now() when job started
+let scene, camera, renderer, toolpathGroup, posMarker;
+let isDragging = false, lastMouse = {x:0, y:0};
+let camTheta = 0.8, camPhi = 0.6, camRadius = 600, camTarget = new THREE.Vector3(400, 400, 0);
+
+// ── HOST CONFIG ──
+function changeHost() {
+  const h = prompt('CNC controller IP address:', localStorage.getItem('cnc_host') || DEFAULT_HOST);
+  if (h && h.trim()) {
+    localStorage.setItem('cnc_host', h.trim());
+    location.reload();
+  }
+}
+
+// ── WEBSOCKET ──
+function connect() {
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => {
+    document.getElementById('conn-dot').className = 'connected';
+    document.getElementById('conn-text').textContent = 'Connected';
+    setMachineState('idle');
+  };
+
+  ws.onclose = () => {
+    document.getElementById('conn-dot').className = 'error';
+    document.getElementById('conn-text').textContent = 'Disconnected — retrying…';
+    setMachineState('connecting');
+    setTimeout(connect, 3000);
+  };
+
+  ws.onerror = () => {
+    document.getElementById('conn-dot').className = 'error';
+    document.getElementById('conn-text').textContent = 'Connection error';
+  };
+
+  ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    Object.assign(state, data);
+    updateUI(data);
+  };
+}
+
+function send(msg) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+}
+
+// ── UI UPDATE ──
+function updateUI(data) {
+  // xp/yp/zp = machine absolute position (from home)
+  // offset_x/y/z = G54 work offset
+  // WCS (work position) = ABS - offset
+  const absX = +(state.xp || 0);
+  const absY = +(state.yp || 0);
+  const absZ = +(state.zp || 0);
+  const wcsX = absX - (+(state.offset_x || 0));
+  const wcsY = absY - (+(state.offset_y || 0));
+  const wcsZ = absZ - (+(state.offset_z || 0));
+  if ('xp' in data || 'offset_x' in data) {
+    document.getElementById('dro-wcs-x').textContent = wcsX.toFixed(3);
+    document.getElementById('dro-abs-x').textContent = absX.toFixed(3);
+    document.getElementById('dro-off-x').textContent = (+(state.offset_x || 0)).toFixed(3);
+  }
+  if ('yp' in data || 'offset_y' in data) {
+    document.getElementById('dro-wcs-y').textContent = wcsY.toFixed(3);
+    document.getElementById('dro-abs-y').textContent = absY.toFixed(3);
+    document.getElementById('dro-off-y').textContent = (+(state.offset_y || 0)).toFixed(3);
+  }
+  if ('zp' in data || 'offset_z' in data) {
+    document.getElementById('dro-wcs-z').textContent = wcsZ.toFixed(3);
+    document.getElementById('dro-abs-z').textContent = absZ.toFixed(3);
+    document.getElementById('dro-off-z').textContent = (+(state.offset_z || 0)).toFixed(3);
+  }
+  // fo = feed override in tenths of % (1000 = 100%)
+  // feed = last commanded F value — only meaningful when running, show 0 when idle
+  if ('fo' in data) document.getElementById('stat-feed').textContent = ((+data.fo) / 10).toFixed(0);
+  const isMoving = state.cycle === 'run' || state.cycle === 'jogging';
+  if ('feed' in data || 'cycle' in data)
+    document.getElementById('stat-feed-mmpm').textContent = isMoving ? (+state.feed || 0).toFixed(0) : '0';
+  if ('speed' in data || 's' in data) {
+    const spd = data.speed ?? data.s ?? 0;
+    document.getElementById('stat-speed').textContent = (+spd).toFixed(0);
+  }
+
+  // Load relay states — mist=water pump (idx 0), flood=vacuum (idx 1); 0=off, 1=on
+  if ('mist'  in data) setLoadState(0, data.mist  > 0);
+  if ('flood' in data) setLoadState(1, data.flood > 0);
+
+  // Machine state — use cycle as primary source, xx as fallback
+  if ('cycle' in data || 'xx' in data || 'st' in data) {
+    const cycle = state.cycle || '';
+    const xx    = (state.xx || '').toUpperCase();
+    let ms;
+    if      (cycle === 'run'     || xx === 'RUNNING')  ms = 'running';
+    else if (cycle === 'holding' || xx === 'HOLDING')  ms = 'paused';
+    else if (cycle === 'homing'  || xx === 'HOMING')   ms = 'running';
+    else if (cycle === 'jogging' || xx === 'JOGGING')  ms = 'idle';
+    else if (xx === 'ERROR' || xx === 'ALARM')         ms = 'error';
+    else                                                ms = 'idle';
+    setMachineState(ms);
+  }
+
+  // Progress label + ETA
+  if ('cycle' in data) {
+    const cycle = state.cycle || 'idle';
+    if (cycle === 'run' && lastMachineState !== 'running') jobStartTime = Date.now();
+    const labelMap = { run:'Running', holding:'Paused', homing:'Homing', jogging:'Jogging', idle:'Idle' };
+    document.getElementById('progress-label').textContent = labelMap[cycle] || cycle;
+  }
+
+  if ('line' in data && totalLines > 0) {
+    const pct = Math.min(100, (data.line / totalLines) * 100);
+    document.getElementById('progress-bar').style.width = pct + '%';
+    // ETA calculation
+    let etaStr = '';
+    if (jobStartTime && pct > 1) {
+      const elapsed = (Date.now() - jobStartTime) / 1000;
+      const remaining = (elapsed / pct) * (100 - pct);
+      etaStr = `  —  ${fmtTime(remaining)} remaining  (ETA ${fmtETA(remaining)})`;
+    }
+    document.getElementById('gcode-line-info').textContent = `Line ${data.line} / ${totalLines}${etaStr}`;
+    highlightLine(data.line);
+  }
+
+  // Keep a live resume snapshot while running/paused — track peak line seen
+  if (!resumeStateLocked && (lastMachineState === 'running' || lastMachineState === 'paused') && (state.line || 0) > 0) {
+    const snap = {
+      line:     state.line,
+      // Store WCS coordinates (ABS - offset) — resume GCode uses G90 (WCS absolute)
+      x:        (state.xp || 0) - (state.offset_x || 0),
+      y:        (state.yp || 0) - (state.offset_y || 0),
+      z:        (state.zp || 0) - (state.offset_z || 0),
+      speed:    state.speed ?? state.s ?? 0,
+      feed:     state.feed  || 0,
+      filename: state.selected || null,
+      wasPaused: lastMachineState === 'paused'
+    };
+    resumeState = snap;
+    // Always keep the highest-line snapshot — controller may send line resets before stop
+    if (!peakResumeState || state.line > peakResumeState.line) {
+      peakResumeState = { ...snap };
+    }
+  }
+
+  // Selected file changed
+  if ('selected' in data && data.selected !== state._lastSelected) {
+    state._lastSelected = data.selected;
+    document.getElementById('selected-file-label').innerHTML =
+      data.selected ? `File: <span>${data.selected}</span>` : 'No file selected';
+    if (data.selected) loadGCode(data.selected);
+  }
+
+  // File list — use gcode_list for folder structure, fall back to flat files
+  if ('gcode_list' in data) populateFileTree(data.gcode_list, state.files || []);
+  else if ('files' in data) populateFileTree(null, data.files);
+
+  // Macros
+  if ('macros' in data) renderMacros(data.macros);
+
+  // Update position marker in 3D
+  if (('xp' in data || 'yp' in data || 'zp' in data) && posMarker) {
+    posMarker.position.set(state.xp || 0, state.yp || 0, state.zp || 0);
+  }
+}
+
+function setMachineState(s) {
+  const el = document.getElementById('machine-state');
+  const labels = { idle:'Idle', running:'Running', paused:'Paused', error:'Error', connecting:'Connecting' };
+  el.textContent = labels[s] || s;
+  el.className = `state-${s}`;
+
+  const resumeBtn = document.getElementById('btn-resume');
+  const pauseBtn  = document.getElementById('btn-pause');
+
+  if (s === 'paused') {
+    pauseBtn.textContent = '▶ Unpause';
+    resumeBtn.style.display = 'none'; // unpause handles it directly
+  } else {
+    pauseBtn.innerHTML = '⏸ Pause';
+  }
+
+  // Show Resume after a stop — only show/update when transitioning FROM running/paused
+  const hasResume = resumeState && resumeState.line > 0 &&
+                    (gcodeLines.length === 0 || gcodeLines.length > resumeState.line);
+  const wasActive = lastMachineState === 'running' || lastMachineState === 'paused';
+  if ((s === 'idle' || s === 'error') && hasResume && wasActive) {
+    // Only update the line number once, when first shown — don't let jog cycles overwrite it
+    document.getElementById('resume-line-num').textContent = Math.max(0, resumeState.line - 1);
+    resumeBtn.style.display = '';
+  } else if (s === 'running') {
+    resumeBtn.style.display = 'none';
+  }
+  // If resume is pending, update Stop button to offer cancel on second click
+  const stopBtn = document.getElementById('btn-stop');
+  if (resumeStateLocked && hasResume && s !== 'running') {
+    stopBtn.textContent = '■ Stop / Cancel Resume';
+    stopBtn.title = 'Click again to cancel the resume point and start fresh';
+  } else {
+    stopBtn.textContent = '■ Stop';
+    stopBtn.title = '';
+  }
+
+  lastMachineState = s;
+}
+
+// ── MACROS ──
+function renderMacros(macros) {
+  const container = document.getElementById('macro-buttons');
+  container.innerHTML = '';
+  macros.forEach((m, i) => {
+    if (m.file_name === 'default') return;
+    const btn = document.createElement('button');
+    btn.className = 'macro-btn';
+    btn.innerHTML = `<div class="macro-dot" style="background:${m.color}"></div>${m.name}`;
+    btn.onclick = () => runMacro(m.file_name);
+    container.appendChild(btn);
+  });
+}
+
+async function runMacro(filename) {
+  await fetch(`${API_URL}/api/file/${encodeURIComponent(filename)}`); // GET selects file
+  await fetch(`${API_URL}/api/start`, { method: 'PUT' });
+}
+
+// ── FILE SELECT ──
+function populateFileTree(gcodeList, flatFiles) {
+  const sel = document.getElementById('file-select');
+  sel.innerHTML = '<option value="">— Select file —</option>';
+
+  // Folders from gcode_list (files are flat on controller — folder is display-only)
+  if (gcodeList && gcodeList.length) {
+    // Collect all filenames in folders for exclusion from root group
+    const inFolder = new Set();
+    gcodeList.forEach(folder => {
+      if (folder.name === 'default' || !folder.files || !folder.files.length) return;
+      folder.files.forEach(f => inFolder.add(f.file_name));
+      const grp = document.createElement('optgroup');
+      grp.label = `📁 ${folder.name}`;
+      folder.files.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f.file_name;          // just the filename — no folder prefix
+        opt.textContent = f.file_name;
+        grp.appendChild(opt);
+      });
+      sel.appendChild(grp);
+    });
+
+    // Root group: files not in any folder
+    const rootFiles = (flatFiles || [])
+      .map(f => f.replace(/^[+\-]/, ''))
+      .filter(f => f && !f.endsWith('/') && !inFolder.has(f));
+    if (rootFiles.length) {
+      const grp = document.createElement('optgroup');
+      grp.label = '📁 Root';
+      rootFiles.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f;
+        opt.textContent = f;
+        grp.appendChild(opt);
+      });
+      sel.appendChild(grp);
+    }
+  } else {
+    // No gcode_list — just flat files
+    (flatFiles || [])
+      .map(f => f.replace(/^[+\-]/, ''))
+      .filter(f => f && !f.endsWith('/'))
+      .forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f;
+        opt.textContent = f;
+        sel.appendChild(opt);
+      });
+  }
+
+  if (state.selected) sel.value = state.selected;
+}
+
+async function selectFile(filename) {
+  if (!filename) return;
+  await loadGCode(filename);   // GET selects AND downloads the file
+}
+
+// ── GCODE VIEWER ──
+function loadGCode(filename) {
+  return new Promise((resolve) => {
+    const wrap = document.getElementById('file-load-bar-wrap');
+    const bar  = document.getElementById('file-load-bar');
+    wrap.classList.add('indeterminate');
+    wrap.style.display = 'block';
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', `${API_URL}/api/file/${encodeURIComponent(filename)}`);
+    xhr.onprogress = (e) => {
+      if (e.lengthComputable) {
+        wrap.classList.remove('indeterminate');
+        bar.style.width = Math.round((e.loaded / e.total) * 100) + '%';
+      }
+    };
+    xhr.onload = () => {
+      bar.style.width = '100%';
+      gcodeLines = xhr.responseText.split('\n');
+      totalLines = gcodeLines.length;
+      renderGCode(gcodeLines);
+      parseAndRender3D(gcodeLines);
+      setTimeout(() => { wrap.style.display = 'none'; bar.style.width = '0%'; wrap.classList.add('indeterminate'); }, 400);
+      resolve();
+    };
+    xhr.onerror = () => { wrap.style.display = 'none'; resolve(); };
+    xhr.send();
+  });
+}
+
+async function deleteSelectedFile() {
+  const sel = document.getElementById('file-select');
+  const filename = sel.value;
+  if (!filename) return;
+  if (!confirm(`Delete "${filename}" from the controller?\n\nThis cannot be undone.`)) return;
+  try {
+    const res = await fetch(`${API_URL}/api/file/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+    if (res.ok) {
+      // Remove from dropdown
+      const opt = sel.querySelector(`option[value="${CSS.escape(filename)}"]`);
+      if (opt) opt.remove();
+      sel.value = '';
+      document.getElementById('selected-file-label').innerHTML = 'No file selected';
+    }
+  } catch(e) { alert('Delete failed: ' + e.message); }
+}
+
+function classifyLine(line) {
+  const l = line.trim().toUpperCase();
+  if (!l || l.startsWith('(') || l.startsWith(';')) return 'comment';
+  if (l.startsWith('G0 ') || l === 'G0' || l.startsWith('G00')) return 'rapid';
+  if (l.startsWith('G1 ') || l === 'G1' || l.startsWith('G01')) return 'cut';
+  if (/^G0?2[\s]/.test(l) || /^G0?3[\s]/.test(l)) return 'cut';
+  if (l.startsWith('S') || l.includes(' S') || l.startsWith('M3') || l.startsWith('M5')) return 'spindle';
+  if (l.startsWith('M7') || l.startsWith('M8') || l.startsWith('M9')) return 'coolant';
+  return '';
+}
+
+function highlightSpindleSpeed(line) {
+  return line.replace(/([Ss])(\d+)/g, '<span class="spindle-speed">$1$2</span>')
+             .replace(/([Ff])(\d+\.?\d*)/g, '<span class="feed-rate">$1$2</span>');
+}
+
+function renderGCode(lines) {
+  const container = document.getElementById('gcode-content');
+  container.innerHTML = lines.map((line, i) => {
+    const cls = classifyLine(line);
+    return `<div class="gcode-line ${cls}" id="gl-${i+1}">
+      <span class="line-num">${i+1}</span>
+      <span>${highlightSpindleSpeed(line || '&nbsp;')}</span>
+    </div>`;
+  }).join('');
+}
+
+function highlightLine(lineNum) {
+  const prev = document.querySelector('.gcode-line.current');
+  if (prev) prev.classList.remove('current');
+  const cur = document.getElementById(`gl-${lineNum}`);
+  if (cur) {
+    cur.classList.add('current');
+    cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+}
+
+// ── XY ORIGIN ──
+function goToXYOrigin() {
+  const wcsX = (+(state.xp || 0)) - (+(state.offset_x || 0));
+  const wcsY = (+(state.yp || 0)) - (+(state.offset_y || 0));
+  if (!confirm(`Move to XY work zero?\n\nCurrent WCS: X${wcsX.toFixed(3)}  Y${wcsY.toFixed(3)}\n\nZ will retract to safe height first.`)) return;
+  const code = `M70\nG90\nG0 Z0\nG0 X0 Y0\nM72`;
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(code);
+}
+
+// ── JOG ──
+// bbctrl accepts raw GCode strings over WebSocket
+// M70 = save modal state, G91 = relative, G0 = rapid, M72 = restore modal
+function jog(axis, dir) {
+  const dist = jogStep * dir;
+  const code = `M70\nG91\nG0 ${axis.toUpperCase()}${dist}\nM72`;
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(code);
+}
+
+function setStep(val) {
+  jogStep = val;
+  document.querySelectorAll('.step-btn').forEach(b => {
+    b.classList.toggle('active', parseFloat(b.textContent) === val);
+  });
+}
+
+
+// ── HOME / ZERO ──
+async function homeAxis(axis) {
+  // axis index map: X=0, Y=1, Z=2
+  const idxMap = { x: 0, y: 1, z: 2 };
+  let alreadyHomed = false;
+
+  // Debug — remove after confirming field names
+  alert(`DEBUG homed fields:\n0homed=${JSON.stringify(state['0homed'])}\n1homed=${JSON.stringify(state['1homed'])}\n2homed=${JSON.stringify(state['2homed'])}\n\nAll homed keys: ${Object.keys(state).filter(k=>k.includes('homed')).map(k=>k+'='+state[k]).join(', ')}`);
+
+  if (axis === 'all') {
+    alreadyHomed = state['0homed'] > 0 && state['1homed'] > 0;
+  } else {
+    const idx = idxMap[axis.toLowerCase()];
+    const val = state[`${idx}homed`];
+    alreadyHomed = val > 0 || val === true;
+  }
+
+  if (alreadyHomed) {
+    const label = axis === 'all' ? 'all axes' : `the ${axis.toUpperCase()} axis`;
+    if (!confirm(`${axis === 'all' ? 'All axes are' : axis.toUpperCase() + ' is'} already homed.\n\nRe-home ${label}? The machine will move to its limit switches.`)) return;
+  }
+
+  const path = axis === 'all' ? '/api/home' : `/api/home/${axis}`;
+  await fetch(`${API_URL}${path}`, { method: 'PUT' });
+}
+
+function zeroAxis(axis) {
+  const cmd = axis === 'all' ? 'G92 X0 Y0 Z0' : `G92 ${axis.toUpperCase()}0`;
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(cmd);
+}
+
+// ── LOAD / RELAY CONTROLS ──
+function setLoadState(idx, on) {
+  const btn = document.getElementById(`load-${idx}`);
+  const val = document.getElementById(`load-${idx}-val`);
+  if (!btn) return;
+  btn.classList.toggle('on', !!on);
+  val.textContent = on ? 'ON' : 'OFF';
+}
+
+async function toggleLoad(idx) {
+  const isOn = document.getElementById(`load-${idx}`).classList.contains('on');
+  const otherOn = document.getElementById(`load-${1 - idx}`).classList.contains('on');
+  let code;
+  if (!isOn) {
+    code = idx === 0 ? 'M7' : 'M8';  // Water Pump=M7(mist), Vacuum=M8(flood)
+  } else {
+    code = otherOn ? (idx === 0 ? 'M9\nM8' : 'M9\nM7') : 'M9';
+  }
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(code);
+  // Display updates via WebSocket mist/flood fields
+}
+
+// ── MACHINE CONTROLS ──
+async function machineStart() {
+  resumeState = null;
+  peakResumeState = null;
+  resumeStateLocked = false;
+  document.getElementById('btn-resume').style.display = 'none';
+  await fetch(`${API_URL}/api/start`, { method: 'PUT' });
+}
+
+async function machinePause() {
+  if (lastMachineState === 'paused') {
+    // Already paused — unpause
+    await fetch(`${API_URL}/api/unpause`, { method: 'PUT' });
+  } else {
+    await fetch(`${API_URL}/api/pause`, { method: 'PUT' });
+  }
+}
+
+async function machineStop() {
+  // Second click when resume is pending — offer to cancel it
+  if (resumeStateLocked && resumeState) {
+    if (!confirm('Cancel the resume point and clear it?\n\nOK = clear resume (fresh start)\nCancel = keep resume available')) return;
+    resumeState = null;
+    resumeStateLocked = false;
+    document.getElementById('btn-resume').style.display = 'none';
+    document.getElementById('btn-stop').textContent = '■ Stop';
+    return;
+  }
+
+  if (!confirm('Stop the machine? You can resume from this line later.')) return;
+  // Use the peak snapshot (highest line seen during run) — controller may have already
+  // sent a lower line number before the stop click
+  if (peakResumeState && peakResumeState.line > 0) {
+    resumeState = { ...peakResumeState, wasPaused: false };
+    resumeStateLocked = true;
+  }
+  await fetch(`${API_URL}/api/stop`, { method: 'PUT' });
+}
+
+async function machineEStop() {
+  await fetch(`${API_URL}/api/stop`, { method: 'PUT' });
+  await fetch(`${API_URL}/api/reset`, { method: 'PUT' });
+  resumeState = null;
+  resumeStateLocked = false;
+  document.getElementById('btn-resume').style.display = 'none';
+  setMachineState('error');
+}
+
+// ── RESUME JOB ──
+async function resumeJob() {
+  if (!resumeState || gcodeLines.length === 0) return;
+
+  const resumeLine = Math.max(0, resumeState.line - 1);
+  const { x, y, z, speed, feed } = resumeState;
+
+  // Scan backwards from resume line to find last active spindle speed and feed rate
+  let activeSpeed = speed || 0;
+  let activeFeed  = feed  || 0;
+  for (let i = Math.min(resumeLine, gcodeLines.length - 1); i >= 0; i--) {
+    const l = gcodeLines[i].toUpperCase();
+    if (activeSpeed === 0) {
+      const sm = l.match(/S(\d+\.?\d*)/);
+      if (sm) activeSpeed = parseFloat(sm[1]);
+    }
+    if (activeFeed === 0) {
+      const fm = l.match(/F(\d+\.?\d*)/);
+      if (fm) activeFeed = parseFloat(fm[1]);
+    }
+    if (activeSpeed > 0 && activeFeed > 0) break;
+  }
+
+  // Safe Z: retract toward Z0 (work surface = max WCS limit on this machine)
+  // Never go positive — clamp to 0
+  const safeZ = Math.min(0, z + SAFE_Z);
+
+  const preamble = [
+    `(Resume from line ${resumeLine} - AlienWoodshop CNC UI)`,
+    `G21`,
+    `G90`,
+    `G17`,
+    activeSpeed > 0 ? `M3 S${Math.round(activeSpeed)}` : `(spindle speed unknown - check before running)`,
+    `G4 P5`,
+    `G0 Z${safeZ.toFixed(3)}`,
+    `G0 X${x.toFixed(3)} Y${y.toFixed(3)}`,
+    activeFeed > 0 ? `G1 Z${z.toFixed(3)} F${Math.round(activeFeed)}` : `G1 Z${z.toFixed(3)} F500`,
+    `(resuming original program)`,
+  ];
+
+  const remaining = gcodeLines.slice(resumeLine);
+  const resumeGCode = [...preamble, ...remaining].join('\n');
+
+  try {
+    // Upload the resume file
+    const uploadRes = await fetch(`${API_URL}/api/file/_resume.ngc`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'text/plain' },
+      body: resumeGCode
+    });
+    if (!uploadRes.ok) throw new Error(`Upload failed: ${uploadRes.status}`);
+
+    // SELECT the file via GET (bbctrl requires GET to select before start)
+    await fetch(`${API_URL}/api/file/_resume.ngc`);
+
+    // Load it into viewer
+    gcodeLines = resumeGCode.split('\n');
+    totalLines = gcodeLines.length;
+    renderGCode(gcodeLines);
+    parseAndRender3D(gcodeLines);
+    document.getElementById('selected-file-label').innerHTML = `File: <span>_resume.ngc (from line ${resumeLine})</span>`;
+    // Start
+    await fetch(`${API_URL}/api/start`, { method: 'PUT' });
+    resumeState = null;
+    resumeStateLocked = false;
+    document.getElementById('btn-resume').style.display = 'none';
+  } catch(e) {
+    alert('Resume failed: ' + e.message);
+  }
+}
+
+// ── THREE.JS 3D VIEW ──
+function init3D() {
+  const canvas = document.getElementById('three-canvas');
+  const panel  = document.getElementById('canvas-wrap');
+
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setClearColor(0x0d0f14, 1);
+
+  scene = new THREE.Scene();
+
+  camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10000);
+  updateCamera();
+
+  // Grid
+  const grid = new THREE.GridHelper(1000, 20, 0x2e3340, 0x1c1f27);
+  grid.rotation.x = Math.PI / 2;
+  grid.position.set(400, 400, 0);
+  scene.add(grid);
+
+  // Axes
+  const axMat = (color) => new THREE.LineBasicMaterial({ color });
+  const axGeo = (x, y, z) => new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0,0,0), new THREE.Vector3(x,y,z)
+  ]);
+  scene.add(new THREE.Line(axGeo(50,0,0), axMat(0xff4444)));
+  scene.add(new THREE.Line(axGeo(0,50,0), axMat(0x44ff88)));
+  scene.add(new THREE.Line(axGeo(0,0,50), axMat(0x4488ff)));
+
+  // Position marker
+  const markerGeo = new THREE.SphereGeometry(5, 8, 8);
+  const markerMat = new THREE.MeshBasicMaterial({ color: 0x00d4ff });
+  posMarker = new THREE.Mesh(markerGeo, markerMat);
+  scene.add(posMarker);
+
+  // Toolpath group
+  toolpathGroup = new THREE.Group();
+  scene.add(toolpathGroup);
+
+  // Resize
+  function resize() {
+    const w = panel.clientWidth, h = panel.clientHeight;
+    renderer.setSize(w, h);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  resize();
+  new ResizeObserver(resize).observe(panel);
+
+  // Mouse orbit
+  canvas.addEventListener('mousedown', e => { isDragging = true; lastMouse = {x:e.clientX, y:e.clientY}; });
+  canvas.addEventListener('mouseup',   () => isDragging = false);
+  canvas.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    const dx = e.clientX - lastMouse.x;
+    const dy = e.clientY - lastMouse.y;
+    camTheta -= dx * 0.005;
+    camPhi = Math.max(0.05, Math.min(Math.PI/2 - 0.05, camPhi - dy * 0.005));
+    lastMouse = {x:e.clientX, y:e.clientY};
+    updateCamera();
+  });
+  canvas.addEventListener('wheel', e => {
+    camRadius = Math.max(50, Math.min(3000, camRadius + e.deltaY));
+    updateCamera();
+  });
+
+  // Touch orbit
+  let lastTouch = null;
+  canvas.addEventListener('touchstart', e => { lastTouch = e.touches[0]; });
+  canvas.addEventListener('touchmove', e => {
+    if (!lastTouch || e.touches.length !== 1) return;
+    const dx = e.touches[0].clientX - lastTouch.clientX;
+    const dy = e.touches[0].clientY - lastTouch.clientY;
+    camTheta -= dx * 0.008;
+    camPhi = Math.max(0.05, Math.min(Math.PI/2-0.05, camPhi - dy * 0.008));
+    lastTouch = e.touches[0];
+    updateCamera();
+    e.preventDefault();
+  }, { passive: false });
+
+  animate();
+}
+
+function updateCamera() {
+  if (!camera) return;
+  camera.position.set(
+    camTarget.x + camRadius * Math.sin(camPhi) * Math.cos(camTheta),
+    camTarget.y + camRadius * Math.sin(camPhi) * Math.sin(camTheta),
+    camTarget.z + camRadius * Math.cos(camPhi)
+  );
+  camera.lookAt(camTarget);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+
+function arcPoints(x0, y0, z0, x1, y1, z1, i, j, cw, segs = 48) {
+  const cx = x0 + i, cy = y0 + j;
+  let a0 = Math.atan2(y0 - cy, x0 - cx);
+  let a1 = Math.atan2(y1 - cy, x1 - cx);
+  const full = Math.abs(x1 - x0) < 0.001 && Math.abs(y1 - y0) < 0.001;
+  if (full) { a1 = a0 + (cw ? -2 * Math.PI : 2 * Math.PI); }
+  else {
+    if (cw  && a1 >= a0) a1 -= 2 * Math.PI;
+    if (!cw && a1 <= a0) a1 += 2 * Math.PI;
+  }
+  const pts = [];
+  for (let n = 0; n <= segs; n++) {
+    const t = n / segs;
+    const a = a0 + t * (a1 - a0);
+    const r = Math.sqrt(i * i + j * j);
+    pts.push(new THREE.Vector3(cx + r * Math.cos(a), cy + r * Math.sin(a), z0 + t * (z1 - z0)));
+  }
+  return pts;
+}
+
+function parseAndRender3D(lines) {
+  while (toolpathGroup.children.length) toolpathGroup.remove(toolpathGroup.children[0]);
+
+  const rapidSegs = [], cutSegs = [];
+  let x = 0, y = 0, z = 0, isRapid = false;
+
+  for (const line of lines) {
+    const l = line.trim().toUpperCase();
+    if (!l || l.startsWith('(') || l.startsWith(';')) continue;
+
+    const isG0  = /^G0?0\b/.test(l);
+    const isG1  = /^G0?1\b/.test(l);
+    const isG2  = /^G0?2\b/.test(l);
+    const isG3  = /^G0?3\b/.test(l);
+
+    if (isG0) isRapid = true;
+    else if (isG1 || isG2 || isG3) isRapid = false;
+
+    const xm = l.match(/X(-?\d+\.?\d*)/), nx = xm ? parseFloat(xm[1]) : x;
+    const ym = l.match(/Y(-?\d+\.?\d*)/), ny = ym ? parseFloat(ym[1]) : y;
+    const zm = l.match(/Z(-?\d+\.?\d*)/), nz = zm ? parseFloat(zm[1]) : z;
+
+    if (isG2 || isG3) {
+      const im = l.match(/I(-?\d+\.?\d*)/), iv = im ? parseFloat(im[1]) : 0;
+      const jm = l.match(/J(-?\d+\.?\d*)/), jv = jm ? parseFloat(jm[1]) : 0;
+      const pts = arcPoints(x, y, z, nx, ny, nz, iv, jv, isG2);
+      for (let n = 0; n < pts.length - 1; n++) {
+        cutSegs.push(pts[n], pts[n + 1]);
+      }
+    } else if (xm || ym || zm) {
+      const seg = isRapid ? rapidSegs : cutSegs;
+      seg.push(new THREE.Vector3(x, y, z), new THREE.Vector3(nx, ny, nz));
+    }
+
+    x = nx; y = ny; z = nz;
+  }
+
+  const addLine = (pts, color) => {
+    if (pts.length < 2) return;
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    toolpathGroup.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color })));
+  };
+  addLine(rapidSegs, 0xff4444);
+  addLine(cutSegs,   0x4efd71);
+
+  // Auto-fit camera
+  const all = [...rapidSegs, ...cutSegs];
+  if (all.length > 0) {
+    const box = new THREE.Box3();
+    all.forEach(p => box.expandByPoint(p));
+    box.getCenter(camTarget);
+    const size = box.getSize(new THREE.Vector3());
+    camRadius = Math.max(size.x, size.y, size.z) * 2.0;
+    camPhi = 0.5;
+    updateCamera();
+  }
+}
+
+function resetCamera() { camTheta=0.8; camPhi=0.6; updateCamera(); }
+function viewTop()     { camPhi = 0.05; updateCamera(); }
+function viewFront()   { camTheta = 0; camPhi = Math.PI/2 - 0.05; updateCamera(); }
+function viewIso()     { camTheta = 0.8; camPhi = 0.6; updateCamera(); }
+
+// ── MOBILE TABS ──
+function showMobileTab(tab) {
+  document.querySelectorAll('.mob-tab').forEach((t,i) => {
+    const tabs = ['view','gcode','jog','macros'];
+    t.classList.toggle('active', tabs[i] === tab);
+  });
+  document.getElementById('sidebar').classList.remove('mobile-active');
+  document.getElementById('gcode-panel').classList.remove('mobile-active');
+  if (tab === 'gcode') document.getElementById('gcode-panel').classList.add('mobile-active');
+  if (tab === 'jog' || tab === 'macros') document.getElementById('sidebar').classList.add('mobile-active');
+}
+
+// ── TIME HELPERS ──
+function fmtTime(secs) {
+  secs = Math.round(secs);
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+function fmtETA(secsRemaining) {
+  const d = new Date(Date.now() + secsRemaining * 1000);
+  return d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+}
+
+// ── FILE MANAGER ──
+let fmPath = [];   // current folder stack e.g. ['fixtures']
+let fmFiles = [];  // raw file list from controller
+
+function openFileManager() {
+  document.getElementById('fm-overlay').classList.add('open');
+  fmRender();
+}
+function closeFileManager() {
+  document.getElementById('fm-overlay').classList.remove('open');
+  document.getElementById('fm-new-folder-row').classList.remove('open');
+}
+
+function fmRender() {
+  // Build breadcrumb
+  const bc = document.getElementById('fm-breadcrumb');
+  bc.innerHTML = `<span class="fm-crumb" onclick="fmNav(-1)">⌂ root</span>`;
+  fmPath.forEach((seg, i) => {
+    bc.innerHTML += `<span class="fm-crumb-sep"> / </span><span class="fm-crumb" onclick="fmNav(${i})">${seg}</span>`;
+  });
+
+  // Filter files for current folder
+  const prefix = fmPath.length ? fmPath.join('/') + '/' : '';
+  const items = [];
+
+  const seen = new Set();
+  for (const f of fmFiles) {
+    if (!f.startsWith(prefix)) continue;
+    const rest = f.slice(prefix.length);
+    const parts = rest.split('/');
+    if (parts.length > 1) {
+      const folder = parts[0];
+      if (!seen.has(folder)) { seen.add(folder); items.push({ type:'folder', name:folder }); }
+    } else if (parts[0]) {
+      items.push({ type:'file', name:parts[0], fullPath: f });
+    }
+  }
+
+  const list = document.getElementById('fm-list');
+  if (items.length === 0) {
+    list.innerHTML = '<div class="fm-empty">No files here. Upload something!</div>';
+  } else {
+    list.innerHTML = items.map(item => {
+      if (item.type === 'folder') {
+        return `<div class="fm-item">
+          <span style="width:15px;flex-shrink:0"></span>
+          <span class="fm-icon">📁</span>
+          <span class="fm-name folder" onclick="fmEnter('${item.name}')">${item.name}</span>
+          <div class="fm-actions">
+            <button class="fm-btn del" onclick="fmDeleteFolder('${prefix}${item.name}')">✕</button>
+          </div>
+        </div>`;
+      } else {
+        const fp = item.fullPath;
+        const esc = fp.replace(/'/g, "\\'");
+        return `<div class="fm-item">
+          <input type="checkbox" class="fm-cb" data-path="${fp}" onchange="fmSelectionChanged()">
+          <span class="fm-icon">📄</span>
+          <span class="fm-name" title="${fp}">${item.name}</span>
+          <div class="fm-actions">
+            <button class="fm-btn load" onclick="fmLoad('${esc}')">Load</button>
+            <button class="fm-btn del"  onclick="fmDelete('${esc}')">✕</button>
+          </div>
+        </div>`;
+      }
+    }).join('');
+  }
+
+  fmSelectionChanged();
+  document.getElementById('fm-status').textContent =
+    `${items.filter(i=>i.type==='file').length} file(s), ${items.filter(i=>i.type==='folder').length} folder(s)`;
+}
+
+function fmGetChecked() {
+  return [...document.querySelectorAll('.fm-cb:checked')].map(cb => cb.dataset.path);
+}
+
+function fmSelectionChanged() {
+  const checked = fmGetChecked();
+  const bar = document.getElementById('fm-bulk-bar');
+  const allCbs = document.querySelectorAll('.fm-cb');
+  if (checked.length > 0) {
+    bar.classList.add('visible');
+    document.getElementById('fm-sel-count').textContent = `${checked.length} selected`;
+  } else {
+    bar.classList.remove('visible');
+  }
+  const btn = document.getElementById('fm-select-all-btn');
+  btn.textContent = (checked.length === allCbs.length && allCbs.length > 0) ? '☑ Deselect All' : '☐ Select All';
+}
+
+function fmToggleSelectAll() {
+  const allCbs = [...document.querySelectorAll('.fm-cb')];
+  const allChecked = allCbs.every(cb => cb.checked);
+  allCbs.forEach(cb => cb.checked = !allChecked);
+  fmSelectionChanged();
+}
+
+async function fmBulkDelete() {
+  const paths = fmGetChecked();
+  if (!paths.length) return;
+  if (!confirm(`Delete ${paths.length} file(s)?\n\n${paths.join('\n')}\n\nThis cannot be undone.`)) return;
+  fmSetStatus(`Deleting ${paths.length} file(s)…`);
+  let failed = 0;
+  for (const fp of paths) {
+    try {
+      await fetch(`${API_URL}/api/file/${encodeURIComponent(fp)}`, { method: 'DELETE' });
+      fmFiles = fmFiles.filter(f => f !== fp);
+    } catch(e) { failed++; }
+  }
+  fmSetStatus(failed ? `Done — ${failed} failed` : `Deleted ${paths.length} file(s)`);
+  document.getElementById('fm-bulk-bar').classList.remove('visible');
+  fmRender();
+}
+
+function fmNav(idx) {
+  fmPath = idx < 0 ? [] : fmPath.slice(0, idx + 1);
+  fmRender();
+}
+function fmEnter(name) { fmPath.push(name); fmRender(); }
+
+function fmSetStatus(msg) { document.getElementById('fm-status').textContent = msg; }
+
+async function fmLoad(filepath) {
+  await selectFile(filepath);
+  closeFileManager();
+}
+
+async function fmDelete(filepath) {
+  if (!confirm(`Delete "${filepath}"?`)) return;
+  try {
+    await fetch(`${API_URL}/api/file/${encodeURIComponent(filepath)}`, { method: 'DELETE' });
+    fmFiles = fmFiles.filter(f => f !== filepath);
+    fmSetStatus(`Deleted ${filepath}`);
+    fmRender();
+  } catch(e) { fmSetStatus('Delete failed: ' + e.message); }
+}
+
+async function fmDeleteFolder(folderPath) {
+  if (!confirm(`Delete folder "${folderPath}" and all its contents?`)) return;
+  const toDelete = fmFiles.filter(f => f.startsWith(folderPath + '/'));
+  for (const f of toDelete) {
+    await fetch(`${API_URL}/api/file/${encodeURIComponent(f)}`, { method: 'DELETE' });
+  }
+  fmFiles = fmFiles.filter(f => !f.startsWith(folderPath + '/'));
+  fmSetStatus(`Deleted folder ${folderPath}`);
+  fmRender();
+}
+
+function fmToggleNewFolder() {
+  document.getElementById('fm-new-folder-row').classList.toggle('open');
+  document.getElementById('fm-folder-input').focus();
+}
+
+async function fmCreateFolder() {
+  const input = document.getElementById('fm-folder-input');
+  const name = input.value.trim().replace(/[^a-zA-Z0-9_\- ]/g, '');
+  if (!name) return;
+  const prefix = fmPath.length ? fmPath.join('/') + '/' : '';
+  const placeholder = `${prefix}${name}/.keep`;
+  try {
+    await fetch(`${API_URL}/api/file/${encodeURIComponent(placeholder)}`, {
+      method: 'PUT', headers: {'Content-Type':'text/plain'}, body: ''
+    });
+    fmFiles.push(placeholder);
+    input.value = '';
+    document.getElementById('fm-new-folder-row').classList.remove('open');
+    fmSetStatus(`Created folder "${name}"`);
+    fmRender();
+  } catch(e) { fmSetStatus('Failed: ' + e.message); }
+}
+
+async function fmUploadFiles(files) {
+  const prefix = fmPath.length ? fmPath.join('/') + '/' : '';
+  let count = 0;
+  for (const file of files) {
+    fmSetStatus(`Uploading ${file.name}…`);
+    try {
+      const text = await file.text();
+      const dest = prefix + file.name;
+      await fetch(`${API_URL}/api/file/${encodeURIComponent(dest)}`, {
+        method: 'PUT', headers: {'Content-Type':'text/plain'}, body: text
+      });
+      if (!fmFiles.includes(dest)) fmFiles.push(dest);
+      count++;
+    } catch(e) { fmSetStatus(`Failed to upload ${file.name}: ` + e.message); return; }
+  }
+  fmSetStatus(`Uploaded ${count} file(s)`);
+  fmRender();
+  // Also refresh the file dropdown
+  populateFiles(fmFiles);
+}
+
+// ── INIT ──
+init3D();
+connect();
+
+// Drag-and-drop on file manager drop zone
+document.addEventListener('DOMContentLoaded', () => {
+  const dz = document.getElementById('fm-dropzone');
+  dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault();
+    dz.classList.remove('drag-over');
+    fmUploadFiles(e.dataTransfer.files);
+  });
+});
+</script>
+</body>
+</html>
