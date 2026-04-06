@@ -870,7 +870,7 @@
     <div class="section-title">Jog Z</div>
     <div class="jog-z">
       <button class="jog-btn" onclick="jog('Z', 1)" style="width:100%">▲ Z+</button>
-      <button class="jog-btn center" onclick="goToZOrigin()" title="Move to Z work zero" style="width:100%;color:var(--accent);">Z Origin</button>
+      <button class="jog-btn center" onclick="goToZOrigin()" title="Move to Z work zero" style="color:var(--accent);align-self:center;">Z Origin</button>
       <button class="jog-btn" onclick="jog('Z', -1)" style="width:100%">▼ Z−</button>
     </div>
 
@@ -1776,10 +1776,13 @@ let fmPath = [];   // current folder stack e.g. ['fixtures']
 let fmFiles = [];  // raw file list from controller
 
 function openFileManager() {
-  // Refresh file list from current WS state before opening
   populateFileTree(state.gcode_list || null, state.files || []);
   document.getElementById('fm-overlay').classList.add('open');
   fmRender();
+  // Debug: show raw state in status bar — remove once file loading is confirmed working
+  const gl = state.gcode_list;
+  const fl = state.files;
+  fmSetStatus(`[dbg] gcode_list: ${gl ? JSON.stringify(gl).slice(0,120) : 'undefined'} | files: ${fl ? JSON.stringify(fl).slice(0,80) : 'undefined'}`);
 }
 function closeFileManager() {
   document.getElementById('fm-overlay').classList.remove('open');
@@ -1977,8 +1980,6 @@ async function fmUploadFiles(files) {
   }
   fmSetStatus(`Uploaded ${count} file(s)`);
   fmRender();
-  // Also refresh the file dropdown
-  populateFiles(fmFiles);
 }
 
 // ── INIT ──
