@@ -1201,6 +1201,13 @@ function connect() {
 
   ws.onmessage = (e) => {
     const data = JSON.parse(e.data);
+    // DEBUG — log any delta that contains error-related fields
+    if ('pr' in data || 'messages' in data || 'xx' in data) {
+      console.log('[WS delta]', JSON.stringify({
+        xx: data.xx, pr: data.pr, cycle: data.cycle,
+        messages: data.messages, st: data.st
+      }));
+    }
     Object.assign(state, data);
     updateUI(data);
   };
@@ -1269,11 +1276,18 @@ function updateUI(data) {
     setMachineState(ms);
   }
 
-  // state.pr is a short pause-reason CODE from bbctrl ("switch found", "probe", "hold", etc.)
-  // It is NOT the human-readable error message. Only use it to auto-clear the banner when
-  // the controller clears pr back to empty — the actual message comes from state.messages.
-  if ('pr' in data && !data.pr) {
-    clearErrorBanner();
+  // state.pr = bbctrl pause-reason code. Some values are normal ops ("probe", "hold", "user"),
+  // others indicate real faults. Show the banner for fault codes; clear when pr goes empty.
+  if ('pr' in data) {
+    if (!data.pr) {
+      clearErrorBanner();
+    } else if (/switch|limit|fault|error|alarm|fail/i.test(data.pr)) {
+      // pr is a fault — show it; prefer a message from state.messages if one just arrived
+      const msgText = (data.messages && data.messages.length)
+        ? data.messages[data.messages.length - 1].text
+        : data.pr;
+      showErrorBanner(msgText);
+    }
   }
 
   // Progress label + ETA
