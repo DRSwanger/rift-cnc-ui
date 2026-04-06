@@ -535,6 +535,46 @@
     color: var(--muted);
   }
 
+  /* ── TOAST NOTIFICATIONS ── */
+  #toast-container {
+    position: fixed;
+    bottom: 54px; /* above bottom-bar */
+    right: 14px;
+    z-index: 3000;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 8px;
+    max-width: 380px;
+    pointer-events: none;
+  }
+  .toast {
+    background: #1e1e2e;
+    border-left: 4px solid var(--red);
+    border-top: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 10px 8px 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    pointer-events: all;
+    animation: toast-in 0.2s ease;
+    max-width: 380px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  }
+  .toast.warn { border-left-color: var(--accent2); }
+  .toast.info { border-left-color: var(--accent); }
+  .toast-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+  .toast-body { flex: 1; min-width: 0; }
+  .toast-title { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; color: var(--red); margin-bottom: 2px; }
+  .toast.warn .toast-title { color: var(--accent2); }
+  .toast.info .toast-title { color: var(--accent); }
+  .toast-msg { font-size: 11px; color: var(--text); line-height: 1.4; word-break: break-word; }
+  .toast-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0 0 0 6px; line-height: 1; flex-shrink: 0; }
+  .toast-close:hover { color: var(--text); }
+  @keyframes toast-in { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
   .gcode-line {
     padding: 2px 14px;
     display: flex;
@@ -865,12 +905,8 @@
   <button id="btn-estop" onclick="machineEStop()">⛔ E-Stop</button>
 </div>
 
-<!-- ERROR BANNER -->
-<div id="error-banner" style="display:none;background:#3a0000;border:1px solid var(--red);color:#ff6666;padding:6px 12px;font-size:13px;display:none;align-items:center;gap:10px;flex-wrap:wrap;">
-  <span style="font-weight:700;color:var(--red)">⚠ ERROR</span>
-  <span id="error-msg" style="flex:1"></span>
-  <button onclick="document.getElementById('error-banner').style.display='none'" style="background:none;border:1px solid var(--red);color:var(--red);padding:2px 8px;cursor:pointer;border-radius:3px;font-size:11px">Dismiss</button>
-</div>
+<!-- TOAST CONTAINER -->
+<div id="toast-container"></div>
 
 <!-- DRO BAR -->
 <div id="dro-bar">
@@ -1244,10 +1280,19 @@ function updateUI(data) {
     if (data.selected) loadGCode(data.selected);
   }
 
-  // Error message updates
-  if (lastMachineState === 'error' && ('pr' in data || 'messages' in data)) {
-    const msg = state.pr || (state.messages && state.messages.length ? state.messages.slice(-1)[0].text : '');
-    if (msg) showErrorBanner(msg);
+  // Error / message updates — catch soft-limit aborts and other non-ERROR-state messages
+  if ('messages' in data && data.messages && data.messages.length) {
+    const newest = data.messages[data.messages.length - 1];
+    const id = newest.id || newest.text;
+    if (!_seenMsgIds.has(id)) {
+      _seenMsgIds.add(id);
+      const level = /error|limit|alarm|fail/i.test(newest.text) ? 'error'
+                  : /warn/i.test(newest.text) ? 'warn' : 'info';
+      showToast(newest.text, level);
+    }
+  }
+  if ('pr' in data && data.pr && lastMachineState === 'error') {
+    showToast(data.pr, 'error');
   }
 
   // File list — use gcode_list for folder structure
@@ -1270,11 +1315,34 @@ function updateUI(data) {
   }
 }
 
-function showErrorBanner(msg) {
-  const banner = document.getElementById('error-banner');
-  document.getElementById('error-msg').textContent = msg;
-  banner.style.display = 'flex';
+// ── TOAST NOTIFICATIONS ──
+let _lastToastMsg = '';
+let _seenMsgIds = new Set();
+
+function showToast(msg, level = 'error') {
+  if (!msg || msg === _lastToastMsg) return;
+  _lastToastMsg = msg;
+
+  const icons = { error: '⚠', warn: '⚡', info: 'ℹ' };
+  const titles = { error: 'ERROR', warn: 'WARNING', info: 'INFO' };
+
+  const el = document.createElement('div');
+  el.className = `toast ${level}`;
+  el.innerHTML = `
+    <span class="toast-icon">${icons[level]}</span>
+    <div class="toast-body">
+      <div class="toast-title">${titles[level]}</div>
+      <div class="toast-msg">${msg.replace(/</g,'&lt;')}</div>
+    </div>
+    <button class="toast-close" onclick="this.closest('.toast').remove()">✕</button>`;
+  document.getElementById('toast-container').appendChild(el);
+
+  // Auto-dismiss after 10s
+  setTimeout(() => { if (el.parentNode) el.remove(); _lastToastMsg = ''; }, 10000);
 }
+
+// Keep alias so old call sites still work
+function showErrorBanner(msg) { showToast(msg, 'error'); }
 
 function setMachineState(s) {
   const el = document.getElementById('machine-state');
@@ -1284,8 +1352,7 @@ function setMachineState(s) {
   // Sync E-Stop button label with state
   const estopBtn = document.getElementById('btn-estop');
   if (estopBtn) estopBtn.textContent = s === 'estopped' ? '✅ Clear E-Stop' : '⛔ E-Stop';
-  // Auto-dismiss error banner when machine recovers
-  if (s === 'idle' || s === 'running') document.getElementById('error-banner').style.display = 'none';
+  // Toasts dismiss themselves — no action needed here on state change
 
   const resumeBtn = document.getElementById('btn-resume');
   const pauseBtn  = document.getElementById('btn-pause');
