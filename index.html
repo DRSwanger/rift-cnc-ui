@@ -1999,47 +1999,54 @@ function closeFileManager() {
   document.getElementById('fm-new-folder-row').classList.remove('open');
 }
 
+function fmGetFolderNames() {
+  // Named folders from gcode_list, excluding 'default' (that's just root)
+  if (!state.gcode_list) return [];
+  return state.gcode_list
+    .map(f => f.name)
+    .filter(n => n && n !== 'default');
+}
+
 function fmRender() {
   // Build breadcrumb
   const bc = document.getElementById('fm-breadcrumb');
-  bc.innerHTML = `<span class="fm-crumb" onclick="fmNav(-1)">⌂ root</span>`;
+  bc.innerHTML = `<span class="fm-crumb" onclick="fmNav(-1)">⌂ Root</span>`;
   fmPath.forEach((seg, i) => {
     bc.innerHTML += `<span class="fm-crumb-sep"> / </span><span class="fm-crumb" onclick="fmNav(${i})">${seg}</span>`;
   });
 
-  // Current folder: fmPath[0] or '' for root
   const currentFolder = fmPath.length ? fmPath[0] : null;
   const items = [];
 
   if (currentFolder === null) {
-    // Root: show virtual folders + files not in any named folder
-    const seenFolders = new Set();
+    // Root view: all named folders from gcode_list (including empty ones),
+    // then any files not assigned to a named folder
+    const knownFolders = fmGetFolderNames();
+    knownFolders.forEach(name => items.push({ type: 'folder', name }));
     for (const f of fmFiles) {
-      const folder = fmFolderMap[f] !== undefined ? fmFolderMap[f] : '';
-      if (folder) {
-        if (!seenFolders.has(folder)) { seenFolders.add(folder); items.push({ type:'folder', name:folder }); }
-      } else {
-        items.push({ type:'file', name:f });
-      }
+      if (!(fmFolderMap[f])) items.push({ type: 'file', name: f });
     }
   } else {
-    // Inside a folder: show files belonging to this folder
+    // Inside a named folder: files assigned to it
     for (const f of fmFiles) {
-      if ((fmFolderMap[f] || '') === currentFolder) items.push({ type:'file', name:f });
+      if ((fmFolderMap[f] || '') === currentFolder) items.push({ type: 'file', name: f });
     }
   }
 
   const list = document.getElementById('fm-list');
   if (items.length === 0) {
-    list.innerHTML = '<div class="fm-empty">No files here.</div>';
+    list.innerHTML = `<div class="fm-empty">${currentFolder ? 'Folder is empty — upload files here.' : 'No files on controller.'}</div>`;
   } else {
     list.innerHTML = items.map(item => {
       if (item.type === 'folder') {
         const esc = item.name.replace(/'/g, "\\'");
+        const fileCount = fmFiles.filter(f => fmFolderMap[f] === item.name).length;
         return `<div class="fm-item">
           <span style="width:15px;flex-shrink:0"></span>
           <span class="fm-icon">📁</span>
-          <span class="fm-name folder" onclick="fmEnter('${esc}')">${item.name}</span>
+          <span class="fm-name folder" onclick="fmEnter('${esc}')" style="flex:1">${item.name}</span>
+          <span style="font-size:10px;color:var(--muted);margin-right:6px">${fileCount} file${fileCount===1?'':'s'}</span>
+          <button class="fm-btn del" onclick="fmDeleteFolder('${esc}')" title="Delete folder and its files">✕</button>
         </div>`;
       } else {
         const esc = item.name.replace(/'/g, "\\'");
@@ -2141,13 +2148,20 @@ function fmRemoveFromState(filepath) {
 }
 
 async function fmDeleteFolder(folderName) {
-  if (!confirm(`Delete all files in "${folderName}"?`)) return;
   const toDelete = fmFiles.filter(f => (fmFolderMap[f] || '') === folderName);
+  const msg = toDelete.length
+    ? `Delete folder "${folderName}" and its ${toDelete.length} file(s)?`
+    : `Delete empty folder "${folderName}"?`;
+  if (!confirm(msg)) return;
   for (const f of toDelete) {
     await fetch(`${API_URL}/api/file/${encodeURIComponent(f)}`, { method: 'DELETE' });
     fmRemoveFromState(f);
   }
-  fmSetStatus(`Deleted ${toDelete.length} file(s) from ${folderName}`);
+  // Remove folder from gcode_list and save config
+  if (state.gcode_list) state.gcode_list = state.gcode_list.filter(f => f.name !== folderName);
+  try { await fmSaveConfig(); } catch(e) { /* non-fatal */ }
+  fmSetStatus(`Deleted folder "${folderName}"${toDelete.length ? ` and ${toDelete.length} file(s)` : ''}`);
+  fmNav(-1); // back to root
   fmRender();
 }
 
