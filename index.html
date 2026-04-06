@@ -77,6 +77,82 @@
   }
   #error-banner-clear:hover { border-color: var(--red); color: var(--red); }
 
+  /* Error log badge button */
+  #err-log-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 5px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: none; /* hidden until first error */
+  }
+  #err-log-btn.has-errors { display: inline-flex; align-items: center; gap: 4px; color: var(--red); border-color: #661111; }
+  #err-log-btn.has-errors:hover { border-color: var(--red); }
+
+  /* Error log modal */
+  #errlog-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 3000;
+    align-items: center;
+    justify-content: center;
+  }
+  #errlog-overlay.open { display: flex; }
+  #errlog-modal {
+    background: var(--surface);
+    border: 1px solid #661111;
+    border-radius: 8px;
+    width: 600px;
+    max-width: 95vw;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+  }
+  #errlog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--red);
+    flex-shrink: 0;
+  }
+  .errlog-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 3px 10px;
+    border-radius: 3px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .errlog-btn:hover { border-color: var(--text); color: var(--text); }
+  #errlog-list {
+    overflow-y: auto;
+    flex: 1;
+    padding: 8px 0;
+  }
+  .errlog-entry {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    gap: 4px 12px;
+    align-items: start;
+  }
+  .errlog-entry:last-child { border-bottom: none; }
+  .errlog-time { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 2px; }
+  .errlog-msg  { font-size: 12px; color: var(--text); line-height: 1.5; }
+  .errlog-pos  { font-size: 10px; color: var(--muted); grid-column: 2; font-family: 'Courier New', monospace; }
+  #errlog-empty { padding: 30px; text-align: center; color: var(--muted); font-size: 13px; }
+
   .status-logo {
     display: flex;
     flex-direction: column;
@@ -937,11 +1013,26 @@
 
     <div id="machine-state" class="state-connecting">Connecting</div>
     <button id="btn-estop" onclick="machineEStop()">⛔ E-Stop</button>
+    <button id="err-log-btn" onclick="openErrorLog()" title="Error history">⚠ <span id="err-log-count">0</span></button>
   </div>
   <div id="error-banner">
     <span id="error-banner-icon">⚠</span>
-    <span id="error-banner-msg"></span>
+    <span id="error-banner-msg" style="cursor:pointer" onclick="openErrorLog()"></span>
     <button id="error-banner-clear" onclick="clearErrorBanner()">Clear</button>
+  </div>
+</div>
+
+<!-- ERROR LOG MODAL -->
+<div id="errlog-overlay" onclick="if(event.target===this)closeErrorLog()">
+  <div id="errlog-modal">
+    <div id="errlog-header">
+      <span>⚠ Error Log</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="errlog-btn" onclick="clearErrorLog()">Clear All</button>
+        <button class="errlog-btn" onclick="closeErrorLog()">✕</button>
+      </div>
+    </div>
+    <div id="errlog-list"></div>
   </div>
 </div>
 
@@ -1379,17 +1470,59 @@ function showToast(msg, level = 'error') {
   setTimeout(() => { if (el.parentNode) el.remove(); _lastToastMsg = ''; }, 10000);
 }
 
+// ── ERROR LOG ──
+const errorLog = [];
+
 function showErrorBanner(msg) {
   if (!msg) return;
   document.getElementById('error-banner-msg').textContent = msg;
   document.getElementById('error-banner').classList.add('visible');
-  // Also fire a toast for messages that aren't already shown via the banner
   showToast(msg, 'error');
+  // Append to session error log
+  errorLog.push({
+    time: new Date(),
+    msg,
+    x: (+(state.xp||0) - (+(state.offset_x||0))).toFixed(2),
+    y: (+(state.yp||0) - (+(state.offset_y||0))).toFixed(2),
+    z: (+(state.zp||0) - (+(state.offset_z||0))).toFixed(2),
+  });
+  const btn = document.getElementById('err-log-btn');
+  document.getElementById('err-log-count').textContent = errorLog.length;
+  btn.classList.add('has-errors');
 }
 
 function clearErrorBanner() {
   document.getElementById('error-banner').classList.remove('visible');
   document.getElementById('error-banner-msg').textContent = '';
+}
+
+function openErrorLog() {
+  const list = document.getElementById('errlog-list');
+  if (!errorLog.length) {
+    list.innerHTML = '<div id="errlog-empty">No errors recorded this session.</div>';
+  } else {
+    list.innerHTML = [...errorLog].reverse().map(e => {
+      const t = e.time.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+      return `<div class="errlog-entry">
+        <span class="errlog-time">${t}</span>
+        <span class="errlog-msg">${e.msg.replace(/</g,'&lt;')}</span>
+        <span class="errlog-pos">WCS X:${e.x}  Y:${e.y}  Z:${e.z}</span>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('errlog-overlay').classList.add('open');
+}
+
+function closeErrorLog() {
+  document.getElementById('errlog-overlay').classList.remove('open');
+}
+
+function clearErrorLog() {
+  errorLog.length = 0;
+  document.getElementById('err-log-count').textContent = '0';
+  document.getElementById('err-log-btn').classList.remove('has-errors');
+  clearErrorBanner();
+  closeErrorLog();
 }
 
 // ── PR MESSAGE BUILDER ──
@@ -1470,8 +1603,13 @@ function setMachineState(s) {
   // Sync E-Stop button label with state
   const estopBtn = document.getElementById('btn-estop');
   if (estopBtn) estopBtn.textContent = s === 'estopped' ? '✅ Clear E-Stop' : '⛔ E-Stop';
-  // Clear the error banner only if the controller has also cleared state.pr
-  if ((s === 'idle' || s === 'running') && !state.pr) clearErrorBanner();
+  // If machine drops to idle/ready while pr is still set, a new fault just occurred
+  // even if pr code didn't change (consecutive same-type errors don't produce a pr delta)
+  if ((s === 'idle' || s === 'running') && state.pr) {
+    showErrorBanner(buildPrMessage(state.pr));
+  } else if ((s === 'idle' || s === 'running') && !state.pr) {
+    clearErrorBanner();
+  }
 
   const resumeBtn = document.getElementById('btn-resume');
   const pauseBtn  = document.getElementById('btn-pause');
