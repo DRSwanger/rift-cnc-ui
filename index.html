@@ -1960,19 +1960,40 @@ async function fmCreateFolder() {
 }
 
 async function fmUploadFiles(files) {
-  const prefix = fmPath.length ? fmPath.join('/') + '/' : '';
+  const targetFolder = fmPath.length ? fmPath[0] : null; // current display folder (or null = root)
   let count = 0;
   for (const file of files) {
     fmSetStatus(`Uploading ${file.name}…`);
     try {
       const text = await file.text();
-      const dest = prefix + file.name;
-      await fetch(`${API_URL}/api/file/${encodeURIComponent(dest)}`, {
+      // Files always upload to root — folder assignment is stored in config
+      await fetch(`${API_URL}/api/file/${encodeURIComponent(file.name)}`, {
         method: 'PUT', headers: {'Content-Type':'text/plain'}, body: text
       });
-      if (!fmFiles.includes(dest)) fmFiles.push(dest);
+      if (!fmFiles.includes(file.name)) fmFiles.push(file.name);
+      // Assign to current display folder in gcode_list config
+      fmFolderMap[file.name] = targetFolder || '';
+      if (state.files) state.files.push('-' + file.name);
+      if (state.gcode_list && targetFolder) {
+        const folder = state.gcode_list.find(f => f.name === targetFolder);
+        if (folder) { if (!folder.files.find(f => f.file_name === file.name)) folder.files.push({ file_name: file.name }); }
+        else state.gcode_list.push({ name: targetFolder, type: 'folder', files: [{ file_name: file.name }] });
+      } else if (state.gcode_list) {
+        const def = state.gcode_list.find(f => f.name === 'default');
+        if (def && !def.files.find(f => f.file_name === file.name)) def.files.push({ file_name: file.name });
+      }
       count++;
     } catch(e) { fmSetStatus(`Failed to upload ${file.name}: ` + e.message); return; }
+  }
+  // Save updated gcode_list to controller config so folder assignments persist
+  if (count > 0 && state.gcode_list) {
+    try {
+      const cfg = await fetch(`${API_URL}/api/config/load`).then(r => r.json()).catch(() => null);
+      if (cfg) {
+        cfg.gcode_list = state.gcode_list;
+        await fetch(`${API_URL}/api/config/save`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(cfg) });
+      }
+    } catch(e) { /* non-fatal — file is uploaded, folder assignment may not persist */ }
   }
   fmSetStatus(`Uploaded ${count} file(s)`);
   fmRender();
