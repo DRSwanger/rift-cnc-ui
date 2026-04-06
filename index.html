@@ -1234,25 +1234,24 @@ async function runMacro(filename) {
 let fmFolderMap = {};  // basename → display folder name ('' = root)
 
 function populateFileTree(gcodeList, flatFiles) {
-  // Flat basenames from state.files (authoritative list of what exists on controller)
-  const raw = (flatFiles || []).map(f => f.replace(/^[+\-]/, '')).filter(f => f && !f.endsWith('/'));
-
   fmFolderMap = {};
+  const configFiles = new Set();
+
   if (gcodeList && gcodeList.length) {
+    // Build from config — only show files tracked in gcode_list
+    // Files on disk but not in config (orphaned/stuck) are intentionally excluded
     gcodeList.forEach(folder => {
       if (!folder.files) return;
       const folderName = (folder.name && folder.name !== 'default') ? folder.name : '';
-      folder.files.forEach(f => { fmFolderMap[f.file_name] = folderName; });
+      folder.files.forEach(f => {
+        fmFolderMap[f.file_name] = folderName;
+        configFiles.add(f.file_name);
+      });
     });
-    // Include any gcode_list files not in state.files (edge case)
-    const extra = [];
-    gcodeList.forEach(folder => {
-      if (!folder.files) return;
-      folder.files.forEach(f => { if (!raw.includes(f.file_name)) extra.push(f.file_name); });
-    });
-    fmFiles = [...new Set([...raw, ...extra])];
+    fmFiles = [...configFiles];
   } else {
-    fmFiles = raw;
+    // No gcode_list — fall back to flat files from WS
+    fmFiles = (flatFiles || []).map(f => f.replace(/^[+\-]/, '')).filter(f => f && !f.endsWith('/'));
   }
 }
 
