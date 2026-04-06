@@ -1201,13 +1201,8 @@ function connect() {
 
   ws.onmessage = (e) => {
     const data = JSON.parse(e.data);
-    // DEBUG — log any delta that contains error-related fields
-    if ('pr' in data || 'messages' in data || 'xx' in data) {
-      console.log('[WS delta]', JSON.stringify({
-        xx: data.xx, pr: data.pr, cycle: data.cycle,
-        messages: data.messages, st: data.st
-      }));
-    }
+    // DEBUG — log all deltas so we can see exactly what fields arrive during errors
+    console.log('[WS]', JSON.stringify(data));
     Object.assign(state, data);
     updateUI(data);
   };
@@ -1276,17 +1271,22 @@ function updateUI(data) {
     setMachineState(ms);
   }
 
-  // state.pr = bbctrl pause-reason code. Some values are normal ops ("probe", "hold", "user"),
-  // others indicate real faults. Show the banner for fault codes; clear when pr goes empty.
+  // state.pr = bbctrl pause/problem reason. Any non-empty value means the controller
+  // has something to say. Show the banner for all of them; use state.messages for the
+  // full text (pr is just the short code). state.messages is the accumulated full state,
+  // not just the delta, so it's available even if messages wasn't in this particular delta.
   if ('pr' in data) {
     if (!data.pr) {
       clearErrorBanner();
-    } else if (/switch|limit|fault|error|alarm|fail/i.test(data.pr)) {
-      // pr is a fault — show it; prefer a message from state.messages if one just arrived
-      const msgText = (data.messages && data.messages.length)
-        ? data.messages[data.messages.length - 1].text
-        : data.pr;
-      showErrorBanner(msgText);
+    } else {
+      // Find the most recent message text from accumulated state (not just this delta)
+      let msgText = data.pr;
+      if (state.messages && state.messages.length) {
+        msgText = state.messages[state.messages.length - 1].text || data.pr;
+      }
+      // Label with the pr code so context is clear (e.g. "switch found: Z axis hit limit")
+      const display = (msgText !== data.pr) ? `[${data.pr}] ${msgText}` : msgText;
+      showErrorBanner(display);
     }
   }
 
