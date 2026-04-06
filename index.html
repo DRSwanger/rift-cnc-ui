@@ -39,10 +39,43 @@
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+  }
+  #status-bar-main {
+    display: flex;
     align-items: center;
     gap: 20px;
     padding: 12px 24px;
   }
+  /* Error banner — zero height when hidden, slides open when active */
+  #error-banner {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 16px;
+    background: #2d0000;
+    border-top: 1px solid #661111;
+    border-bottom: 1px solid #661111;
+    font-size: 12px;
+    color: #ff8080;
+  }
+  #error-banner.visible { display: flex; }
+  #error-banner-icon { font-size: 14px; flex-shrink: 0; }
+  #error-banner-msg { flex: 1; line-height: 1.4; }
+  #error-banner-clear {
+    background: none;
+    border: 1px solid #661111;
+    color: #ff8080;
+    padding: 2px 10px;
+    border-radius: 3px;
+    font-size: 11px;
+    cursor: pointer;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  #error-banner-clear:hover { border-color: var(--red); color: var(--red); }
 
   .status-logo {
     display: flex;
@@ -889,20 +922,27 @@
 
 <!-- STATUS BAR -->
 <div id="status-bar">
-  <div class="status-logo">
-    <div class="status-logo-row">
-      <img src="https://images.squarespace-cdn.com/content/v1/66c5d13cb8783313c3c7da82/e4cc24b6-efc3-4317-b8c5-83db3cc25c6a/Color+logo+with+background.png" alt="AlienWoodshop">
-      <span class="status-logo-name">AlienWoodshop CNC</span>
+  <div id="status-bar-main">
+    <div class="status-logo">
+      <div class="status-logo-row">
+        <img src="https://images.squarespace-cdn.com/content/v1/66c5d13cb8783313c3c7da82/e4cc24b6-efc3-4317-b8c5-83db3cc25c6a/Color+logo+with+background.png" alt="AlienWoodshop">
+        <span class="status-logo-name">AlienWoodshop CNC</span>
+      </div>
+      <div class="status-conn-row">
+        <div id="conn-dot"></div>
+        <span class="status-conn-text" id="conn-text">Connecting…</span>
+        <span style="margin-left:10px;font-size:10px;opacity:0.6;cursor:pointer" onclick="changeHost()">⚙ IP</span>
+      </div>
     </div>
-    <div class="status-conn-row">
-      <div id="conn-dot"></div>
-      <span class="status-conn-text" id="conn-text">Connecting…</span>
-      <span style="margin-left:10px;font-size:10px;opacity:0.6;cursor:pointer" onclick="changeHost()">⚙ IP</span>
-    </div>
-  </div>
 
-  <div id="machine-state" class="state-connecting">Connecting</div>
-  <button id="btn-estop" onclick="machineEStop()">⛔ E-Stop</button>
+    <div id="machine-state" class="state-connecting">Connecting</div>
+    <button id="btn-estop" onclick="machineEStop()">⛔ E-Stop</button>
+  </div>
+  <div id="error-banner">
+    <span id="error-banner-icon">⚠</span>
+    <span id="error-banner-msg"></span>
+    <button id="error-banner-clear" onclick="clearErrorBanner()">Clear</button>
+  </div>
 </div>
 
 <!-- TOAST CONTAINER -->
@@ -1341,8 +1381,18 @@ function showToast(msg, level = 'error') {
   setTimeout(() => { if (el.parentNode) el.remove(); _lastToastMsg = ''; }, 10000);
 }
 
-// Keep alias so old call sites still work
-function showErrorBanner(msg) { showToast(msg, 'error'); }
+function showErrorBanner(msg) {
+  if (!msg) return;
+  document.getElementById('error-banner-msg').textContent = msg;
+  document.getElementById('error-banner').classList.add('visible');
+  // Also fire a toast for messages that aren't already shown via the banner
+  showToast(msg, 'error');
+}
+
+function clearErrorBanner() {
+  document.getElementById('error-banner').classList.remove('visible');
+  document.getElementById('error-banner-msg').textContent = '';
+}
 
 function setMachineState(s) {
   const el = document.getElementById('machine-state');
@@ -1352,7 +1402,8 @@ function setMachineState(s) {
   // Sync E-Stop button label with state
   const estopBtn = document.getElementById('btn-estop');
   if (estopBtn) estopBtn.textContent = s === 'estopped' ? '✅ Clear E-Stop' : '⛔ E-Stop';
-  // Toasts dismiss themselves — no action needed here on state change
+  // Clear the error banner when machine recovers cleanly
+  if (s === 'idle' || s === 'running') clearErrorBanner();
 
   const resumeBtn = document.getElementById('btn-resume');
   const pauseBtn  = document.getElementById('btn-pause');
