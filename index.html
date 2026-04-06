@@ -1272,16 +1272,13 @@ function updateUI(data) {
     setMachineState(ms);
   }
 
-  // WS does send 'pr' (pause reason) delta when a fault occurs — use it to trigger
-  // an immediate log fetch so the banner shows without waiting for the 1s poll tick.
+  // pr = pause/fault reason. Build a useful message from WS state immediately —
+  // no log fetch needed, so display is instant.
   if ('pr' in data) {
     if (!data.pr) {
       clearErrorBanner();
     } else {
-      // Fault signalled — fetch log immediately, then once more after 300ms in case
-      // the log write lags slightly behind the WS state update.
-      pollLog();
-      setTimeout(pollLog, 300);
+      showErrorBanner(buildPrMessage(data.pr));
     }
   }
 
@@ -1395,44 +1392,74 @@ function clearErrorBanner() {
   document.getElementById('error-banner-msg').textContent = '';
 }
 
+// ── PR MESSAGE BUILDER ──
+// Constructs a human-readable error message from the WS pr code + live state.
+// This is instant — no network fetch required.
+function buildPrMessage(pr) {
+  const zAbs = (+(state.zp || 0)).toFixed(1);
+  const xAbs = (+(state.xp || 0)).toFixed(1);
+  const yAbs = (+(state.yp || 0)).toFixed(1);
+  const zWcs = ((+(state.zp || 0)) - (+(state.offset_z || 0))).toFixed(1);
+  const zMin = state['3tn'] !== undefined ? (+state['3tn']).toFixed(0) : '?';
+  const zMax = state['3tm'] !== undefined ? (+state['3tm']).toFixed(0) : '?';
+
+  const p = (pr || '').toLowerCase();
+  if (/switch/.test(p)) {
+    // Could be soft limit or physical switch — include position for context
+    return `Limit/switch fault — Z:${zWcs}mm WCS (ABS ${zAbs})  ·  soft limits Z:${zMin}…${zMax}mm`;
+  }
+  if (/probe/.test(p))       return `Probe triggered at Z:${zAbs}mm`;
+  if (/hold/.test(p))        return `Machine hold`;
+  if (/user/.test(p))        return `Stopped by user`;
+  if (/program/.test(p))     return `Programmed stop (M0/M1/M2)`;
+  return `Controller fault: ${pr}  (Z:${zAbs}mm)`;
+}
+
 // ── LOG POLLER ──
-// bbctrl errors go to /api/log as "E:Source:message" lines — never over WebSocket.
-// Poll every 3s, track cursor so we only process new content.
-let _logCursor  = -1;   // char offset into log we've already processed (-1 = not yet init)
-let _logTimer   = null;
+// The log grows large quickly and the Pi serves it slowly, so we poll very
+// infrequently — just to catch any errors that don't arrive via WS pr.
+// Primary error display is WS pr (instant). This is a fallback only.
+let _logCursor = -1;
+let _logTimer  = null;
 
 function startLogPoll() {
   stopLogPoll();
-  _logCursor = -1;  // reset so first fetch just sets the cursor without showing old errors
-  pollLog();        // immediate call to initialize cursor
-  _logTimer = setInterval(pollLog, 1000);
+  _logCursor = -1;
+  pollLog();                               // init cursor on connect
+  _logTimer = setInterval(pollLog, 60000); // fallback check every 60s
 }
 
 function stopLogPoll() {
   if (_logTimer) { clearInterval(_logTimer); _logTimer = null; }
 }
 
+let _logPolling = false;
+
 async function pollLog() {
+  if (_logPolling) return;
+  _logPolling = true;
   try {
-    const text = await fetch(`${API_URL}/api/log`).then(r => r.text());
+    const res   = await fetch(`${API_URL}/api/log-since?pos=${Math.max(0, _logCursor)}`);
+    const total = parseInt(res.headers.get('X-Log-Total') || '0');
+    const text  = await res.text();
+
     if (_logCursor < 0) {
-      // First call — set cursor to end of current log, don't surface old errors
-      _logCursor = text.length;
+      _logCursor = total || text.length;
+      _logPolling = false;
       return;
     }
-    if (text.length < _logCursor) _logCursor = 0; // log was rotated/cleared
-    if (text.length === _logCursor) return;        // nothing new
-    const newContent = text.slice(_logCursor);
-    _logCursor = text.length;
-    // Only surface E:Planner: lines — real motion/execution errors (soft limits, etc.)
-    // E:Preplanner: lines are pre-run file validation (e.g. "doesn't appear to be GCode")
-    // and fire constantly on stuck/macro files; not actionable during a run.
-    const errLine = newContent.split('\n')
+
+    if (total && total < _logCursor) _logCursor = 0;
+    _logCursor = total || (_logCursor + text.length);
+
+    // Only surface E:Planner lines not already handled by pr (rare non-pr errors)
+    const errLine = text.split('\n')
       .filter(l => /^E:Planner:/.test(l))
       .map(l => l.replace(/^E:Planner:/, '').trim())
       .find(l => l && !/^While executing|^\s+At:|^Caused by/.test(l));
     if (errLine) showErrorBanner(errLine);
-  } catch(e) { /* controller may be temporarily unreachable */ }
+  } catch(e) { /* ignore */ }
+  _logPolling = false;
 }
 
 function setMachineState(s) {

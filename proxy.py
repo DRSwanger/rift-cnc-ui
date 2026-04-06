@@ -54,6 +54,26 @@ async def handle(request):
                 await asyncio.gather(to_server(), to_client())
         return ws_client
 
+    # ── Log-tail helper ──
+    # /api/log-since?pos=N  →  returns only bytes from position N onward.
+    # Keeps the browser fetch tiny (a few hundred bytes) instead of the full 1MB+ log.
+    # The proxy does the heavy fetch from the controller; the browser gets only new content.
+    if path == '/api/log-since':
+        pos = int(request.query.get('pos', 0))
+        async with ClientSession() as session:
+            async with session.get(f'http://{CNC_HOST}/api/log') as resp:
+                content = await resp.read()
+        tail = content[pos:]
+        return web.Response(
+            body=tail,
+            status=200,
+            headers={
+                'Content-Type': 'text/plain',
+                'X-Log-Total': str(len(content)),
+                'Access-Control-Allow-Origin': '*',
+            }
+        )
+
     # ── API / upload proxy ──
     if path.startswith('/api/') or path.startswith('/upload/'):
         target = f'http://{CNC_HOST}{path}'
