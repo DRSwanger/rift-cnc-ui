@@ -1185,12 +1185,14 @@ function connect() {
     document.getElementById('conn-dot').className = 'connected';
     document.getElementById('conn-text').textContent = 'Connected';
     setMachineState('idle');
+    startLogPoll();
   };
 
   ws.onclose = () => {
     document.getElementById('conn-dot').className = 'error';
     document.getElementById('conn-text').textContent = 'Disconnected — retrying…';
     setMachineState('connecting');
+    stopLogPoll();
     setTimeout(connect, 3000);
   };
 
@@ -1259,34 +1261,19 @@ function updateUI(data) {
     const cycle = state.cycle || '';
     const xx    = (state.xx || '').toUpperCase();
     let ms;
-    if      (cycle === 'run'     || xx === 'RUNNING')   ms = 'running';
-    else if (cycle === 'holding' || xx === 'HOLDING')   ms = 'paused';
-    else if (cycle === 'homing'  || xx === 'HOMING')    ms = 'running';
-    else if (cycle === 'jogging' || xx === 'JOGGING')   ms = 'idle';
-    else if (xx === 'ESTOPPED')                         ms = 'estopped';
+    if      (cycle === 'run'     || xx === 'RUNNING')            ms = 'running';
+    else if (cycle === 'holding' || xx === 'HOLDING')            ms = 'paused';
+    else if (cycle === 'homing'  || xx === 'HOMING')             ms = 'running';
+    else if (cycle === 'jogging' || xx === 'JOGGING')            ms = 'idle';
+    else if (xx === 'ESTOPPED')                                  ms = 'estopped';
     else if (xx === 'ERROR' || xx === 'ALARM' || xx === 'FAULT') ms = 'error';
-    else                                                ms = 'idle';
+    else if (xx === 'READY'  || xx === 'IDLE' || cycle === 'idle') ms = 'idle';
+    else                                                         ms = 'idle';
     setMachineState(ms);
   }
 
-  // state.pr = bbctrl pause/problem reason. Any non-empty value means the controller
-  // has something to say. Show the banner for all of them; use state.messages for the
-  // full text (pr is just the short code). state.messages is the accumulated full state,
-  // not just the delta, so it's available even if messages wasn't in this particular delta.
-  if ('pr' in data) {
-    if (!data.pr) {
-      clearErrorBanner();
-    } else {
-      // Find the most recent message text from accumulated state (not just this delta)
-      let msgText = data.pr;
-      if (state.messages && state.messages.length) {
-        msgText = state.messages[state.messages.length - 1].text || data.pr;
-      }
-      // Label with the pr code so context is clear (e.g. "switch found: Z axis hit limit")
-      const display = (msgText !== data.pr) ? `[${data.pr}] ${msgText}` : msgText;
-      showErrorBanner(display);
-    }
-  }
+  // Error messages do NOT come through WebSocket — they go to /api/log as E: lines.
+  // The log poller (startLogPoll) handles banner display. Nothing to do here.
 
   // Progress label + ETA
   if ('cycle' in data) {
@@ -1338,21 +1325,6 @@ function updateUI(data) {
     if (data.selected) loadGCode(data.selected);
   }
 
-  // Message log — show new messages as toasts; error-level ones also go to the banner.
-  // Use time-based dedup (30s cooldown) so the same error can fire again if re-triggered.
-  if ('messages' in data && data.messages && data.messages.length) {
-    const newest = data.messages[data.messages.length - 1];
-    const key = newest.id ?? newest.text;
-    const now = Date.now();
-    const lastSeen = _seenMsgIds.get(key) || 0;
-    if (now - lastSeen > 30000) {
-      _seenMsgIds.set(key, now);
-      const level = /error|limit|alarm|fail|fault/i.test(newest.text) ? 'error'
-                  : /warn/i.test(newest.text) ? 'warn' : 'info';
-      showToast(newest.text, level);
-      if (level === 'error') showErrorBanner(newest.text);
-    }
-  }
 
   // File list — use gcode_list for folder structure
   // NOTE: do NOT call populateFileTree from raw 'files' delta — that bypasses config-based
@@ -1411,7 +1383,44 @@ function showErrorBanner(msg) {
 function clearErrorBanner() {
   document.getElementById('error-banner').classList.remove('visible');
   document.getElementById('error-banner-msg').textContent = '';
-  _seenMsgIds.clear(); // reset cooldowns so next occurrence always shows
+}
+
+// ── LOG POLLER ──
+// bbctrl errors go to /api/log as "E:Source:message" lines — never over WebSocket.
+// Poll every 3s, track cursor so we only process new content.
+let _logCursor  = -1;   // char offset into log we've already processed (-1 = not yet init)
+let _logTimer   = null;
+
+function startLogPoll() {
+  stopLogPoll();
+  _logCursor = -1;  // reset so first fetch just sets the cursor without showing old errors
+  pollLog();        // immediate call to initialize cursor
+  _logTimer = setInterval(pollLog, 3000);
+}
+
+function stopLogPoll() {
+  if (_logTimer) { clearInterval(_logTimer); _logTimer = null; }
+}
+
+async function pollLog() {
+  try {
+    const text = await fetch(`${API_URL}/api/log`).then(r => r.text());
+    if (_logCursor < 0) {
+      // First call — set cursor to end of current log, don't surface old errors
+      _logCursor = text.length;
+      return;
+    }
+    if (text.length < _logCursor) _logCursor = 0; // log was rotated/cleared
+    if (text.length === _logCursor) return;        // nothing new
+    const newContent = text.slice(_logCursor);
+    _logCursor = text.length;
+    // Find the first primary error line — skip the "While executing / At: / Caused by" follow-up lines
+    const errLine = newContent.split('\n')
+      .filter(l => /^E:[^:]+:/.test(l))
+      .map(l => l.replace(/^E:[^:]+:/, '').trim())
+      .find(l => l && !/^While executing|^\s+At:|^Caused by/.test(l));
+    if (errLine) showErrorBanner(errLine);
+  } catch(e) { /* controller may be temporarily unreachable */ }
 }
 
 function setMachineState(s) {
