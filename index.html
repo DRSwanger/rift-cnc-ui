@@ -1272,8 +1272,18 @@ function updateUI(data) {
     setMachineState(ms);
   }
 
-  // Error messages do NOT come through WebSocket — they go to /api/log as E: lines.
-  // The log poller (startLogPoll) handles banner display. Nothing to do here.
+  // WS does send 'pr' (pause reason) delta when a fault occurs — use it to trigger
+  // an immediate log fetch so the banner shows without waiting for the 1s poll tick.
+  if ('pr' in data) {
+    if (!data.pr) {
+      clearErrorBanner();
+    } else {
+      // Fault signalled — fetch log immediately, then once more after 300ms in case
+      // the log write lags slightly behind the WS state update.
+      pollLog();
+      setTimeout(pollLog, 300);
+    }
+  }
 
   // Progress label + ETA
   if ('cycle' in data) {
@@ -1414,10 +1424,12 @@ async function pollLog() {
     if (text.length === _logCursor) return;        // nothing new
     const newContent = text.slice(_logCursor);
     _logCursor = text.length;
-    // Find the first primary error line — skip the "While executing / At: / Caused by" follow-up lines
+    // Only surface E:Planner: lines — real motion/execution errors (soft limits, etc.)
+    // E:Preplanner: lines are pre-run file validation (e.g. "doesn't appear to be GCode")
+    // and fire constantly on stuck/macro files; not actionable during a run.
     const errLine = newContent.split('\n')
-      .filter(l => /^E:[^:]+:/.test(l))
-      .map(l => l.replace(/^E:[^:]+:/, '').trim())
+      .filter(l => /^E:Planner:/.test(l))
+      .map(l => l.replace(/^E:Planner:/, '').trim())
       .find(l => l && !/^While executing|^\s+At:|^Caused by/.test(l));
     if (errLine) showErrorBanner(errLine);
   } catch(e) { /* controller may be temporarily unreachable */ }
