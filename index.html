@@ -1201,8 +1201,6 @@ function connect() {
 
   ws.onmessage = (e) => {
     const data = JSON.parse(e.data);
-    // DEBUG — log all deltas so we can see exactly what fields arrive during errors
-    console.log('[WS]', JSON.stringify(data));
     Object.assign(state, data);
     updateUI(data);
   };
