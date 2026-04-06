@@ -1269,16 +1269,11 @@ function updateUI(data) {
     setMachineState(ms);
   }
 
-  // Error banner — check state.pr on every update, not just on ERROR state transitions.
-  // bbctrl sets pr (pause/problem reason) for soft limits, faults, etc. even when xx
-  // doesn't reach 'ERROR' before recovering. Show banner whenever pr is non-empty.
-  if ('pr' in data) {
-    if (data.pr) {
-      showErrorBanner(data.pr);
-    } else {
-      // pr cleared by controller — auto-dismiss only if user hasn't manually shown one
-      clearErrorBanner();
-    }
+  // state.pr is a short pause-reason CODE from bbctrl ("switch found", "probe", "hold", etc.)
+  // It is NOT the human-readable error message. Only use it to auto-clear the banner when
+  // the controller clears pr back to empty — the actual message comes from state.messages.
+  if ('pr' in data && !data.pr) {
+    clearErrorBanner();
   }
 
   // Progress label + ETA
@@ -1331,12 +1326,15 @@ function updateUI(data) {
     if (data.selected) loadGCode(data.selected);
   }
 
-  // Message log — show new messages as toasts; error-level ones also go to the banner
+  // Message log — show new messages as toasts; error-level ones also go to the banner.
+  // Use time-based dedup (30s cooldown) so the same error can fire again if re-triggered.
   if ('messages' in data && data.messages && data.messages.length) {
     const newest = data.messages[data.messages.length - 1];
-    const id = newest.id ?? newest.text;
-    if (!_seenMsgIds.has(id)) {
-      _seenMsgIds.add(id);
+    const key = newest.id ?? newest.text;
+    const now = Date.now();
+    const lastSeen = _seenMsgIds.get(key) || 0;
+    if (now - lastSeen > 30000) {
+      _seenMsgIds.set(key, now);
       const level = /error|limit|alarm|fail|fault/i.test(newest.text) ? 'error'
                   : /warn/i.test(newest.text) ? 'warn' : 'info';
       showToast(newest.text, level);
@@ -1366,7 +1364,7 @@ function updateUI(data) {
 
 // ── TOAST NOTIFICATIONS ──
 let _lastToastMsg = '';
-let _seenMsgIds = new Set();
+let _seenMsgIds = new Map(); // key → timestamp of last display (30s cooldown)
 
 function showToast(msg, level = 'error') {
   if (!msg || msg === _lastToastMsg) return;
@@ -1401,6 +1399,7 @@ function showErrorBanner(msg) {
 function clearErrorBanner() {
   document.getElementById('error-banner').classList.remove('visible');
   document.getElementById('error-banner-msg').textContent = '';
+  _seenMsgIds.clear(); // reset cooldowns so next occurrence always shows
 }
 
 function setMachineState(s) {
