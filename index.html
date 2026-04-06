@@ -870,8 +870,8 @@
     <div class="section-title">Jog Z</div>
     <div class="jog-z">
       <button class="jog-btn" onclick="jog('Z', 1)" style="width:100%">▲ Z+</button>
+      <button class="jog-btn center" onclick="goToZOrigin()" title="Move to Z work zero" style="width:100%;color:var(--accent);">Z Origin</button>
       <button class="jog-btn" onclick="jog('Z', -1)" style="width:100%">▼ Z−</button>
-      <button class="jog-btn" onclick="goToZOrigin()" style="width:100%;font-size:10px;color:var(--accent);font-weight:700;" title="Move to Z work zero">Z Origin</button>
     </div>
 
     <div class="section-title">Step Size (mm)</div>
@@ -1224,8 +1224,13 @@ function renderMacros(macros) {
 }
 
 async function runMacro(filename) {
-  await fetch(`${API_URL}/api/file/${encodeURIComponent(filename)}`); // GET selects file
+  await fetch(`${API_URL}/api/file/${encodeFilePath(filename)}`); // GET selects file
   await fetch(`${API_URL}/api/start`, { method: 'PUT' });
+}
+
+// Encode each path segment separately so folder/file.ngc → folder/file.ngc not folder%2Ffile.ngc
+function encodeFilePath(p) {
+  return p.split('/').map(encodeURIComponent).join('/');
 }
 
 // ── FILE SELECT ──
@@ -1266,7 +1271,7 @@ function loadGCode(filename) {
     wrap.style.display = 'block';
 
     const xhr = new XMLHttpRequest();
-    xhr.open('GET', `${API_URL}/api/file/${encodeURIComponent(filename)}`);
+    xhr.open('GET', `${API_URL}/api/file/${encodeFilePath(filename)}`);
     xhr.onprogress = (e) => {
       if (e.lengthComputable) {
         wrap.classList.remove('indeterminate');
@@ -1874,8 +1879,9 @@ async function fmBulkDelete() {
   let failed = 0;
   for (const fp of paths) {
     try {
-      await fetch(`${API_URL}/api/file/${encodeURIComponent(fp)}`, { method: 'DELETE' });
-      fmFiles = fmFiles.filter(f => f !== fp);
+      const res = await fetch(`${API_URL}/api/file/${encodeFilePath(fp)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error();
+      fmRemoveFromState(fp);
     } catch(e) { failed++; }
   }
   fmSetStatus(failed ? `Done — ${failed} failed` : `Deleted ${paths.length} file(s)`);
@@ -1899,20 +1905,34 @@ async function fmLoad(filepath) {
 async function fmDelete(filepath) {
   if (!confirm(`Delete "${filepath}"?`)) return;
   try {
-    await fetch(`${API_URL}/api/file/${encodeURIComponent(filepath)}`, { method: 'DELETE' });
-    fmFiles = fmFiles.filter(f => f !== filepath);
+    const res = await fetch(`${API_URL}/api/file/${encodeFilePath(filepath)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    fmRemoveFromState(filepath);
     fmSetStatus(`Deleted ${filepath}`);
     fmRender();
   } catch(e) { fmSetStatus('Delete failed: ' + e.message); }
+}
+
+// Remove a file from fmFiles and the cached WS state so re-opening doesn't resurrect it
+function fmRemoveFromState(filepath) {
+  fmFiles = fmFiles.filter(f => f !== filepath);
+  const basename = filepath.split('/').pop();
+  if (state.files) state.files = state.files.filter(f => {
+    const n = f.replace(/^[+\-]/, '');
+    return n !== basename && n !== filepath;
+  });
+  if (state.gcode_list) state.gcode_list.forEach(folder => {
+    if (folder.files) folder.files = folder.files.filter(f => f.file_name !== basename);
+  });
 }
 
 async function fmDeleteFolder(folderPath) {
   if (!confirm(`Delete folder "${folderPath}" and all its contents?`)) return;
   const toDelete = fmFiles.filter(f => f.startsWith(folderPath + '/'));
   for (const f of toDelete) {
-    await fetch(`${API_URL}/api/file/${encodeURIComponent(f)}`, { method: 'DELETE' });
+    await fetch(`${API_URL}/api/file/${encodeFilePath(f)}`, { method: 'DELETE' });
+    fmRemoveFromState(f);
   }
-  fmFiles = fmFiles.filter(f => !f.startsWith(folderPath + '/'));
   fmSetStatus(`Deleted folder ${folderPath}`);
   fmRender();
 }
@@ -1929,7 +1949,7 @@ async function fmCreateFolder() {
   const prefix = fmPath.length ? fmPath.join('/') + '/' : '';
   const placeholder = `${prefix}${name}/.keep`;
   try {
-    await fetch(`${API_URL}/api/file/${encodeURIComponent(placeholder)}`, {
+    await fetch(`${API_URL}/api/file/${encodeFilePath(placeholder)}`, {
       method: 'PUT', headers: {'Content-Type':'text/plain'}, body: ''
     });
     fmFiles.push(placeholder);
@@ -1948,7 +1968,7 @@ async function fmUploadFiles(files) {
     try {
       const text = await file.text();
       const dest = prefix + file.name;
-      await fetch(`${API_URL}/api/file/${encodeURIComponent(dest)}`, {
+      await fetch(`${API_URL}/api/file/${encodeFilePath(dest)}`, {
         method: 'PUT', headers: {'Content-Type':'text/plain'}, body: text
       });
       if (!fmFiles.includes(dest)) fmFiles.push(dest);
