@@ -242,17 +242,6 @@
   }
 
   /* File selector */
-  #file-select {
-    width: 100%;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: var(--radius);
-    padding: 8px;
-    font-size: 12px;
-    cursor: pointer;
-  }
-
   /* Jog controls */
   .jog-grid {
     display: grid;
@@ -389,25 +378,6 @@
   }
 
   /* ── FILE ROW ── */
-  .file-row {
-    display: flex;
-    gap: 4px;
-    align-items: center;
-  }
-  .file-row select { flex: 1; min-width: 0; }
-  .file-del-btn {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    border-radius: 6px;
-    padding: 0 8px;
-    height: 32px;
-    cursor: pointer;
-    font-size: 14px;
-    flex-shrink: 0;
-    transition: all 0.15s;
-  }
-  .file-del-btn:hover { border-color: #e05252; color: #e05252; }
 
   /* ── GCODE PANEL ── */
   #gcode-panel {
@@ -437,6 +407,46 @@
     font-family: 'Courier New', monospace;
     font-size: 12px;
   }
+
+  #mdi-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  #mdi-label {
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 700;
+    letter-spacing: 1px;
+    flex-shrink: 0;
+  }
+  #mdi-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    border-radius: 3px;
+    outline: none;
+  }
+  #mdi-input:focus { border-color: var(--accent); }
+  #mdi-send {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 12px;
+    cursor: pointer;
+    border-radius: 3px;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  #mdi-send:hover { border-color: var(--accent); color: var(--accent); }
 
   .gcode-line {
     padding: 2px 14px;
@@ -842,13 +852,7 @@
   <div id="sidebar">
 
     <div class="section-title">File</div>
-    <div class="file-row">
-      <select id="file-select" onchange="selectFile(this.value)">
-        <option value="">— Select file —</option>
-      </select>
-      <button class="file-del-btn" onclick="deleteSelectedFile()" title="Delete selected file">🗑</button>
-    </div>
-    <button class="hz-btn" style="width:100%;padding:10px;font-size:12px;" onclick="openFileManager()">📁 File Manager</button>
+    <button class="hz-btn" style="width:100%;padding:10px;font-size:12px;" onclick="openFileManager()">📁 Files</button>
 
     <div class="section-title">Jog XY</div>
     <div class="jog-grid">
@@ -867,6 +871,7 @@
     <div class="jog-z">
       <button class="jog-btn" onclick="jog('Z', 1)" style="width:100%">▲ Z+</button>
       <button class="jog-btn" onclick="jog('Z', -1)" style="width:100%">▼ Z−</button>
+      <button class="jog-btn" onclick="goToZOrigin()" style="width:100%;font-size:10px;color:var(--accent);font-weight:700;" title="Move to Z work zero">Z Origin</button>
     </div>
 
     <div class="section-title">Step Size (mm)</div>
@@ -927,6 +932,12 @@
       <div style="padding:20px; color: var(--muted); text-align:center; font-family: var(--font);">
         Select a file to view GCode
       </div>
+    </div>
+    <div id="mdi-bar">
+      <span id="mdi-label">MDI</span>
+      <input id="mdi-input" type="text" placeholder="Enter GCode… (e.g. G0 X0 Y0)" autocomplete="off" spellcheck="false"
+             onkeydown="if(event.key==='Enter')mdiSend()">
+      <button id="mdi-send" onclick="mdiSend()">Send</button>
     </div>
   </div>
 
@@ -1219,56 +1230,26 @@ async function runMacro(filename) {
 
 // ── FILE SELECT ──
 function populateFileTree(gcodeList, flatFiles) {
-  const sel = document.getElementById('file-select');
-  sel.innerHTML = '<option value="">— Select file —</option>';
-
-  // Folders from gcode_list (files are flat on controller — folder is display-only)
+  // Build fmFiles: full paths used by the file manager window
+  const raw = (flatFiles || []).map(f => f.replace(/^[+\-]/, '')).filter(f => f && !f.endsWith('/'));
   if (gcodeList && gcodeList.length) {
-    // Collect all filenames in folders for exclusion from root group
-    const inFolder = new Set();
+    const fromList = [];
     gcodeList.forEach(folder => {
-      if (folder.name === 'default' || !folder.files || !folder.files.length) return;
-      folder.files.forEach(f => inFolder.add(f.file_name));
-      const grp = document.createElement('optgroup');
-      grp.label = `📁 ${folder.name}`;
+      if (!folder.files) return;
       folder.files.forEach(f => {
-        const opt = document.createElement('option');
-        opt.value = f.file_name;          // just the filename — no folder prefix
-        opt.textContent = f.file_name;
-        grp.appendChild(opt);
+        const path = (folder.name && folder.name !== 'default')
+          ? `${folder.name}/${f.file_name}`
+          : f.file_name;
+        fromList.push(path);
       });
-      sel.appendChild(grp);
     });
-
-    // Root group: files not in any folder
-    const rootFiles = (flatFiles || [])
-      .map(f => f.replace(/^[+\-]/, ''))
-      .filter(f => f && !f.endsWith('/') && !inFolder.has(f));
-    if (rootFiles.length) {
-      const grp = document.createElement('optgroup');
-      grp.label = '📁 Root';
-      rootFiles.forEach(f => {
-        const opt = document.createElement('option');
-        opt.value = f;
-        opt.textContent = f;
-        grp.appendChild(opt);
-      });
-      sel.appendChild(grp);
-    }
+    // Merge: prefer gcode_list paths (have folder info), add any flat files not already present
+    const listed = new Set(fromList.map(p => p.split('/').pop()));
+    const extra = raw.filter(f => !listed.has(f));
+    fmFiles = [...fromList, ...extra];
   } else {
-    // No gcode_list — just flat files
-    (flatFiles || [])
-      .map(f => f.replace(/^[+\-]/, ''))
-      .filter(f => f && !f.endsWith('/'))
-      .forEach(f => {
-        const opt = document.createElement('option');
-        opt.value = f;
-        opt.textContent = f;
-        sel.appendChild(opt);
-      });
+    fmFiles = raw;
   }
-
-  if (state.selected) sel.value = state.selected;
 }
 
 async function selectFile(filename) {
@@ -1306,22 +1287,6 @@ function loadGCode(filename) {
   });
 }
 
-async function deleteSelectedFile() {
-  const sel = document.getElementById('file-select');
-  const filename = sel.value;
-  if (!filename) return;
-  if (!confirm(`Delete "${filename}" from the controller?\n\nThis cannot be undone.`)) return;
-  try {
-    const res = await fetch(`${API_URL}/api/file/${encodeURIComponent(filename)}`, { method: 'DELETE' });
-    if (res.ok) {
-      // Remove from dropdown
-      const opt = sel.querySelector(`option[value="${CSS.escape(filename)}"]`);
-      if (opt) opt.remove();
-      sel.value = '';
-      document.getElementById('selected-file-label').innerHTML = 'No file selected';
-    }
-  } catch(e) { alert('Delete failed: ' + e.message); }
-}
 
 function classifyLine(line) {
   const l = line.trim().toUpperCase();
@@ -1361,6 +1326,13 @@ function highlightLine(lineNum) {
 }
 
 // ── XY ORIGIN ──
+function goToZOrigin() {
+  const wcsZ = (+(state.zp || 0)) - (+(state.offset_z || 0));
+  if (!confirm(`⚠ Move Z to work zero?\n\nCurrent Z WCS: ${wcsZ.toFixed(3)}\n\nThe Z axis will move to Z=0. Make sure the path is clear.`)) return;
+  const code = `M70\nG90\nG0 Z0\nM72`;
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(code);
+}
+
 function goToXYOrigin() {
   const wcsX = (+(state.xp || 0)) - (+(state.offset_x || 0));
   const wcsY = (+(state.yp || 0)) - (+(state.offset_y || 0));
@@ -1376,6 +1348,18 @@ function jog(axis, dir) {
   const dist = jogStep * dir;
   const code = `M70\nG91\nG0 ${axis.toUpperCase()}${dist}\nM72`;
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(code);
+}
+
+// ── MDI ──
+function mdiSend() {
+  const input = document.getElementById('mdi-input');
+  const cmd = input.value.trim();
+  if (!cmd) return;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(cmd);
+    input.value = '';
+    input.focus();
+  }
 }
 
 function setStep(val) {
@@ -1787,6 +1771,8 @@ let fmPath = [];   // current folder stack e.g. ['fixtures']
 let fmFiles = [];  // raw file list from controller
 
 function openFileManager() {
+  // Refresh file list from current WS state before opening
+  populateFileTree(state.gcode_list || null, state.files || []);
   document.getElementById('fm-overlay').classList.add('open');
   fmRender();
 }
