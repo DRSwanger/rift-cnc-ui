@@ -1224,34 +1224,33 @@ function renderMacros(macros) {
 }
 
 async function runMacro(filename) {
-  await fetch(`${API_URL}/api/file/${encodeFilePath(filename)}`); // GET selects file
+  await fetch(`${API_URL}/api/file/${encodeURIComponent(filename)}`); // GET selects file
   await fetch(`${API_URL}/api/start`, { method: 'PUT' });
 }
 
-// Encode each path segment separately so folder/file.ngc → folder/file.ngc not folder%2Ffile.ngc
-function encodeFilePath(p) {
-  return p.split('/').map(encodeURIComponent).join('/');
-}
-
 // ── FILE SELECT ──
+// bbctrl filenames are FLAT — folder structure in gcode_list is display-only.
+// All API calls use just the basename. fmFolderMap tracks which folder each file belongs to.
+let fmFolderMap = {};  // basename → display folder name ('' = root)
+
 function populateFileTree(gcodeList, flatFiles) {
-  // Build fmFiles: full paths used by the file manager window
+  // Flat basenames from state.files (authoritative list of what exists on controller)
   const raw = (flatFiles || []).map(f => f.replace(/^[+\-]/, '')).filter(f => f && !f.endsWith('/'));
+
+  fmFolderMap = {};
   if (gcodeList && gcodeList.length) {
-    const fromList = [];
     gcodeList.forEach(folder => {
       if (!folder.files) return;
-      folder.files.forEach(f => {
-        const path = (folder.name && folder.name !== 'default')
-          ? `${folder.name}/${f.file_name}`
-          : f.file_name;
-        fromList.push(path);
-      });
+      const folderName = (folder.name && folder.name !== 'default') ? folder.name : '';
+      folder.files.forEach(f => { fmFolderMap[f.file_name] = folderName; });
     });
-    // Merge: prefer gcode_list paths (have folder info), add any flat files not already present
-    const listed = new Set(fromList.map(p => p.split('/').pop()));
-    const extra = raw.filter(f => !listed.has(f));
-    fmFiles = [...fromList, ...extra];
+    // Include any gcode_list files not in state.files (edge case)
+    const extra = [];
+    gcodeList.forEach(folder => {
+      if (!folder.files) return;
+      folder.files.forEach(f => { if (!raw.includes(f.file_name)) extra.push(f.file_name); });
+    });
+    fmFiles = [...new Set([...raw, ...extra])];
   } else {
     fmFiles = raw;
   }
@@ -1271,7 +1270,7 @@ function loadGCode(filename) {
     wrap.style.display = 'block';
 
     const xhr = new XMLHttpRequest();
-    xhr.open('GET', `${API_URL}/api/file/${encodeFilePath(filename)}`);
+    xhr.open('GET', `${API_URL}/api/file/${encodeURIComponent(filename)}`);
     xhr.onprogress = (e) => {
       if (e.lengthComputable) {
         wrap.classList.remove('indeterminate');
@@ -1779,10 +1778,6 @@ function openFileManager() {
   populateFileTree(state.gcode_list || null, state.files || []);
   document.getElementById('fm-overlay').classList.add('open');
   fmRender();
-  // Debug: show raw state in status bar — remove once file loading is confirmed working
-  const gl = state.gcode_list;
-  const fl = state.files;
-  fmSetStatus(`[dbg] gcode_list: ${gl ? JSON.stringify(gl).slice(0,120) : 'undefined'} | files: ${fl ? JSON.stringify(fl).slice(0,80) : 'undefined'}`);
 }
 function closeFileManager() {
   document.getElementById('fm-overlay').classList.remove('open');
@@ -1797,44 +1792,46 @@ function fmRender() {
     bc.innerHTML += `<span class="fm-crumb-sep"> / </span><span class="fm-crumb" onclick="fmNav(${i})">${seg}</span>`;
   });
 
-  // Filter files for current folder
-  const prefix = fmPath.length ? fmPath.join('/') + '/' : '';
+  // Current folder: fmPath[0] or '' for root
+  const currentFolder = fmPath.length ? fmPath[0] : null;
   const items = [];
 
-  const seen = new Set();
-  for (const f of fmFiles) {
-    if (!f.startsWith(prefix)) continue;
-    const rest = f.slice(prefix.length);
-    const parts = rest.split('/');
-    if (parts.length > 1) {
-      const folder = parts[0];
-      if (!seen.has(folder)) { seen.add(folder); items.push({ type:'folder', name:folder }); }
-    } else if (parts[0]) {
-      items.push({ type:'file', name:parts[0], fullPath: f });
+  if (currentFolder === null) {
+    // Root: show virtual folders + files not in any named folder
+    const seenFolders = new Set();
+    for (const f of fmFiles) {
+      const folder = fmFolderMap[f] !== undefined ? fmFolderMap[f] : '';
+      if (folder) {
+        if (!seenFolders.has(folder)) { seenFolders.add(folder); items.push({ type:'folder', name:folder }); }
+      } else {
+        items.push({ type:'file', name:f });
+      }
+    }
+  } else {
+    // Inside a folder: show files belonging to this folder
+    for (const f of fmFiles) {
+      if ((fmFolderMap[f] || '') === currentFolder) items.push({ type:'file', name:f });
     }
   }
 
   const list = document.getElementById('fm-list');
   if (items.length === 0) {
-    list.innerHTML = '<div class="fm-empty">No files here. Upload something!</div>';
+    list.innerHTML = '<div class="fm-empty">No files here.</div>';
   } else {
     list.innerHTML = items.map(item => {
       if (item.type === 'folder') {
+        const esc = item.name.replace(/'/g, "\\'");
         return `<div class="fm-item">
           <span style="width:15px;flex-shrink:0"></span>
           <span class="fm-icon">📁</span>
-          <span class="fm-name folder" onclick="fmEnter('${item.name}')">${item.name}</span>
-          <div class="fm-actions">
-            <button class="fm-btn del" onclick="fmDeleteFolder('${prefix}${item.name}')">✕</button>
-          </div>
+          <span class="fm-name folder" onclick="fmEnter('${esc}')">${item.name}</span>
         </div>`;
       } else {
-        const fp = item.fullPath;
-        const esc = fp.replace(/'/g, "\\'");
+        const esc = item.name.replace(/'/g, "\\'");
         return `<div class="fm-item">
-          <input type="checkbox" class="fm-cb" data-path="${fp}" onchange="fmSelectionChanged()">
+          <input type="checkbox" class="fm-cb" data-path="${item.name}" onchange="fmSelectionChanged()">
           <span class="fm-icon">📄</span>
-          <span class="fm-name" title="${fp}">${item.name}</span>
+          <span class="fm-name" title="${item.name}">${item.name}</span>
           <div class="fm-actions">
             <button class="fm-btn load" onclick="fmLoad('${esc}')">Load</button>
             <button class="fm-btn del"  onclick="fmDelete('${esc}')">✕</button>
@@ -1845,8 +1842,9 @@ function fmRender() {
   }
 
   fmSelectionChanged();
-  document.getElementById('fm-status').textContent =
-    `${items.filter(i=>i.type==='file').length} file(s), ${items.filter(i=>i.type==='folder').length} folder(s)`;
+  const fc = items.filter(i=>i.type==='file').length;
+  const fd = items.filter(i=>i.type==='folder').length;
+  document.getElementById('fm-status').textContent = `${fc} file(s)${fd ? ', ' + fd + ' folder(s)' : ''}`;
 }
 
 function fmGetChecked() {
@@ -1882,7 +1880,7 @@ async function fmBulkDelete() {
   let failed = 0;
   for (const fp of paths) {
     try {
-      const res = await fetch(`${API_URL}/api/file/${encodeFilePath(fp)}`, { method: 'DELETE' });
+      const res = await fetch(`${API_URL}/api/file/${encodeURIComponent(fp)}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
       fmRemoveFromState(fp);
     } catch(e) { failed++; }
@@ -1896,7 +1894,7 @@ function fmNav(idx) {
   fmPath = idx < 0 ? [] : fmPath.slice(0, idx + 1);
   fmRender();
 }
-function fmEnter(name) { fmPath.push(name); fmRender(); }
+function fmEnter(name) { fmPath = [name]; fmRender(); }
 
 function fmSetStatus(msg) { document.getElementById('fm-status').textContent = msg; }
 
@@ -1908,7 +1906,7 @@ async function fmLoad(filepath) {
 async function fmDelete(filepath) {
   if (!confirm(`Delete "${filepath}"?`)) return;
   try {
-    const res = await fetch(`${API_URL}/api/file/${encodeFilePath(filepath)}`, { method: 'DELETE' });
+    const res = await fetch(`${API_URL}/api/file/${encodeURIComponent(filepath)}`, { method: 'DELETE' });
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
     fmRemoveFromState(filepath);
     fmSetStatus(`Deleted ${filepath}`);
@@ -1919,24 +1917,22 @@ async function fmDelete(filepath) {
 // Remove a file from fmFiles and the cached WS state so re-opening doesn't resurrect it
 function fmRemoveFromState(filepath) {
   fmFiles = fmFiles.filter(f => f !== filepath);
-  const basename = filepath.split('/').pop();
-  if (state.files) state.files = state.files.filter(f => {
-    const n = f.replace(/^[+\-]/, '');
-    return n !== basename && n !== filepath;
-  });
+  // filepath is always a flat basename in bbctrl
+  if (state.files) state.files = state.files.filter(f => f.replace(/^[+\-]/, '') !== filepath);
   if (state.gcode_list) state.gcode_list.forEach(folder => {
-    if (folder.files) folder.files = folder.files.filter(f => f.file_name !== basename);
+    if (folder.files) folder.files = folder.files.filter(f => f.file_name !== filepath);
   });
+  delete fmFolderMap[filepath];
 }
 
-async function fmDeleteFolder(folderPath) {
-  if (!confirm(`Delete folder "${folderPath}" and all its contents?`)) return;
-  const toDelete = fmFiles.filter(f => f.startsWith(folderPath + '/'));
+async function fmDeleteFolder(folderName) {
+  if (!confirm(`Delete all files in "${folderName}"?`)) return;
+  const toDelete = fmFiles.filter(f => (fmFolderMap[f] || '') === folderName);
   for (const f of toDelete) {
-    await fetch(`${API_URL}/api/file/${encodeFilePath(f)}`, { method: 'DELETE' });
+    await fetch(`${API_URL}/api/file/${encodeURIComponent(f)}`, { method: 'DELETE' });
     fmRemoveFromState(f);
   }
-  fmSetStatus(`Deleted folder ${folderPath}`);
+  fmSetStatus(`Deleted ${toDelete.length} file(s) from ${folderName}`);
   fmRender();
 }
 
@@ -1952,7 +1948,7 @@ async function fmCreateFolder() {
   const prefix = fmPath.length ? fmPath.join('/') + '/' : '';
   const placeholder = `${prefix}${name}/.keep`;
   try {
-    await fetch(`${API_URL}/api/file/${encodeFilePath(placeholder)}`, {
+    await fetch(`${API_URL}/api/file/${encodeURIComponent(placeholder)}`, {
       method: 'PUT', headers: {'Content-Type':'text/plain'}, body: ''
     });
     fmFiles.push(placeholder);
@@ -1971,7 +1967,7 @@ async function fmUploadFiles(files) {
     try {
       const text = await file.text();
       const dest = prefix + file.name;
-      await fetch(`${API_URL}/api/file/${encodeFilePath(dest)}`, {
+      await fetch(`${API_URL}/api/file/${encodeURIComponent(dest)}`, {
         method: 'PUT', headers: {'Content-Type':'text/plain'}, body: text
       });
       if (!fmFiles.includes(dest)) fmFiles.push(dest);
