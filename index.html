@@ -1395,7 +1395,7 @@ function startLogPoll() {
   stopLogPoll();
   _logCursor = -1;  // reset so first fetch just sets the cursor without showing old errors
   pollLog();        // immediate call to initialize cursor
-  _logTimer = setInterval(pollLog, 3000);
+  _logTimer = setInterval(pollLog, 1000);
 }
 
 function stopLogPoll() {
