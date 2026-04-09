@@ -134,7 +134,8 @@ When you access the controller directly at `http://onefinity.local`, the browser
 |---|---|---|
 | Basic control & jog | ✅ | ✅ |
 | 3D viewer & GCode | ✅ | ✅ |
-| Settings sync across browsers | ❌ (per-browser localStorage) | ✅ (shared `ui-settings.json`) |
+| Probe/motor settings sync across browsers | ✅ (stored in controller config) | ✅ |
+| UI preferences sync across browsers (theme, step sizes, labels) | ❌ (per-browser localStorage) | ✅ (shared `ui-settings.json`) |
 | Combined backup (controller + UI settings) | ❌ | ✅ |
 | Push notifications (ntfy.sh) | ❌ | ✅ |
 | GitHub update check (no CORS error) | ❌ | ✅ |
@@ -207,9 +208,10 @@ The default topic is `alienwoodshop-cnc` if no `NTFY_TOPIC` is set. **Change thi
 
 ### Shared settings & backup
 
-When accessed through the proxy, Rift stores your UI preferences (theme, step sizes, probe settings, etc.) server-side in `ui-settings.json` — shared across all browsers that connect through the proxy. Changes made on your phone are reflected on your laptop and vice versa.
+Settings in Rift are split into two categories:
 
-When accessing the controller directly at `http://onefinity.local`, there is no `/ui-settings` endpoint — settings fall back to each browser's own `localStorage` and are not shared. If you've previously used the proxy on a device, that browser's `localStorage` will still have the last-saved proxy settings, which can make it appear synced — but it won't stay in sync going forward without the proxy.
+- **Controller config** (probe dimensions, motor tuning, tool settings) — saved directly to the Pi via the bbctrl API. These sync across all browsers automatically regardless of whether you use the proxy, because every browser reads from the same controller.
+- **UI preferences** (theme, step sizes, output labels, etc.) — when using the proxy, these are stored server-side in `ui-settings.json` and shared across all browsers. Without the proxy, they fall back to each browser's own `localStorage` and are not shared.
 
 The **Settings → System → Full Backup** option (when using the proxy) downloads a single `.zip` containing both your controller config and your Rift UI settings. Restore brings both back in one step.
 
