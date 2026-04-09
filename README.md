@@ -117,7 +117,9 @@ scripts/            — Pi install helpers
 
 ## License
 
-MIT — use it, fork it, sell machines with it.
+© 2026 AlienWoodshop LLC. All rights reserved.
+
+You may install and use Rift on your own machine for personal, non-commercial use. Redistribution, resale, sublicensing, or incorporation into any commercial product or service is prohibited without explicit written permission from AlienWoodshop LLC.
 
 ---
 
