@@ -2348,10 +2348,6 @@
           </div>
           <div id="fw-update-status" style="font-size:12px;color:var(--muted);margin-bottom:8px;"></div>
           <div id="fw-update-notes" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:11px;color:var(--muted);white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;"></div>
-          <div id="fw-update-action" style="display:none;">
-            <button class="admin-btn" id="fw-install-btn" onclick="downloadAndInstall()" style="background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:700;">⬇ Download &amp; Install</button>
-          </div>
-          <div id="fw-install-status" style="font-size:11px;color:var(--muted);margin-top:8px;display:none;"></div>
         </div>
         <div class="settings-section">
           <div class="settings-section-title">Manual Upload</div>
@@ -6111,14 +6107,11 @@ async function checkForUpdates() {
 
     if (isNewer) {
       statusEl.style.color = 'var(--green)';
-      statusEl.textContent = 'Update available!';
+      statusEl.innerHTML = 'Update available! <a href="https://github.com/DRSwanger/rift-cnc-ui/releases/tag/v' + escHtml(latestTag) + '" target="_blank" style="color:var(--accent)">Download v' + escHtml(latestTag) + ' from GitHub</a> and install via Manual Upload below.';
       if (notesEl && _latestRelease.body) {
         notesEl.textContent = _latestRelease.body;
         notesEl.style.display = '';
       }
-      if (actionEl) actionEl.style.display = '';
-      const installBtn = document.getElementById('fw-install-btn');
-      if (installBtn) installBtn.textContent = '\u2b07 Download & Install v' + latestTag;
     } else {
       statusEl.style.color = 'var(--green)';
       statusEl.textContent = 'You\'re up to date.';
@@ -6131,45 +6124,6 @@ async function checkForUpdates() {
   }
 }
 
-async function downloadAndInstall() {
-  if (!_latestRelease) return;
-  const asset = (_latestRelease.assets || []).find(function(a) { return /\.tar\.bz2$/.test(a.name); });
-  if (!asset) { showToast('No firmware package found in release', 'error'); return; }
-
-  const latestTag = (_latestRelease.tag_name || '').replace(/^v/, '');
-  if (!await darkConfirm(
-    'Install Rift v' + latestTag + '?\n\nThe controller will download and install the update, then reboot (~30 seconds).',
-    'Install'
-  )) return;
-
-  const statusEl  = document.getElementById('fw-install-status');
-  const installBtn = document.getElementById('fw-install-btn');
-  statusEl.style.display = '';
-  statusEl.style.color = 'var(--muted)';
-  statusEl.textContent = 'Downloading update package…';
-  if (installBtn) installBtn.disabled = true;
-
-  try {
-    const dlRes = await fetch(asset.browser_download_url);
-    if (!dlRes.ok) throw new Error('Download failed (' + dlRes.status + ')');
-    const blob = await dlRes.blob();
-
-    statusEl.textContent = 'Uploading to controller…';
-    const fd = new FormData();
-    fd.append('firmware', blob, asset.name);
-    const upRes = await fetch(API_URL + '/api/firmware/update', { method: 'PUT', body: fd });
-    if (!upRes.ok) throw new Error('Install failed (HTTP ' + upRes.status + ')');
-
-    statusEl.style.color = 'var(--green)';
-    statusEl.textContent = 'Installed! Controller is rebooting — reload this page in ~30 seconds.';
-    showToast('Rift v' + latestTag + ' installed — controller rebooting', 'info');
-  } catch(e) {
-    statusEl.style.color = 'var(--red)';
-    statusEl.textContent = 'Error: ' + e.message;
-    showToast('Update failed: ' + e.message, 'error');
-    if (installBtn) installBtn.disabled = false;
-  }
-}
 
 function loadAboutTab() {
   const v = document.getElementById('about-version');

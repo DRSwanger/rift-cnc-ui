@@ -67,6 +67,26 @@ async def check_update(request):
         return web.json_response({'error': str(e)}, status=502)
 
 
+async def download_update(request):
+    """Download a GitHub release asset server-side and stream it back to the browser."""
+    url = request.query.get('url', '')
+    if not url.startswith('https://github.com/') and not url.startswith('https://objects.githubusercontent.com/'):
+        return web.Response(status=400, text='Invalid URL')
+    try:
+        async with ClientSession() as session:
+            async with session.get(url, timeout=120) as resp:
+                if resp.status != 200:
+                    return web.Response(status=resp.status, text='Upstream error')
+                data = await resp.read()
+                return web.Response(
+                    body=data,
+                    content_type='application/x-bzip2',
+                    headers={'Content-Disposition': 'attachment; filename="firmware.tar.bz2"'}
+                )
+    except Exception as e:
+        return web.Response(status=502, text=str(e))
+
+
 async def handle(request):
     path = request.path
 
@@ -292,6 +312,7 @@ async def handle(request):
 def main():
     app = web.Application()
     app.router.add_get('/api/check-update', check_update)
+    app.router.add_get('/api/download-update', download_update)
     app.router.add_route('*', '/{path_info:.*}', handle)
 
     print(f'CNC Proxy running on http://0.0.0.0:{PORT}')
