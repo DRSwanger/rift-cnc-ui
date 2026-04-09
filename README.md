@@ -30,6 +30,27 @@ Rift replaces the stock Onefinity web UI with a fast, dark-themed control panel 
 
 ---
 
+## Before You Install — Back Up Everything
+
+> **Do not skip this step.** Your controller configuration contains your motor tuning, travel limits, tool settings, and homing parameters. If these are lost, your machine will not run correctly and re-entering them from scratch is tedious and error-prone.
+
+### Back up your controller config (do all three)
+
+**1. Download a full backup from the stock UI**
+In the stock Onefinity interface: **Settings → Admin → Backup** — download the `.json` file and save it somewhere safe (not just your Downloads folder — copy it to a USB drive, cloud storage, or email it to yourself).
+
+**2. Screenshot every settings page**
+Open **Settings** in the stock UI and screenshot every tab — Motor X, Motor Y, Motor Z, Tool, and any custom values you've set. If a backup restore ever fails, these photos are your safety net.
+
+**3. Write down your soft limits and motor steps**
+Specifically: travel limits (min/max for X, Y, Z), steps/mm for each axis, max velocity, and max acceleration. These are the values that will brick your machine if wrong.
+
+**Keep your backup somewhere you can find it in 6 months.** A Google Drive folder named "CNC Backups" with the date in the filename (`onefinity-backup-2026-04-08.json`) is a good habit.
+
+Once Rift is installed, you can restore your config any time via **Settings → System → Import Backup**.
+
+---
+
 ## Installation
 
 ### Option A — Firmware Update (Recommended)
