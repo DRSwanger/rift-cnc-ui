@@ -1,0 +1,11 @@
+{
+  "name": "Rift CNC — AlienWoodshop",
+  "short_name": "Rift CNC",
+  "description": "CNC control from another world",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "start_url": "/",
+  "background_color": "#0f1117",
+  "theme_color": "#0f1117",
+  "icons": []
+}

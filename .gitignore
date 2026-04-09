@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+proxy.log
+ui-actions.log
+ui-settings.json

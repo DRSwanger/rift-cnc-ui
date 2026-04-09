@@ -8,12 +8,48 @@ Tornado blocks cross-origin WebSockets, so we proxy from same origin.
 
 import asyncio
 import os
+import io
+import json
 import mimetypes
+import zipfile
 from aiohttp import web, ClientSession, WSMsgType
 
-CNC_HOST = os.environ.get('CNC_HOST', '192.168.1.130')
-STATIC_DIR = os.path.dirname(os.path.abspath(__file__))
-PORT = int(os.environ.get('PORT', 8888))
+CNC_HOST    = os.environ.get('CNC_HOST', '192.168.1.130')
+STATIC_DIR  = os.path.dirname(os.path.abspath(__file__))
+PORT        = int(os.environ.get('PORT', 8888))
+SETTINGS_FILE = os.path.join(STATIC_DIR, 'ui-settings.json')
+UI_LOG_FILE   = os.path.join(STATIC_DIR, 'ui-actions.log')
+
+NTFY_TOPIC  = os.environ.get('NTFY_TOPIC', 'alienwoodshop-cnc')
+NTFY_URL    = f'https://ntfy.sh/{NTFY_TOPIC}'
+
+# Keywords in ui-log lines that trigger a push notification
+# Format: (match_string, title, priority, tags)
+_NTFY_RULES = [
+    ('START job',        'CNC Job Started',   'default', 'white_check_mark'),
+    ('STOP job',         'CNC Job Stopped',   'default', 'stop_sign'),
+    ('ESTOP TRIGGERED',  '🚨 E-STOP',         'urgent',  'rotating_light'),
+    ('ESTOP CLEAR',      'E-Stop Cleared',    'low',     'green_circle'),
+    ('CNC ERROR:',       'CNC Error',         'high',    'warning'),
+    ('job complete',     'CNC Job Complete',  'high',    'tada'),
+]
+
+async def ntfy_send(title, message, priority='default', tags=''):
+    """Fire-and-forget push notification via ntfy.sh."""
+    try:
+        async with ClientSession() as session:
+            await session.post(
+                NTFY_URL,
+                data=message.encode('utf-8'),
+                headers={
+                    'Title':    title,
+                    'Priority': priority,
+                    'Tags':     tags,
+                },
+                timeout=5,
+            )
+    except Exception:
+        pass  # never let notification failure affect the proxy
 
 
 async def handle(request):
@@ -53,6 +89,136 @@ async def handle(request):
 
                 await asyncio.gather(to_server(), to_client())
         return ws_client
+
+    # ── UI Settings (shared across all browsers) ──
+    if path == '/ui-settings':
+        if request.method == 'GET':
+            if os.path.isfile(SETTINGS_FILE):
+                with open(SETTINGS_FILE, 'r') as f:
+                    data = f.read()
+            else:
+                data = '{}'
+            return web.Response(body=data, content_type='application/json',
+                                headers={'Access-Control-Allow-Origin': '*'})
+        elif request.method == 'POST':
+            body = await request.read()
+            # Validate it's JSON before saving
+            json.loads(body)
+            with open(SETTINGS_FILE, 'wb') as f:
+                f.write(body)
+            return web.Response(text='ok', headers={'Access-Control-Allow-Origin': '*'})
+
+    # ── UI Action Log ──
+    # POST /ui-log  body: plain-text line (already timestamped by JS)
+    if path == '/ui-log':
+        if request.method == 'POST':
+            body = await request.read()
+            line = body.decode('utf-8', errors='replace').strip()
+            with open(UI_LOG_FILE, 'a', encoding='utf-8') as f:
+                f.write(line + '\n')
+            # Push notification for key events
+            for keyword, title, priority, tags in _NTFY_RULES:
+                if keyword.lower() in line.lower():
+                    asyncio.ensure_future(ntfy_send(title, line, priority, tags))
+                    break
+            return web.Response(text='ok', headers={'Access-Control-Allow-Origin': '*'})
+        return web.Response(status=405, headers={'Access-Control-Allow-Origin': '*'})
+
+    # ── Full backup (bbctrl zip + ui-settings.json) ──
+    # GET /api/backup-full  →  downloads bbctrl config zip with ui-settings.json injected
+    if path == '/api/backup-full':
+        async with ClientSession() as session:
+            async with session.get(f'http://{CNC_HOST}/api/config/download') as resp:
+                ctrl_zip = await resp.read()
+        # Build new zip: copy everything from the controller zip, add ui-settings.json
+        buf = io.BytesIO()
+        with zipfile.ZipFile(io.BytesIO(ctrl_zip), 'r') as src, \
+             zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as dst:
+            for item in src.infolist():
+                dst.writestr(item, src.read(item.filename))
+        # Add UI settings
+        ui_data = b'{}'
+        if os.path.isfile(SETTINGS_FILE):
+            with open(SETTINGS_FILE, 'rb') as f:
+                ui_data = f.read()
+        with zipfile.ZipFile(buf, 'a', zipfile.ZIP_DEFLATED) as dst:
+            dst.writestr('ui-settings.json', ui_data)
+        return web.Response(
+            body=buf.getvalue(),
+            headers={
+                'Content-Type': 'application/zip',
+                'Content-Disposition': 'attachment; filename="cnc-backup.zip"',
+                'Access-Control-Allow-Origin': '*',
+            }
+        )
+
+    # ── Full restore (bbctrl zip + optional ui-settings.json) ──
+    # POST /api/restore-full  multipart field: backup (zip or json)
+    if path == '/api/restore-full':
+        reader = await request.multipart()
+        field = await reader.next()
+        file_data = await field.read()
+        filename  = field.filename or ''
+        ui_settings = None
+        ctrl_restored = False
+
+        if filename.endswith('.zip') or file_data[:2] == b'PK':
+            # It's a zip — extract config.json and optionally ui-settings.json
+            try:
+                with zipfile.ZipFile(io.BytesIO(file_data)) as zf:
+                    names = zf.namelist()
+                    if 'ui-settings.json' in names:
+                        ui_settings = json.loads(zf.read('ui-settings.json'))
+                    # Forward the zip to bbctrl restore endpoint
+                    async with ClientSession() as session:
+                        form = {'config': (filename, file_data, 'application/zip')}
+                        async with session.put(
+                            f'http://{CNC_HOST}/api/config/restore',
+                            data={'config': file_data},
+                        ) as resp:
+                            ctrl_restored = resp.status < 300
+            except Exception as e:
+                return web.Response(
+                    text=json.dumps({'error': str(e)}),
+                    content_type='application/json', status=400,
+                    headers={'Access-Control-Allow-Origin': '*'}
+                )
+        else:
+            # Legacy JSON format — extract and push
+            try:
+                backup = json.loads(file_data)
+                ui_settings = backup.get('uiSettings')
+                ctrl_cfg = backup.get('controllerConfig')
+                if ctrl_cfg:
+                    async with ClientSession() as session:
+                        async with session.put(
+                            f'http://{CNC_HOST}/api/config/save',
+                            json=ctrl_cfg,
+                        ) as resp:
+                            ctrl_restored = resp.status < 300
+            except Exception as e:
+                return web.Response(
+                    text=json.dumps({'error': str(e)}),
+                    content_type='application/json', status=400,
+                    headers={'Access-Control-Allow-Origin': '*'}
+                )
+
+        # Save UI settings if present
+        if ui_settings:
+            with open(SETTINGS_FILE, 'w') as f:
+                json.dump(ui_settings, f)
+
+        msg = 'Backup imported'
+        if ctrl_restored and ui_settings:  msg = 'Controller config + UI settings restored'
+        elif ctrl_restored:                 msg = 'Controller config restored'
+        elif ui_settings:                   msg = 'UI settings restored'
+
+        return web.Response(
+            text=json.dumps({'message': msg, 'controllerRestored': ctrl_restored,
+                             'uiSettings': ui_settings}),
+            content_type='application/json',
+            headers={'Access-Control-Allow-Origin': '*'}
+        )
 
     # ── Log-tail helper ──
     # /api/log-since?pos=N  →  returns only bytes from position N onward.
