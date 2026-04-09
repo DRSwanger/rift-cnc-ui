@@ -2340,8 +2340,22 @@
       <!-- FIRMWARE -->
       <div class="stab-panel" id="stab-firmware">
         <div class="settings-section">
-          <div class="settings-section-title">Upload Firmware / UI</div>
-          <div class="settings-note" style="margin-bottom:8px;">Upload a <code style="background:var(--surface2);padding:2px 5px;border-radius:4px;font-size:11px;">.tar.bz2</code> package to update the controller UI or firmware. The controller will install it and reboot (~30 seconds).</div>
+          <div class="settings-section-title">Update Manager</div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+            <div style="font-size:12px;color:var(--muted);">Installed: <strong style="color:var(--text)">v<span id="fw-version-val"></span></strong></div>
+            <div style="font-size:12px;color:var(--muted);">Latest: <strong id="fw-latest-val" style="color:var(--text)">—</strong></div>
+            <button class="admin-btn" id="fw-check-btn" onclick="checkForUpdates()">↻ Check Now</button>
+          </div>
+          <div id="fw-update-status" style="font-size:12px;color:var(--muted);margin-bottom:8px;"></div>
+          <div id="fw-update-notes" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:11px;color:var(--muted);white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;"></div>
+          <div id="fw-update-action" style="display:none;">
+            <button class="admin-btn" id="fw-install-btn" onclick="downloadAndInstall()" style="background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:700;">⬇ Download &amp; Install</button>
+          </div>
+          <div id="fw-install-status" style="font-size:11px;color:var(--muted);margin-top:8px;display:none;"></div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-title">Manual Upload</div>
+          <div class="settings-note" style="margin-bottom:8px;">Upload a <code style="background:var(--surface2);padding:2px 5px;border-radius:4px;font-size:11px;">.tar.bz2</code> package manually. The controller will install it and reboot (~30 seconds).</div>
           <div class="admin-action-row" style="flex-wrap:wrap;gap:6px;align-items:center;">
             <label class="admin-btn" style="cursor:pointer;">⬆ Choose Package…<input type="file" id="firmware-file-input" accept=".bz2,.tar,.gz,.tar.bz2,.tar.gz" style="display:none" onchange="uploadFirmware(this)"></label>
           </div>
@@ -2354,10 +2368,6 @@
             <button class="admin-btn danger" onclick="revertToStock()" style="color:var(--muted);">⚠ Revert to Stock 1.6.6</button>
           </div>
           <div id="revert-status" style="font-size:11px;color:var(--muted);margin-top:8px;display:none;"></div>
-        </div>
-        <div class="settings-section">
-          <div class="settings-section-title">Current Build</div>
-          <div style="font-size:12px;color:var(--muted);">Rift CNC UI: <strong style="color:var(--accent)">v<span id="fw-version-val"></span></strong></div>
         </div>
       </div>
 
@@ -6052,9 +6062,105 @@ async function revertToStock() {
   document.getElementById('firmware-file-input').click();
 }
 
+let _latestRelease = null;
+
 async function loadFirmwareVersion() {
   const el = document.getElementById('fw-version-val');
   if (el) el.textContent = UI_VERSION;
+  checkForUpdates();
+}
+
+async function checkForUpdates() {
+  const statusEl = document.getElementById('fw-update-status');
+  const latestEl = document.getElementById('fw-latest-val');
+  const notesEl  = document.getElementById('fw-update-notes');
+  const actionEl = document.getElementById('fw-update-action');
+  const checkBtn = document.getElementById('fw-check-btn');
+  if (!statusEl) return;
+
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Checking for updates…';
+  if (latestEl) latestEl.textContent = '—';
+  if (notesEl)  notesEl.style.display = 'none';
+  if (actionEl) actionEl.style.display = 'none';
+  if (checkBtn) checkBtn.disabled = true;
+
+  try {
+    const res = await fetch('https://api.github.com/repos/DRSwanger/rift-cnc-ui/releases/latest', {
+      headers: { 'Accept': 'application/vnd.github+json' }
+    });
+    if (!res.ok) throw new Error('GitHub API error (' + res.status + ')');
+    _latestRelease = await res.json();
+
+    const latestTag = (_latestRelease.tag_name || '').replace(/^v/, '');
+    if (latestEl) latestEl.textContent = 'v' + latestTag;
+
+    const current = UI_VERSION.split('.').map(Number);
+    const latest  = latestTag.split('.').map(Number);
+    const isNewer = latest[0] > current[0] ||
+                   (latest[0] === current[0] && latest[1] > current[1]) ||
+                   (latest[0] === current[0] && latest[1] === current[1] && latest[2] > current[2]);
+
+    if (isNewer) {
+      statusEl.style.color = 'var(--green)';
+      statusEl.textContent = 'Update available!';
+      if (notesEl && _latestRelease.body) {
+        notesEl.textContent = _latestRelease.body;
+        notesEl.style.display = '';
+      }
+      if (actionEl) actionEl.style.display = '';
+      const installBtn = document.getElementById('fw-install-btn');
+      if (installBtn) installBtn.textContent = '\u2b07 Download & Install v' + latestTag;
+    } else {
+      statusEl.style.color = 'var(--green)';
+      statusEl.textContent = 'You\'re up to date.';
+    }
+  } catch(e) {
+    statusEl.style.color = 'var(--muted)';
+    statusEl.textContent = 'Could not check for updates — ' + e.message;
+  } finally {
+    if (checkBtn) checkBtn.disabled = false;
+  }
+}
+
+async function downloadAndInstall() {
+  if (!_latestRelease) return;
+  const asset = (_latestRelease.assets || []).find(function(a) { return /\.tar\.bz2$/.test(a.name); });
+  if (!asset) { showToast('No firmware package found in release', 'error'); return; }
+
+  const latestTag = (_latestRelease.tag_name || '').replace(/^v/, '');
+  if (!await darkConfirm(
+    'Install Rift v' + latestTag + '?\n\nThe controller will download and install the update, then reboot (~30 seconds).',
+    'Install'
+  )) return;
+
+  const statusEl  = document.getElementById('fw-install-status');
+  const installBtn = document.getElementById('fw-install-btn');
+  statusEl.style.display = '';
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Downloading update package…';
+  if (installBtn) installBtn.disabled = true;
+
+  try {
+    const dlRes = await fetch(asset.browser_download_url);
+    if (!dlRes.ok) throw new Error('Download failed (' + dlRes.status + ')');
+    const blob = await dlRes.blob();
+
+    statusEl.textContent = 'Uploading to controller…';
+    const fd = new FormData();
+    fd.append('firmware', blob, asset.name);
+    const upRes = await fetch(API_URL + '/api/firmware/update', { method: 'PUT', body: fd });
+    if (!upRes.ok) throw new Error('Install failed (HTTP ' + upRes.status + ')');
+
+    statusEl.style.color = 'var(--green)';
+    statusEl.textContent = 'Installed! Controller is rebooting — reload this page in ~30 seconds.';
+    showToast('Rift v' + latestTag + ' installed — controller rebooting', 'info');
+  } catch(e) {
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = 'Error: ' + e.message;
+    showToast('Update failed: ' + e.message, 'error');
+    if (installBtn) installBtn.disabled = false;
+  }
 }
 
 function loadAboutTab() {
