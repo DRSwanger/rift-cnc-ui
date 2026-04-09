@@ -28,7 +28,8 @@ Rift runs in two modes depending on how you access it:
 - **Start / Pause / Stop / E-Stop** — with confirmation dialogs where it counts
 - **Progress bar** — time remaining and ETA during a job
 - **Water pump + vacuum toggles** — relay control from the DRO bar
-- **Settings modal** — motor tuning, tool config, I/O indicators, WiFi, system clock, firmware update, and more
+- **Settings modal** — motor tuning, tool config, I/O indicators, WiFi, network, system clock, and more
+- **Update manager** — checks GitHub for new releases and links directly to the download
 - **Kiosk mode** — optimized layout for a Pi-connected touchscreen
 - **Dark + light theme** — persisted per browser
 - **Revert to stock anytime** — one button, no tools required
@@ -59,7 +60,7 @@ Specifically: travel limits (min/max for X, Y, Z), steps/mm for each axis, max v
 
 **Keep your backup somewhere you can find it in 6 months.** A Google Drive folder named "CNC Backups" with the date in the filename (`onefinity-backup-2026-04-08.json`) is a good habit.
 
-Once Rift is installed, you can restore your config any time via **Settings → System → Import Backup**.
+Once Rift is installed, you can restore your config any time via **Settings → System → Import Backup**. Your controller config (motors, limits, tool) is separate and restored through the controller's own settings.
 
 ---
 
@@ -70,7 +71,7 @@ Once Rift is installed, you can restore your config any time via **Settings → 
 No SSH, no tools. Done in under a minute.
 
 1. **Download** the latest Rift firmware package:
-   👉 **[rift-cnc-ui-v1.3.0.tar.bz2](https://github.com/DRSwanger/rift-cnc-ui/releases/download/v1.3.0/rift-cnc-ui-v1.3.0.tar.bz2)**
+   👉 **[rift-cnc-ui-v1.3.1.tar.bz2](https://github.com/DRSwanger/rift-cnc-ui/releases/download/v1.3.1/rift-cnc-ui-v1.3.1.tar.bz2)**
 
 2. Open your Onefinity controller in a browser (usually `http://onefinity.local` or your machine's IP)
 
@@ -81,6 +82,14 @@ No SSH, no tools. Done in under a minute.
 5. Wait ~30 seconds for the controller to reboot — then hard-refresh your browser
 
 That's it. Rift is now your controller UI.
+
+### Updating Rift
+
+Once installed, Rift checks for updates automatically. Open **Settings → Firmware** — if a newer version is available it will show the release notes and a link to download the package. Install it the same way as the initial install via **Manual Upload**.
+
+### Previous Versions
+
+All historical releases are available on the [GitHub Releases page](https://github.com/DRSwanger/rift-cnc-ui/releases). Each release includes the firmware package and release notes. You can roll back to any prior version using the same Manual Upload process.
 
 ---
 
@@ -103,7 +112,7 @@ The script auto-discovers the bbctrl HTTP directory and backs up the original `i
 Rift includes a one-click revert:
 
 1. Download the official Onefinity 1.6.6 firmware from Onefinity's website
-2. In Rift: **Settings → Firmware → Revert to Stock 1.6.6**
+2. In Rift: **Settings → Firmware → Revert to Stock**
 3. Select the downloaded `.tar.bz2` — the controller installs it and reboots
 
 Everything is restored: the stock UI, splash screens, and all defaults.
