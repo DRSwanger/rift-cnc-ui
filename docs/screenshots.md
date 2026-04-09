@@ -72,13 +72,13 @@ The Job Scaling dialog lets you adjust feed rate and spindle speed **while a job
 ### Controls
 - **Slider** — drag to set a percentage from ~10% to 200%
 - **±5 / ±10 buttons** — tap for precise incremental adjustments
-- Changes apply **immediately** — the controller responds in real time
+- Tap **Apply Scale & Close** to confirm — the scale is applied when the job starts
 
 ### Notes
-- Setting feed rate below ~10% may cause stalls on some moves — use caution
+- Feed rate scaling takes effect at job start and reverts to default when the job completes
 - Spindle speed scaling only applies if your spindle is controlled via Modbus or PWM through the controller; manually-set routers are unaffected
-- The status line below the sliders shows the current active scale so you always know where you are
-- Tap **Apply Scale & Close** to dismiss — the scale stays active until you reset it to 100%
+- The status line below the sliders shows the currently set scale before you apply it
+- Setting feed rate below ~10% may cause stalls on some moves — use caution
 
 ---
 
