@@ -10,7 +10,7 @@ Rift replaces the stock Onefinity web UI with a fast, dark-themed control panel 
 
 - **Full DRO** — WCS + ABS positions for X, Y, Z at a glance
 - **Jog controls** — XY pad + Z column with configurable step sizes
-- **3D toolpath viewer** — G0/G1/G2/G3 arc support via Three.js
+- **3D toolpath viewer** — G0/G1/G2/G3 arc support via Three.js *(remote browsers only — disabled in kiosk mode)*
 - **GCode viewer** — syntax highlighting with live line tracking during a job
 - **File manager** — upload, drag-and-drop, folder support
 - **Start / Pause / Stop / E-Stop** — with confirmation dialogs where it counts
