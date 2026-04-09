@@ -2667,8 +2667,6 @@
         <button class="view-btn" onclick="viewTop()">Top</button>
         <button class="view-btn" onclick="viewFront()">Front</button>
         <button class="view-btn" onclick="viewIso()">Iso</button>
-        <button class="view-btn" onclick="centerOnBit()" title="Center view on current bit position">⊕ Bit</button>
-        <button class="view-btn" onclick="centerOnZero()" title="Center view on WCS zero">⊕ Zero</button>
         <button class="view-btn view-toggle" id="vt-grid"    onclick="toggleView('grid')"   title="Toggle grid">Grid</button>
         <button class="view-btn view-toggle" id="vt-rapids"  onclick="toggleView('rapids')" title="Toggle G0 rapids">Rapids</button>
         <button class="view-btn view-toggle" id="vt-marker"  onclick="toggleView('marker')" title="Toggle position marker">Marker</button>
@@ -5192,19 +5190,10 @@ function parseAndRender3D(lines) {
   }
 }
 
-function resetCamera()  { camTheta=0.8; camPhi=0.6; updateCamera(); }
-function viewTop()      { camPhi = 0.05; updateCamera(); }
-function viewFront()    { camTheta = 0; camPhi = Math.PI/2 - 0.05; updateCamera(); }
-function viewIso()      { camTheta = 0.8; camPhi = 0.6; updateCamera(); }
-function centerOnBit()  {
-  if (!posMarker) return;
-  camTarget.copy(posMarker.position);
-  updateCamera();
-}
-function centerOnZero() {
-  camTarget.set(0, 0, 0);
-  updateCamera();
-}
+function resetCamera() { camTheta=0.8; camPhi=0.6; updateCamera(); }
+function viewTop()     { camPhi = 0.05; updateCamera(); }
+function viewFront()   { camTheta = 0; camPhi = Math.PI/2 - 0.05; updateCamera(); }
+function viewIso()     { camTheta = 0.8; camPhi = 0.6; updateCamera(); }
 
 // ── MOBILE TABS ──
 const _mobileTabs = ['jog', 'gcode'];
