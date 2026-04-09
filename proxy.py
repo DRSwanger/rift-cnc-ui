@@ -52,6 +52,21 @@ async def ntfy_send(title, message, priority='default', tags=''):
         pass  # never let notification failure affect the proxy
 
 
+async def check_update(request):
+    """Proxy GitHub releases/latest to avoid CORS / SSL issues in older browsers."""
+    try:
+        async with ClientSession() as session:
+            async with session.get(
+                'https://api.github.com/repos/DRSwanger/rift-cnc-ui/releases/latest',
+                headers={'Accept': 'application/vnd.github+json'},
+                timeout=10,
+            ) as resp:
+                data = await resp.json()
+                return web.json_response(data)
+    except Exception as e:
+        return web.json_response({'error': str(e)}, status=502)
+
+
 async def handle(request):
     path = request.path
 
@@ -276,6 +291,7 @@ async def handle(request):
 
 def main():
     app = web.Application()
+    app.router.add_get('/api/check-update', check_update)
     app.router.add_route('*', '/{path_info:.*}', handle)
 
     print(f'CNC Proxy running on http://0.0.0.0:{PORT}')

@@ -6086,11 +6086,19 @@ async function checkForUpdates() {
   if (checkBtn) checkBtn.disabled = true;
 
   try {
-    const res = await fetch('https://api.github.com/repos/DRSwanger/rift-cnc-ui/releases/latest', {
-      headers: { 'Accept': 'application/vnd.github+json' }
-    });
+    // Try proxy endpoint first (avoids CORS/SSL issues on older browsers)
+    let res;
+    try {
+      res = await fetch(API_URL + '/api/check-update');
+      if (!res.ok) throw new Error('proxy ' + res.status);
+    } catch(_) {
+      res = await fetch('https://api.github.com/repos/DRSwanger/rift-cnc-ui/releases/latest', {
+        headers: { 'Accept': 'application/vnd.github+json' }
+      });
+    }
     if (!res.ok) throw new Error('GitHub API error (' + res.status + ')');
     _latestRelease = await res.json();
+    if (_latestRelease.error) throw new Error(_latestRelease.error);
 
     const latestTag = (_latestRelease.tag_name || '').replace(/^v/, '');
     if (latestEl) latestEl.textContent = 'v' + latestTag;
