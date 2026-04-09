@@ -72,12 +72,14 @@ The Job Scaling dialog lets you adjust feed rate and spindle speed **while a job
 ### Controls
 - **Slider** — drag to set a percentage from ~10% to 200%
 - **±5 / ±10 buttons** — tap for precise incremental adjustments
-- Tap **Apply Scale & Close** to confirm — the scale is applied when the job starts
+- Tap **Apply Scale & Close** to confirm
+
+### How it works
+bbctrl has no live feed override API, so Rift handles scaling by rewriting the GCode directly. When you tap **Apply Scale & Close**, Rift rewrites every `F` value in the loaded file at the selected percentage and uploads it as a temporary scaled file. That scaled file is what runs when you tap **Start**. When the job ends, the original unscaled file is automatically restored.
 
 ### Notes
-- Feed rate scaling takes effect at job start and reverts to default when the job completes
 - Spindle speed scaling only applies if your spindle is controlled via Modbus or PWM through the controller; manually-set routers are unaffected
-- The status line below the sliders shows the currently set scale before you apply it
+- The dot indicator on the Feed/Spindle cards turns yellow when a scale is pending (set but not yet applied) and green when a scaled file is loaded and ready
 - Setting feed rate below ~10% may cause stalls on some moves — use caution
 
 ---
