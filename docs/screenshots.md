@@ -4,6 +4,14 @@ A visual walkthrough of the major features in Rift CNC UI.
 
 ---
 
+## Kiosk Mode — Touchscreen Layout
+
+![Rift Kiosk Mode](screenshot-kiosk.png)
+
+Kiosk mode activates automatically when Rift is opened directly on the Pi's connected display (localhost). The layout is optimized for a touchscreen mounted at the machine — larger tap targets, jog controls front and center, and the 3D viewer is disabled to keep the Pi's CPU free for motion control.
+
+---
+
 ## Main Interface — 3D Toolpath Viewer
 
 ![3D Toolpath Viewer](screenshot-3d.jpg)
