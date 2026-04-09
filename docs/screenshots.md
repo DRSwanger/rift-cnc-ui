@@ -23,7 +23,7 @@ The GCode panel shows syntax-highlighted code with the active line always scroll
 
 ## Probe Z — Reference Selection
 
-![Probe Z Dialog](screenshot-probe-z.jpg)
+<img src="screenshot-probe-z.jpg" width="480" alt="Probe Z Dialog">
 
 The Probe Z workflow guides you step-by-step through setting your Z zero before a job. When you tap **Probe Z** on the main screen, this dialog appears first to confirm your reference method.
 
@@ -43,7 +43,7 @@ The probe block height is pulled from your Settings → Probe configuration and 
 
 ## File Manager
 
-![File Manager](screenshot-file-manager.jpg)
+<img src="screenshot-file-manager.jpg" width="600" alt="File Manager">
 
 The file manager handles uploading and organizing GCode on the controller's storage. Open it by tapping the folder icon on the main screen.
 
@@ -65,7 +65,7 @@ Tap any file to select it. The filename appears in the footer of the main screen
 
 ## Job Scaling
 
-![Job Scaling](screenshot-job-scaling.jpg)
+<img src="screenshot-job-scaling.jpg" width="420" alt="Job Scaling">
 
 The Job Scaling dialog lets you adjust feed rate and spindle speed **while a job is running** — no need to stop, edit, and restart. Open it by tapping the feed rate or spindle RPM display in the DRO bar during a job.
 
@@ -84,7 +84,7 @@ The Job Scaling dialog lets you adjust feed rate and spindle speed **while a job
 
 ## Settings — Firmware & Update Manager
 
-![Firmware Tab](screenshot-firmware.jpg)
+<img src="screenshot-firmware.jpg" width="560" alt="Firmware Tab">
 
 The Firmware tab in Settings handles everything related to the Rift version running on your controller. Open it via **Settings → Firmware**.
 

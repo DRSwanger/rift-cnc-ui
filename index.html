@@ -1808,7 +1808,7 @@
 
   /* Indicators tab */
   .indicator-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; }
-  .indicator-item { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:3px; align-items:center; text-align:center; transition:all 0.2s; }
+  .indicator-item { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:3px; align-items:center; text-align:center; transition:all 0.2s; min-height:52px; justify-content:center; }
   .indicator-item.ind-active { border-color:var(--green); background:rgba(78,253,113,0.08); }
   .indicator-item.ind-fault  { border-color:var(--red); background:rgba(255,68,68,0.08); }
   .indicator-item.ind-warn   { border-color:var(--yellow); background:rgba(251,255,0,0.06); }
@@ -1820,7 +1820,7 @@
   .ind-value { font-size:11px; font-weight:600; font-family:'Courier New',monospace; color:var(--text); }
 
   /* DB25 table */
-  .db25-wrap { overflow-x:auto; overflow-y:auto; max-height:260px; border:1px solid var(--border); border-radius:6px; }
+  .db25-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:6px; }
   .db25-table { width:100%; border-collapse:collapse; font-size:11px; }
   .db25-table th { text-align:left; padding:4px 8px; color:var(--accent); font-size:10px; letter-spacing:0.5px; border-bottom:1px solid var(--border); font-weight:700; text-transform:uppercase; }
   .db25-table td { padding:3px 8px; border-bottom:1px solid rgba(46,51,64,0.4); vertical-align:middle; }
@@ -2036,6 +2036,7 @@
       <div class="stab"         onclick="switchSettingsTab('io')">I/O</div>
       <div class="stab"         onclick="switchSettingsTab('gcode-scripts')">GCode</div>
       <div class="stab"         onclick="switchSettingsTab('indicators')">Indicators</div>
+      <div class="stab"         onclick="switchSettingsTab('db25')">DB25</div>
       <div class="stab"         onclick="switchSettingsTab('network')">Network</div>
       <div class="stab"         onclick="switchSettingsTab('system')">System</div>
       <div class="stab"         onclick="switchSettingsTab('firmware')">Firmware</div>
@@ -2078,51 +2079,54 @@
 
       <!-- PROBING -->
       <div class="stab-panel" id="stab-probe">
-        <div class="settings-section">
-          <div class="settings-section-title">Probe Block</div>
-          <div class="settings-row">
-            <div><div class="settings-label">Block height</div><div class="settings-sub">Z — thickness of the touch probe block (mm)</div></div>
-            <input class="settings-input" id="cfg-probe-height" type="number" step="0.01" min="0">
-          </div>
-          <div class="settings-row">
-            <div><div class="settings-label">Block width</div><div class="settings-sub">X dimension (mm)</div></div>
-            <input class="settings-input" id="cfg-probe-width" type="number" step="0.01" min="0">
-          </div>
-          <div class="settings-row">
-            <div><div class="settings-label">Block length</div><div class="settings-sub">Y dimension (mm)</div></div>
-            <input class="settings-input" id="cfg-probe-length" type="number" step="0.01" min="0">
-          </div>
-        </div>
-        <div class="settings-section">
-          <div class="settings-section-title">Touch-Off Speeds</div>
-          <div class="settings-row">
-            <div><div class="settings-label">Fast seek</div><div class="settings-sub">First touch — mm/min</div></div>
-            <input class="settings-input" id="cfg-probe-fast" type="number" step="1" min="1">
-          </div>
-          <div class="settings-row">
-            <div><div class="settings-label">Slow seek</div><div class="settings-sub">Second touch — mm/min</div></div>
-            <input class="settings-input" id="cfg-probe-slow" type="number" step="1" min="1">
-          </div>
-          <div class="settings-row">
-            <div><div class="settings-label">Retract between touches</div><div class="settings-sub">Backoff before slow seek (mm)</div></div>
-            <input class="settings-input" id="cfg-probe-backoff" type="number" step="0.1" min="0.5">
-          </div>
-          <div class="settings-row">
-            <div><div class="settings-label">Retract after probe</div><div class="settings-sub">Lift after touch-off (mm)</div></div>
-            <input class="settings-input" id="cfg-probe-retract" type="number" step="0.1" min="0">
-          </div>
-        </div>
-        <div class="settings-section">
-          <div class="settings-section-title">Safety</div>
-          <div class="settings-row">
-            <div>
-              <div class="settings-label">Require circuit verification</div>
-              <div class="settings-sub">Before probing, user must touch probe to the bit to confirm the circuit is live</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px;">
+          <div>
+            <div class="settings-section">
+              <div class="settings-section-title">Probe Block</div>
+              <div class="settings-row">
+                <div><div class="settings-label">Block height</div><div class="settings-sub">Z — thickness (mm)</div></div>
+                <input class="settings-input" id="cfg-probe-height" type="number" step="0.01" min="0">
+              </div>
+              <div class="settings-row">
+                <div><div class="settings-label">Block width</div><div class="settings-sub">X dimension (mm)</div></div>
+                <input class="settings-input" id="cfg-probe-width" type="number" step="0.01" min="0">
+              </div>
+              <div class="settings-row">
+                <div><div class="settings-label">Block length</div><div class="settings-sub">Y dimension (mm)</div></div>
+                <input class="settings-input" id="cfg-probe-length" type="number" step="0.01" min="0">
+              </div>
             </div>
-            <select class="settings-select" id="cfg-probe-safety">
-              <option value="1">Enabled</option>
-              <option value="0">Disabled</option>
-            </select>
+            <div class="settings-section">
+              <div class="settings-section-title">Safety</div>
+              <div class="settings-row">
+                <div><div class="settings-label">Circuit verification</div><div class="settings-sub">Touch probe to bit before probing</div></div>
+                <select class="settings-select" id="cfg-probe-safety">
+                  <option value="1">Enabled</option>
+                  <option value="0">Disabled</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="settings-section">
+              <div class="settings-section-title">Touch-Off Speeds</div>
+              <div class="settings-row">
+                <div><div class="settings-label">Fast seek</div><div class="settings-sub">First touch — mm/min</div></div>
+                <input class="settings-input" id="cfg-probe-fast" type="number" step="1" min="1">
+              </div>
+              <div class="settings-row">
+                <div><div class="settings-label">Slow seek</div><div class="settings-sub">Second touch — mm/min</div></div>
+                <input class="settings-input" id="cfg-probe-slow" type="number" step="1" min="1">
+              </div>
+              <div class="settings-row">
+                <div><div class="settings-label">Retract between</div><div class="settings-sub">Backoff before slow seek (mm)</div></div>
+                <input class="settings-input" id="cfg-probe-backoff" type="number" step="0.1" min="0.5">
+              </div>
+              <div class="settings-row">
+                <div><div class="settings-label">Retract after</div><div class="settings-sub">Lift after touch-off (mm)</div></div>
+                <input class="settings-input" id="cfg-probe-retract" type="number" step="0.1" min="0">
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -2213,57 +2217,47 @@
       <!-- INDICATORS -->
       <div class="stab-panel" id="stab-indicators">
         <div class="settings-section">
-          <div class="settings-section-title">Power Board</div>
-          <div id="pwr-telemetry-row" style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--text);margin-bottom:4px;">
-            <span>Input: <strong id="pwr-vin">—</strong> V</span>
-            <span>Output: <strong id="pwr-vout">—</strong> V</span>
-            <span>Motor: <strong id="pwr-motor">—</strong> A</span>
-            <span>Load 1: <strong id="pwr-load1">—</strong> A</span>
-            <span>Load 2: <strong id="pwr-load2">—</strong> A</span>
-            <span>Temp: <strong id="pwr-temp">—</strong> °C</span>
-          </div>
-          <div id="pwr-fault-row" style="font-size:11px;color:var(--red);min-height:14px;"></div>
-        </div>
-        <div class="settings-section">
           <div class="settings-section-title">Live I/O State</div>
           <div class="indicator-grid" id="indicators-io-grid" style="margin-bottom:10px;">
             <!-- Injected by updateIndicatorsTab() -->
           </div>
         </div>
+      </div>
+
+      <!-- DB25 -->
+      <div class="stab-panel" id="stab-db25">
         <div class="settings-section">
           <div class="settings-section-title">DB25 Breakout Board</div>
-          <div class="db25-wrap">
-            <table class="db25-table">
-              <thead><tr><th>Pin</th><th>Signal</th><th>Type</th><th>Notes</th></tr></thead>
-              <tbody>
-                <tr><td class="db25-pin">1</td><td class="db25-func">Load 2</td><td><span class="db25-badge output">Output</span></td><td class="db25-note">Relay 2 — Vacuum (M8) · code: 2om</td></tr>
-                <tr><td class="db25-pin">2</td><td class="db25-func">Load 1</td><td><span class="db25-badge output">Output</span></td><td class="db25-note">Relay 1 — Water Pump (M7) · code: 1om</td></tr>
-                <tr><td class="db25-pin">3</td><td class="db25-func">X Min Switch</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Motor 0 min limit / home switch</td></tr>
-                <tr><td class="db25-pin">4</td><td class="db25-func">X Max Switch</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Motor 0 max limit switch</td></tr>
-                <tr><td class="db25-pin">5</td><td class="db25-func">Y Min Switch</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Motor 1 min limit / home switch</td></tr>
-                <tr><td class="db25-pin">6</td><td class="db25-func">3.3V</td><td><span class="db25-badge pwr">Power</span></td><td class="db25-note">3.3V power output</td></tr>
-                <tr><td class="db25-pin">7</td><td class="db25-func">GND</td><td><span class="db25-badge pwr">Power</span></td><td class="db25-note">Ground</td></tr>
-                <tr><td class="db25-pin">8</td><td class="db25-func">Y Max Switch</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Motor 1 max limit switch</td></tr>
-                <tr><td class="db25-pin">9</td><td class="db25-func">A Min Switch</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Motor 2 min limit (4th axis)</td></tr>
-                <tr><td class="db25-pin">10</td><td class="db25-func">A Max Switch</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Motor 2 max limit (4th axis)</td></tr>
-                <tr><td class="db25-pin">11</td><td class="db25-func">Z Min Switch</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Motor 3 min limit / home switch</td></tr>
-                <tr><td class="db25-pin">12</td><td class="db25-func">Z Max Switch</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Motor 3 max limit switch</td></tr>
-                <tr><td class="db25-pin">13</td><td class="db25-func">RS-485 A</td><td><span class="db25-badge input">Serial</span></td><td class="db25-note">RS-485 differential pair A — Modbus VFD</td></tr>
-                <tr><td class="db25-pin">14</td><td class="db25-func">RS-485 B</td><td><span class="db25-badge input">Serial</span></td><td class="db25-note">RS-485 differential pair B — Modbus VFD</td></tr>
-                <tr><td class="db25-pin">15</td><td class="db25-func">Tool Enable</td><td><span class="db25-badge output">Output</span></td><td class="db25-note">Spindle enable / PWM signal · code: eom</td></tr>
-                <tr><td class="db25-pin">16</td><td class="db25-func">Tool Direction</td><td><span class="db25-badge output">Output</span></td><td class="db25-note">Spindle direction · code: dom</td></tr>
-                <tr><td class="db25-pin">17</td><td class="db25-func">Tool PWM</td><td><span class="db25-badge output">Output</span></td><td class="db25-note">Spindle PWM signal (alternative to pin 15)</td></tr>
-                <tr><td class="db25-pin">18</td><td class="db25-func">Analog 2</td><td><span class="db25-badge input">Analog</span></td><td class="db25-note">Analog input 2</td></tr>
-                <tr><td class="db25-pin">19</td><td class="db25-func">GND</td><td><span class="db25-badge pwr">Power</span></td><td class="db25-note">Ground</td></tr>
-                <tr><td class="db25-pin">20</td><td class="db25-func">3.3V</td><td><span class="db25-badge pwr">Power</span></td><td class="db25-note">3.3V power output</td></tr>
-                <tr><td class="db25-pin">21</td><td class="db25-func">Fault</td><td><span class="db25-badge output">Output</span></td><td class="db25-note">Driver fault signal · code: fom</td></tr>
-                <tr><td class="db25-pin">22</td><td class="db25-func">Probe</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Touch probe / bit setter input · code: pt</td></tr>
-                <tr><td class="db25-pin">23</td><td class="db25-func">E-Stop</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Emergency stop input · code: et</td></tr>
-                <tr><td class="db25-pin">24</td><td class="db25-func">Analog 1</td><td><span class="db25-badge input">Analog</span></td><td class="db25-note">Analog input 1</td></tr>
-                <tr><td class="db25-pin">25</td><td class="db25-func">GND</td><td><span class="db25-badge pwr">Power</span></td><td class="db25-note">Ground</td></tr>
-              </tbody>
-            </table>
-          </div>
+          <table class="db25-table">
+            <thead><tr><th>Pin</th><th>Signal</th><th>Type</th><th>Notes</th></tr></thead>
+            <tbody>
+              <tr><td class="db25-pin">1</td><td class="db25-func">Load 2</td><td><span class="db25-badge output">Output</span></td><td class="db25-note">Relay 2 — Vacuum (M8) · code: 2om</td></tr>
+              <tr><td class="db25-pin">2</td><td class="db25-func">Load 1</td><td><span class="db25-badge output">Output</span></td><td class="db25-note">Relay 1 — Water Pump (M7) · code: 1om</td></tr>
+              <tr><td class="db25-pin">3</td><td class="db25-func">X Min Switch</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Motor 0 min limit / home switch</td></tr>
+              <tr><td class="db25-pin">4</td><td class="db25-func">X Max Switch</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Motor 0 max limit switch</td></tr>
+              <tr><td class="db25-pin">5</td><td class="db25-func">Y Min Switch</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Motor 1 min limit / home switch</td></tr>
+              <tr><td class="db25-pin">6</td><td class="db25-func">3.3V</td><td><span class="db25-badge pwr">Power</span></td><td class="db25-note">3.3V power output</td></tr>
+              <tr><td class="db25-pin">7</td><td class="db25-func">GND</td><td><span class="db25-badge pwr">Power</span></td><td class="db25-note">Ground</td></tr>
+              <tr><td class="db25-pin">8</td><td class="db25-func">Y Max Switch</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Motor 1 max limit switch</td></tr>
+              <tr><td class="db25-pin">9</td><td class="db25-func">A Min Switch</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Motor 2 min limit (4th axis)</td></tr>
+              <tr><td class="db25-pin">10</td><td class="db25-func">A Max Switch</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Motor 2 max limit (4th axis)</td></tr>
+              <tr><td class="db25-pin">11</td><td class="db25-func">Z Min Switch</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Motor 3 min limit / home switch</td></tr>
+              <tr><td class="db25-pin">12</td><td class="db25-func">Z Max Switch</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Motor 3 max limit switch</td></tr>
+              <tr><td class="db25-pin">13</td><td class="db25-func">RS-485 A</td><td><span class="db25-badge input">Serial</span></td><td class="db25-note">RS-485 differential pair A — Modbus VFD</td></tr>
+              <tr><td class="db25-pin">14</td><td class="db25-func">RS-485 B</td><td><span class="db25-badge input">Serial</span></td><td class="db25-note">RS-485 differential pair B — Modbus VFD</td></tr>
+              <tr><td class="db25-pin">15</td><td class="db25-func">Tool Enable</td><td><span class="db25-badge output">Output</span></td><td class="db25-note">Spindle enable / PWM signal · code: eom</td></tr>
+              <tr><td class="db25-pin">16</td><td class="db25-func">Tool Direction</td><td><span class="db25-badge output">Output</span></td><td class="db25-note">Spindle direction · code: dom</td></tr>
+              <tr><td class="db25-pin">17</td><td class="db25-func">Tool PWM</td><td><span class="db25-badge output">Output</span></td><td class="db25-note">Spindle PWM signal (alternative to pin 15)</td></tr>
+              <tr><td class="db25-pin">18</td><td class="db25-func">Analog 2</td><td><span class="db25-badge input">Analog</span></td><td class="db25-note">Analog input 2</td></tr>
+              <tr><td class="db25-pin">19</td><td class="db25-func">GND</td><td><span class="db25-badge pwr">Power</span></td><td class="db25-note">Ground</td></tr>
+              <tr><td class="db25-pin">20</td><td class="db25-func">3.3V</td><td><span class="db25-badge pwr">Power</span></td><td class="db25-note">3.3V power output</td></tr>
+              <tr><td class="db25-pin">21</td><td class="db25-func">Fault</td><td><span class="db25-badge output">Output</span></td><td class="db25-note">Driver fault signal · code: fom</td></tr>
+              <tr><td class="db25-pin">22</td><td class="db25-func">Probe</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Touch probe / bit setter input · code: pt</td></tr>
+              <tr><td class="db25-pin">23</td><td class="db25-func">E-Stop</td><td><span class="db25-badge input">Input</span></td><td class="db25-note">Emergency stop input · code: et</td></tr>
+              <tr><td class="db25-pin">24</td><td class="db25-func">Analog 1</td><td><span class="db25-badge input">Analog</span></td><td class="db25-note">Analog input 1</td></tr>
+              <tr><td class="db25-pin">25</td><td class="db25-func">GND</td><td><span class="db25-badge pwr">Power</span></td><td class="db25-note">Ground</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -2281,7 +2275,7 @@
 
         <div class="settings-section">
           <div class="settings-section-title">Pi Network &amp; WiFi</div>
-          <div style="overflow-y:auto;max-height:260px;border:1px solid var(--border);border-radius:6px;padding:10px;">
+          <div style="overflow-y:auto;max-height:200px;border:1px solid var(--border);border-radius:6px;padding:10px;">
             <div id="wifi-status-info" style="display:flex;gap:16px;font-size:12px;color:var(--muted);margin-bottom:10px;flex-wrap:wrap;">
               <span>Hostname: <strong id="wifi-hostname" style="color:var(--text)">—</strong></span>
               <span>IP: <strong id="wifi-ip" style="color:var(--text)">—</strong></span>
@@ -2347,6 +2341,9 @@
             <button class="admin-btn" id="fw-check-btn" onclick="checkForUpdates()">↻ Check Now</button>
           </div>
           <div id="fw-update-status" style="font-size:12px;color:var(--muted);margin-bottom:8px;"></div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">
+            <a href="https://github.com/DRSwanger/rift-cnc-ui/releases" target="_blank" style="color:var(--accent);text-decoration:none;">⎋ All releases on GitHub</a>
+          </div>
           <div id="fw-update-notes" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:11px;color:var(--muted);white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;"></div>
         </div>
         <div class="settings-section">
@@ -2993,20 +2990,6 @@ function updateUI(data) {
   // Controller messages (tool-change prompts, M0 MSG, etc.)
   if ('messages' in data) handleControllerMessages(data.messages);
 
-  // Power board telemetry
-  if ('vin'   in data) { const el = document.getElementById('pwr-vin');   if (el) el.textContent = (+data.vin).toFixed(1); }
-  if ('vout'  in data) { const el = document.getElementById('pwr-vout');  if (el) el.textContent = (+data.vout).toFixed(1); }
-  if ('motor' in data) { const el = document.getElementById('pwr-motor'); if (el) el.textContent = (+data.motor).toFixed(2); }
-  if ('load1' in data) { const el = document.getElementById('pwr-load1'); if (el) el.textContent = (+data.load1).toFixed(2); }
-  if ('load2' in data) { const el = document.getElementById('pwr-load2'); if (el) el.textContent = (+data.load2).toFixed(2); }
-  if ('temp'  in data) { const el = document.getElementById('pwr-temp');  if (el) el.textContent = (+data.temp).toFixed(1); }
-  // Power fault flags
-  const pwrFaults = ['under_voltage','over_voltage','over_current','motor_overload','load1_shutdown','load2_shutdown','power_shutdown'];
-  if (pwrFaults.some(f => f in data)) {
-    const active = pwrFaults.filter(f => state[f]);
-    const el = document.getElementById('pwr-fault-row');
-    if (el) el.textContent = active.length ? 'Faults: ' + active.map(f => f.replace(/_/g,' ')).join(', ') : '';
-  }
 
   // Probe input indicator — bbctrl uses 'pw' (probe wire) for the probe input state.
   // pw=1 = open circuit (not touching), pw=0 = closed (probe touching bit).
@@ -4003,7 +3986,7 @@ async function loadSettings() {
 function switchSettingsTab(tab) {
   document.querySelectorAll('#settings-tabs .stab').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.stab-panel').forEach(el => el.classList.remove('active'));
-  const tabs = ['general','probe','motors','motors-yy','tool','io','gcode-scripts','indicators','network','system','firmware','about','logs'];
+  const tabs = ['general','probe','motors','motors-yy','tool','io','gcode-scripts','indicators','db25','network','system','firmware','about','logs'];
   const idx = tabs.indexOf(tab);
   const _stabTab = document.querySelectorAll('#settings-tabs .stab')[idx];
   if (_stabTab) _stabTab.classList.add('active');
@@ -4169,10 +4152,9 @@ function renderIOSettings(cfg) {
   };
   const outputLabels = settings.outputLabels || {};
   const renderOutput = (k, v, idx) => {
-    // Only Load 1 (idx 0) and Load 2 (idx 1) get a rename input; others show the key as-is
-    const isLoad = idx === 0 || idx === 1;
+    const isLoad = k === 'load-1' || k === 'load-2';
     const saved  = outputLabels[k] || '';
-    const ph     = idx === 0 ? 'Water Pump' : 'Vacuum';
+    const ph     = k === 'load-1' ? 'Water Pump' : 'Vacuum';
     const labelCell = isLoad
       ? `<div style="display:flex;align-items:center;gap:8px;min-width:0;">
            <input class="settings-input io-out-label" data-key="${k}" data-idx="${idx}"
@@ -4189,8 +4171,13 @@ function renderIOSettings(cfg) {
   };
   document.getElementById('io-inputs-content').innerHTML =
     Object.entries(switches).map(([k,v]) => renderSwitch(k,v)).join('') || '<div class="settings-note">No switches found.</div>';
+  const outputOrder = ['load-1', 'load-2', 'fault'];
+  const sortedOutputs = [
+    ...outputOrder.filter(k => k in outputs).map(k => [k, outputs[k]]),
+    ...Object.entries(outputs).filter(([k]) => !outputOrder.includes(k))
+  ];
   document.getElementById('io-outputs-content').innerHTML =
-    Object.entries(outputs).map(([k,v], i) => renderOutput(k, v, i)).join('') || '<div class="settings-note">No outputs found.</div>';
+    sortedOutputs.map(([k,v], i) => renderOutput(k, v, i)).join('') || '<div class="settings-note">No outputs found.</div>';
   document.getElementById('io-loading').style.display = 'none';
   document.getElementById('io-content').style.display = '';
 }
@@ -6169,14 +6156,14 @@ function updateIndicatorsTab() {
     },
     {
       id: 'ind-load1',
-      label: 'Load 1\nWater Pump',
+      label: 'Load 1',
       value: state['1oa'] ? 'ON' : 'OFF',
       cls: state['1oa'] ? 'ind-active' : '',
       icon: '⬤',
     },
     {
       id: 'ind-load2',
-      label: 'Load 2\nVacuum',
+      label: 'Load 2',
       value: state['2oa'] ? 'ON' : 'OFF',
       cls: state['2oa'] ? 'ind-active' : '',
       icon: '⬤',
@@ -6226,13 +6213,35 @@ function updateIndicatorsTab() {
     }
   }
 
-  const all = [...indicators, ...inputPins];
-  grid.innerHTML = all.map(ind => `
+  // Power board telemetry as indicator items
+  const pwrItems = [];
+  const pwrFields = [
+    { key: 'vin',   label: 'In V',    fmt: v => (+v).toFixed(1), cls: v => (+v) < 20 ? 'ind-fault' : (+v) < 22 ? 'ind-warn' : '' },
+    { key: 'vout',  label: 'Out V',   fmt: v => (+v).toFixed(1), cls: () => '' },
+    { key: 'motor', label: 'Motor A', fmt: v => (+v).toFixed(2), cls: v => (+v) > 0.05 ? 'ind-active' : '' },
+    { key: 'load1', label: 'Ld 1 A',  fmt: v => (+v).toFixed(2), cls: v => (+v) > 0.05 ? 'ind-active' : '' },
+    { key: 'load2', label: 'Ld 2 A',  fmt: v => (+v).toFixed(2), cls: v => (+v) > 0.05 ? 'ind-active' : '' },
+    { key: 'temp',  label: 'Temp °C', fmt: v => (+v).toFixed(1), cls: v => (+v) > 60 ? 'ind-fault' : (+v) > 45 ? 'ind-warn' : '' },
+  ];
+  pwrFields.forEach(function(f) {
+    if (f.key in state) {
+      pwrItems.push({
+        id: 'ind-pwr-' + f.key,
+        label: f.label,
+        value: f.fmt(state[f.key]),
+        cls: f.cls(state[f.key]),
+        icon: '⬤',
+      });
+    }
+  });
+
+  const all = [...indicators, ...inputPins, ...pwrItems];
+  grid.innerHTML = all.map(function(ind) { return `
     <div class="indicator-item ${ind.cls}" id="${ind.id}">
       <div class="ind-dot"></div>
-      <div class="ind-label">${ind.label.replace('\n', '<br>')}</div>
+      <div class="ind-label">${ind.label}</div>
       <div class="ind-value">${ind.value}</div>
-    </div>`).join('');
+    </div>`; }).join('');
 }
 
 // ── UI LOGGING ──
