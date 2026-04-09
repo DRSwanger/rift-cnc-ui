@@ -6,6 +6,18 @@ Rift replaces the stock Onefinity web UI with a fast, dark-themed control panel 
 
 ---
 
+## Kiosk Mode vs Remote Browser
+
+Rift runs in two modes depending on how you access it:
+
+**Kiosk Mode** — when opened directly on the Pi's connected display (localhost). The layout is optimized for a touchscreen mounted at the machine: larger buttons, no 3D viewer, compact sidebar with jog controls front and center.
+
+![Rift Kiosk Mode](docs/screenshot-kiosk.png)
+
+**Remote Browser Mode** — when opened from any other device on the network (phone, tablet, laptop). Full layout with the 3D toolpath viewer, GCode panel, and wider settings modal. This is the recommended mode for monitoring and setup.
+
+---
+
 ## Features
 
 - **Full DRO** — WCS + ABS positions for X, Y, Z at a glance
