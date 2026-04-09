@@ -16,6 +16,10 @@ Rift runs in two modes depending on how you access it:
 
 **Remote Browser Mode** — when opened from any other device on the network (phone, tablet, laptop). Full layout with the 3D toolpath viewer, GCode panel, and wider settings modal. This is the recommended mode for monitoring and setup.
 
+![Rift Remote Browser — 3D Toolpath Viewer](docs/screenshot-3d.jpg)
+
+📸 **[Full screenshot tour →](docs/screenshots.md)**
+
 ---
 
 ## Features
@@ -121,17 +125,9 @@ Everything is restored: the stock UI, splash screens, and all defaults.
 
 ## Running the Local Proxy (Optional)
 
-Rift can be served from any machine on your network using the included proxy:
+The included `proxy.py` server unlocks features that aren't available when accessing the controller directly — push notifications, shared settings across browsers, combined backup/restore, and more.
 
-```bash
-# Default (auto-detects controller at 192.168.1.130)
-python3 proxy.py
-
-# Custom controller IP
-CNC_HOST=192.168.1.xxx python3 proxy.py
-```
-
-Then open `http://<your-machine-ip>:8888` in any browser.
+See **[Local Proxy — Setup & Features →](docs/screenshots.md#local-proxy--setup--features)** for full details and instructions.
 
 ---
 
