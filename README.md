@@ -28,8 +28,6 @@ Rift replaces the stock Onefinity web UI with a fast, dark-themed control panel 
 - Onefinity CNC running **bbctrl 1.6.6** (BuildBotics controller)
 - A browser on the same network (Chrome, Firefox, Safari, Edge)
 
-> Rift targets the original BuildBotics-based Onefinity controller. It is **not** compatible with the Onefinity Redline controller at this time.
-
 ---
 
 ## Installation
@@ -114,7 +112,6 @@ scripts/            — Pi install helpers
 
 - Resume-from-stop is implemented but disabled pending further testing (`ENABLE_RESUME = false`)
 - Macro buttons are implemented but disabled pending the editor UI (`ENABLE_MACROS = false`)
-- Not compatible with Onefinity Redline (proprietary API, not yet reverse engineered)
 
 ---
 
