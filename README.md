@@ -112,6 +112,8 @@ scripts/            — Pi install helpers
 
 - Resume-from-stop is implemented but disabled pending further testing (`ENABLE_RESUME = false`)
 - Macro buttons are implemented but disabled pending the editor UI (`ENABLE_MACROS = false`)
+- Rotary (4th axis) functionality is in progress and not yet enabled by default
+- Automatic tool changer (ATC) workflow is in progress and not yet enabled by default
 
 ---
 
