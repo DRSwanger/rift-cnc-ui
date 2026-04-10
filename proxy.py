@@ -53,11 +53,17 @@ async def ntfy_send(title, message, priority='default', tags=''):
 
 
 async def check_update(request):
-    """Proxy GitHub releases/latest to avoid CORS / SSL issues in older browsers."""
+    """Proxy GitHub releases to avoid CORS / SSL issues in older browsers.
+    ?channel=nightly returns the full releases list (includes pre-releases).
+    Default returns /releases/latest (stable only)."""
+    nightly = request.query.get('channel') == 'nightly'
+    url = ('https://api.github.com/repos/DRSwanger/rift-cnc-ui/releases'
+           if nightly else
+           'https://api.github.com/repos/DRSwanger/rift-cnc-ui/releases/latest')
     try:
         async with ClientSession() as session:
             async with session.get(
-                'https://api.github.com/repos/DRSwanger/rift-cnc-ui/releases/latest',
+                url,
                 headers={'Accept': 'application/vnd.github+json'},
                 timeout=10,
             ) as resp:

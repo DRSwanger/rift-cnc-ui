@@ -81,6 +81,7 @@
     align-items: center;
     gap: 20px;
     padding: 12px 24px;
+    position: relative;
   }
   /* Error banner — zero height when hidden, slides open when active */
   #error-banner {
@@ -330,7 +331,7 @@
     border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-bottom: 12px;
   }
   .settings-row {
-    display: grid; grid-template-columns: 1fr 130px;
+    display: grid; grid-template-columns: 1fr 195px;
     align-items: center; gap: 8px; margin-bottom: 10px;
   }
   .settings-label { font-size: 12px; color: var(--text); }
@@ -351,7 +352,7 @@
   #motors-content-yy .motor-row,
   #tool-content .motor-row {
     display: grid;
-    grid-template-columns: 1fr 72px;
+    grid-template-columns: 1fr 108px;
     align-items: center;
     gap: 4px;
   }
@@ -1932,6 +1933,7 @@
       </div>
     </div>
 
+    <a id="fw-update-notice" href="#" onclick="openSettings();switchSettingsTab('firmware');return false;" style="display:none;position:absolute;left:50%;transform:translateX(-50%);font-size:11px;color:var(--green);text-decoration:none;font-weight:600;letter-spacing:0.2px;white-space:nowrap;" title="Click to view update details">⬆ Update available</a>
     <div id="machine-state" class="state-connecting">Connecting</div>
     <button id="btn-force-clear" onclick="forceClearState()" title="Machine appears stuck — force controller back to idle without E-Stop" style="display:none">⚡ Force Clear</button>
     <button id="btn-estop" onclick="machineEStop()">⛔ E-Stop</button>
@@ -2073,6 +2075,23 @@
           <div class="settings-row">
             <div><div class="settings-label">Cornering speed</div><div class="settings-sub">Junction acceleration (mm/min²)</div></div>
             <input class="settings-input" id="cfg-junction-accel" type="number" step="1000" min="0">
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-title">Safety</div>
+          <div class="settings-row">
+            <div><div class="settings-label">Soft limit pre-flight check</div><div class="settings-sub">Warn before starting if file extents exceed machine limits</div></div>
+            <select class="settings-select" id="cfg-warn-soft-limits">
+              <option value="1">Enabled</option>
+              <option value="0">Disabled</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-label">Zero Z confirmation</div><div class="settings-sub">Confirm dialog when zeroing Z or all axes</div></div>
+            <select class="settings-select" id="cfg-warn-zero-z">
+              <option value="1">Enabled</option>
+              <option value="0">Disabled</option>
+            </select>
           </div>
         </div>
       </div>
@@ -2339,6 +2358,20 @@
             <div style="font-size:12px;color:var(--muted);">Installed: <strong style="color:var(--text)">v<span id="fw-version-val"></span></strong></div>
             <div style="font-size:12px;color:var(--muted);">Latest: <strong id="fw-latest-val" style="color:var(--text)">—</strong></div>
             <button class="admin-btn" id="fw-check-btn" onclick="checkForUpdates()">↻ Check Now</button>
+          </div>
+          <div class="settings-row" style="margin-top:6px;">
+            <div><div class="settings-label">Auto-check for updates</div><div class="settings-sub">Check GitHub on startup and daily</div></div>
+            <select class="settings-select" id="cfg-auto-check-updates">
+              <option value="1">Enabled</option>
+              <option value="0">Disabled</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-label">Update channel</div><div class="settings-sub">Nightly includes pre-releases and betas</div></div>
+            <select class="settings-select" id="cfg-update-channel">
+              <option value="stable">Stable</option>
+              <option value="nightly">Nightly</option>
+            </select>
           </div>
           <div id="fw-update-status" style="font-size:12px;color:var(--muted);margin-bottom:8px;"></div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">
@@ -2802,7 +2835,7 @@ function escHtml(s) {
 const WS_URL  = `ws://${location.host}/websocket`; // same-origin always
 const API_URL = ``; // relative URLs — works for both proxy and direct bbctrl
 const SAFE_Z  = 50; // mm to retract before repositioning on resume
-const UI_VERSION             = '1.3.1'; // Rift by AlienWoodshop LLC
+const UI_VERSION             = '1.3.0'; // Rift by AlienWoodshop LLC
 const ENABLE_RESUME          = false; // set true to re-enable resume-from-stop feature
 const ENABLE_MACROS          = false; // set true to re-enable macro buttons
 const ENABLE_ROTARY          = false; // set true to show rotary axis toggle
@@ -2843,6 +2876,7 @@ window.addEventListener('unhandledrejection', e => {
 });
 let gcodeLines = [];
 let totalLines = 0;
+let fileExtents = null; // { minX, maxX, minY, maxY, minZ, maxZ } in WCS coords
 let lastMachineState = 'idle';
 
 // Resume state — snapshot saved on pause or stop
@@ -2926,20 +2960,21 @@ function updateUI(data) {
   const wcsX = absX - (+(state.offset_x || 0));
   const wcsY = absY - (+(state.offset_y || 0));
   const wcsZ = absZ - (+(state.offset_z || 0));
+  const fmt = (v, d=3) => (v === 0 ? 0 : v).toFixed(d);
   if ('xp' in data || 'offset_x' in data) {
-    document.getElementById('dro-wcs-x').textContent = wcsX.toFixed(3);
-    document.getElementById('dro-abs-x').textContent = absX.toFixed(3);
-    document.getElementById('dro-off-x').textContent = (+(state.offset_x || 0)).toFixed(3);
+    document.getElementById('dro-wcs-x').textContent = fmt(wcsX);
+    document.getElementById('dro-abs-x').textContent = fmt(absX);
+    document.getElementById('dro-off-x').textContent = fmt(+(state.offset_x || 0));
   }
   if ('yp' in data || 'offset_y' in data) {
-    document.getElementById('dro-wcs-y').textContent = wcsY.toFixed(3);
-    document.getElementById('dro-abs-y').textContent = absY.toFixed(3);
-    document.getElementById('dro-off-y').textContent = (+(state.offset_y || 0)).toFixed(3);
+    document.getElementById('dro-wcs-y').textContent = fmt(wcsY);
+    document.getElementById('dro-abs-y').textContent = fmt(absY);
+    document.getElementById('dro-off-y').textContent = fmt(+(state.offset_y || 0));
   }
   if ('zp' in data || 'offset_z' in data) {
-    document.getElementById('dro-wcs-z').textContent = wcsZ.toFixed(3);
-    document.getElementById('dro-abs-z').textContent = absZ.toFixed(3);
-    document.getElementById('dro-off-z').textContent = (+(state.offset_z || 0)).toFixed(3);
+    document.getElementById('dro-wcs-z').textContent = fmt(wcsZ);
+    document.getElementById('dro-abs-z').textContent = fmt(absZ);
+    document.getElementById('dro-off-z').textContent = fmt(+(state.offset_z || 0));
   }
   // Homed state — motor map: X=0, Y=1, Z=3
   if ('0homed' in data || '1homed' in data || '3homed' in data) {
@@ -2953,10 +2988,9 @@ function updateUI(data) {
   // Feed rate display. Use user's local override pct if they've set one — the controller
   // resets fo to 1000 on every F-command, so we don't sync the slider from WS fo.
   // Instead, re-apply the user's override whenever the controller sends a new feed delta.
-  if ('feed' in data || 'fo' in data || 'cycle' in data) {
-    // DRO shows raw state.feed — no multiplier. The scale is baked into the file already.
-    const feed = +(state.feed || 0);
-    document.getElementById('stat-feed-mmpm').textContent = feed.toFixed(0);
+  if ('feed' in data || 'v' in data || 'fo' in data || 'cycle' in data) {
+    // Show actual velocity from controller; idle transition zeroes it below.
+    document.getElementById('stat-feed-mmpm').textContent = (+(state.v || 0)).toFixed(0);
     document.getElementById('stat-feed').textContent      = _feedScaleAppliedPct;
   }
   if ('so' in data) {
@@ -3459,7 +3493,10 @@ function setMachineState(s) {
 
   updateOverrideVisibility(s);
   // Reset live overrides on job end
-  if (s === 'idle') { _ovrFeed = 1.0; _ovrSpeed = 1.0; updateOverrideDisplay(); }
+  if (s === 'idle') {
+    _ovrFeed = 1.0; _ovrSpeed = 1.0; updateOverrideDisplay();
+    document.getElementById('stat-feed-mmpm').textContent = '0';
+  }
 
   lastMachineState = s;
 }
@@ -3644,9 +3681,8 @@ function setOverrideAbs(type, pct) {
   if (type === 'feed') {
     _userFeedOverride = pct;
     _updateFeedScaleStatus();
-    // mm/min display: show what the scaled file will run at
-    const feed = +(state.feed || 0);
-    document.getElementById('stat-feed-mmpm').textContent = (feed * pct / 100).toFixed(0);
+    // mm/min display: actual velocity when fast enough, else programmed feed
+    document.getElementById('stat-feed-mmpm').textContent = (+(state.v || 0)).toFixed(0);
   } else {
     _userSpindleOverride = pct;
     _updateFeedScaleStatus();
@@ -3824,7 +3860,8 @@ function jog(axis, dir) {
   const limitErr = jogCheckLimit(axis, dist);
   if (limitErr) { showErrorBanner(limitErr, true); return; }
   uiLog(`JOG ${axis.toUpperCase()}${dist > 0 ? '+' : ''}${dist}mm`, 'DEBUG');
-  const code = `M70\nG91\nG0 ${axis.toUpperCase()}${dist}\nM72`;
+  const units = settings.units === 'in' ? 'G20' : 'G21';
+  const code = `M70\n${units}\nG91\nG0 ${axis.toUpperCase()}${dist}\nM72`;
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(code);
     scheduleErrorCheck();
@@ -3919,7 +3956,7 @@ async function homeAxis(axis) {
 }
 
 async function zeroAxis(axis) {
-  if (axis === 'z' || axis === 'all') {
+  if ((axis === 'z' || axis === 'all') && settings.warnZeroZ !== false) {
     const which = axis === 'z' ? 'Z' : 'all axes including Z';
     if (!await darkConfirm(`Zero ${which}?\n\nThis sets the current position as work zero. If the tool is not at your intended Z reference point, this will cause incorrect cut depths.`)) return;
   }
@@ -3944,6 +3981,10 @@ const SETTINGS_DEFAULTS = {
   pathAccuracy:   0.05,    // mm max deviation
   junctionAccel:  200000,  // mm/min²
   probeSafety:    true,    // require circuit check before probing
+  warnSoftLimits:     true,   // pre-flight check: warn if file extents exceed soft limits
+  warnZeroZ:          true,   // confirm dialog when zeroing Z or all axes
+  autoCheckUpdates:   true,   // check GitHub for new Rift releases on startup
+  updateChannel:      'stable', // 'stable' = latest release only; 'nightly' = includes pre-releases
 };
 
 let settings = Object.assign({}, SETTINGS_DEFAULTS);
@@ -4018,6 +4059,10 @@ async function openSettings() {
   document.getElementById('cfg-probe-backoff').value  = settings.probeBackoff;
   document.getElementById('cfg-probe-retract').value  = settings.probeRetract;
   document.getElementById('cfg-probe-safety').value   = settings.probeSafety ? '1' : '0';
+  document.getElementById('cfg-warn-soft-limits').value    = settings.warnSoftLimits !== false ? '1' : '0';
+  document.getElementById('cfg-warn-zero-z').value         = settings.warnZeroZ !== false ? '1' : '0';
+  document.getElementById('cfg-auto-check-updates').value  = settings.autoCheckUpdates !== false ? '1' : '0';
+  document.getElementById('cfg-update-channel').value      = settings.updateChannel || 'stable';
   document.getElementById('cfg-path-accuracy').value  = settings.pathAccuracy;
   document.getElementById('cfg-junction-accel').value = settings.junctionAccel;
   document.getElementById('cfg-cnc-host').value = localStorage.getItem('cnc_host') || DEFAULT_HOST;
@@ -4209,8 +4254,12 @@ async function saveSettings() {
   settings.probeSlow     = parseFloat(document.getElementById('cfg-probe-slow').value)    || SETTINGS_DEFAULTS.probeSlow;
   settings.probeBackoff  = parseFloat(document.getElementById('cfg-probe-backoff').value) || SETTINGS_DEFAULTS.probeBackoff;
   settings.probeRetract  = parseFloat(document.getElementById('cfg-probe-retract').value) || SETTINGS_DEFAULTS.probeRetract;
-  settings.probeSafety   = document.getElementById('cfg-probe-safety').value === '1';
-  settings.pathAccuracy  = parseFloat(document.getElementById('cfg-path-accuracy').value) || SETTINGS_DEFAULTS.pathAccuracy;
+  settings.probeSafety     = document.getElementById('cfg-probe-safety').value === '1';
+  settings.warnSoftLimits      = document.getElementById('cfg-warn-soft-limits').value === '1';
+  settings.warnZeroZ           = document.getElementById('cfg-warn-zero-z').value === '1';
+  settings.autoCheckUpdates    = document.getElementById('cfg-auto-check-updates').value === '1';
+  settings.updateChannel       = document.getElementById('cfg-update-channel').value || 'stable';
+  settings.pathAccuracy    = parseFloat(document.getElementById('cfg-path-accuracy').value) || SETTINGS_DEFAULTS.pathAccuracy;
   settings.junctionAccel = parseFloat(document.getElementById('cfg-junction-accel').value)|| SETTINGS_DEFAULTS.junctionAccel;
 
   // Network — save host and reload if changed
@@ -4339,6 +4388,10 @@ loadSettings().then(() => {
   applyTheme(settings.theme || 'dark');
   applyLoadLabel(0, settings.load0Label);
   applyLoadLabel(1, settings.load1Label);
+  if (settings.autoCheckUpdates !== false) {
+    setTimeout(checkForUpdates, 8000); // wait for WS + page settle
+    setInterval(checkForUpdates, 24 * 60 * 60 * 1000); // daily
+  }
 });
 
 // ── DARK CONFIRM DIALOG ──
@@ -4716,12 +4769,40 @@ async function toggleLoad(idx) {
 }
 
 // ── MACHINE CONTROLS ──
+function checkFileLimits() {
+  if (!fileExtents || settings.warnSoftLimits === false) return null;
+  const axes = [
+    { name: 'X', minK: '0tn', maxK: '0tm', offset: +(state.offset_x || 0), fMin: fileExtents.minX, fMax: fileExtents.maxX },
+    { name: 'Y', minK: '1tn', maxK: '1tm', offset: +(state.offset_y || 0), fMin: fileExtents.minY, fMax: fileExtents.maxY },
+    { name: 'Z', minK: '3tn', maxK: '3tm', offset: +(state.offset_z || 0), fMin: fileExtents.minZ, fMax: fileExtents.maxZ },
+  ];
+  const violations = [];
+  for (const ax of axes) {
+    if (!(ax.minK in state) && !(ax.maxK in state)) continue; // soft limits not configured
+    const absMin = ax.offset + ax.fMin;
+    const absMax = ax.offset + ax.fMax;
+    if (ax.minK in state && absMin < +state[ax.minK])
+      violations.push(`${ax.name} reaches ${ax.fMin.toFixed(1)}mm (abs ${absMin.toFixed(1)}mm) — below soft limit ${(+state[ax.minK]).toFixed(1)}mm`);
+    if (ax.maxK in state && absMax > +state[ax.maxK])
+      violations.push(`${ax.name} reaches ${ax.fMax.toFixed(1)}mm (abs ${absMax.toFixed(1)}mm) — exceeds soft limit ${(+state[ax.maxK]).toFixed(1)}mm`);
+  }
+  return violations.length ? violations : null;
+}
+
 async function machineStart() {
   if (ENABLE_RESUME) {
     resumeState = null;
     peakResumeState = null;
     resumeStateLocked = false;
     { const _rb=document.getElementById('btn-resume'); _rb.style.visibility='hidden'; _rb.style.pointerEvents='none'; _rb.classList.add('hidden'); }
+  }
+  const _limitViolations = checkFileLimits();
+  if (_limitViolations) {
+    const msg = 'Cannot start — file exceeds machine soft limits from your current zero position:\n\n'
+      + _limitViolations.map(v => '• ' + v).join('\n')
+      + '\n\nThe machine will fault when it hits the limit. To fix this, jog to a better position on the material and re-zero your axes so the file fits within the machine travel, or adjust the GCode origin in your CAM software.';
+    await darkConfirm(msg, 'OK', '');
+    return;
   }
   const _selFileLbl = document.getElementById('selected-file-label');
   uiLog('START job: ' + ((_selFileLbl && _selFileLbl.textContent) || 'unknown'));
@@ -5130,6 +5211,8 @@ function parseAndRender3D(lines) {
 
   const rapidSegs = [], cutSegs = [];
   let x = 0, y = 0, z = 0, isRapid = false;
+  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity, minZ=Infinity, maxZ=-Infinity;
+  const trackPt = (px,py,pz) => { minX=Math.min(minX,px); maxX=Math.max(maxX,px); minY=Math.min(minY,py); maxY=Math.max(maxY,py); minZ=Math.min(minZ,pz); maxZ=Math.max(maxZ,pz); };
 
   for (const line of lines) {
     const l = line.trim().toUpperCase();
@@ -5159,8 +5242,10 @@ function parseAndRender3D(lines) {
       seg.push(new THREE.Vector3(x, y, z), new THREE.Vector3(nx, ny, nz));
     }
 
+    if (xm || ym || zm) trackPt(nx, ny, nz);
     x = nx; y = ny; z = nz;
   }
+  fileExtents = (minX === Infinity) ? null : { minX, maxX, minY, maxY, minZ, maxZ };
 
   const addLine = (pts, color) => {
     if (pts.length < 2) return;
@@ -6068,40 +6153,53 @@ async function checkForUpdates() {
   if (actionEl) actionEl.style.display = 'none';
   if (checkBtn) checkBtn.disabled = true;
 
+  const nightly = (settings.updateChannel || 'stable') === 'nightly';
   try {
     // Try proxy endpoint first (avoids CORS/SSL issues on older browsers)
     let res;
     try {
-      res = await fetch(API_URL + '/api/check-update');
+      res = await fetch(API_URL + '/api/check-update' + (nightly ? '?channel=nightly' : ''));
       if (!res.ok) throw new Error('proxy ' + res.status);
     } catch(_) {
-      res = await fetch('https://api.github.com/repos/DRSwanger/rift-cnc-ui/releases/latest', {
-        headers: { 'Accept': 'application/vnd.github+json' }
-      });
+      const ghUrl = nightly
+        ? 'https://api.github.com/repos/DRSwanger/rift-cnc-ui/releases'
+        : 'https://api.github.com/repos/DRSwanger/rift-cnc-ui/releases/latest';
+      res = await fetch(ghUrl, { headers: { 'Accept': 'application/vnd.github+json' } });
     }
     if (!res.ok) throw new Error('GitHub API error (' + res.status + ')');
-    _latestRelease = await res.json();
-    if (_latestRelease.error) throw new Error(_latestRelease.error);
+    const raw = await res.json();
+    if (raw.error) throw new Error(raw.error);
+
+    // Nightly: raw is an array — pick newest by semver (includes pre-releases)
+    if (nightly) {
+      if (!raw.length) throw new Error('No releases found');
+      const semver = tag => (tag || '').replace(/^v/, '').split(/[-.]/).slice(0,3).map(Number);
+      const newer = (a, b) => { for (let i=0;i<3;i++) { if(a[i]>b[i]) return true; if(a[i]<b[i]) return false; } return false; };
+      _latestRelease = raw.reduce((best, r) => newer(semver(r.tag_name), semver(best.tag_name)) ? r : best, raw[0]);
+    } else {
+      _latestRelease = raw;
+    }
 
     const latestTag = (_latestRelease.tag_name || '').replace(/^v/, '');
-    if (latestEl) latestEl.textContent = 'v' + latestTag;
+    const channelLabel = nightly ? ' (nightly)' : '';
+    if (latestEl) latestEl.textContent = 'v' + latestTag + channelLabel;
 
-    const current = UI_VERSION.split('.').map(Number);
-    const latest  = latestTag.split('.').map(Number);
-    const isNewer = latest[0] > current[0] ||
-                   (latest[0] === current[0] && latest[1] > current[1]) ||
-                   (latest[0] === current[0] && latest[1] === current[1] && latest[2] > current[2]);
+    const semCmp = (a, b) => { const av=a.split('.').map(Number), bv=b.split('.').map(Number); for(let i=0;i<3;i++){if(av[i]>bv[i])return 1;if(av[i]<bv[i])return -1;} return 0; };
+    const isNewer = semCmp(latestTag, UI_VERSION) > 0;
 
+    const noticeEl = document.getElementById('fw-update-notice');
     if (isNewer) {
       statusEl.style.color = 'var(--green)';
-      statusEl.innerHTML = 'Update available! <a href="https://github.com/DRSwanger/rift-cnc-ui/releases/tag/v' + escHtml(latestTag) + '" target="_blank" style="color:var(--accent)">Download v' + escHtml(latestTag) + ' from GitHub</a> and install via Manual Upload below.';
+      statusEl.innerHTML = 'Update available! <a href="https://github.com/DRSwanger/rift-cnc-ui/releases/tag/v' + escHtml(latestTag) + '" target="_blank" style="color:var(--accent)">Download v' + escHtml(latestTag) + channelLabel + ' from GitHub</a> and install via Manual Upload below.';
       if (notesEl && _latestRelease.body) {
         notesEl.textContent = _latestRelease.body;
         notesEl.style.display = '';
       }
+      if (noticeEl) { noticeEl.textContent = '⬆ Update available' + channelLabel; noticeEl.style.display = ''; }
     } else {
       statusEl.style.color = 'var(--green)';
       statusEl.textContent = 'You\'re up to date.';
+      if (noticeEl) noticeEl.style.display = 'none';
     }
   } catch(e) {
     statusEl.style.color = 'var(--muted)';
