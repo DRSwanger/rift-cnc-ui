@@ -209,15 +209,15 @@
 
   /* Probe safety check modal */
   #probe-safety-overlay {
-    display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,0.75); z-index: 4000;
-    align-items: center; justify-content: center;
+    display: none; position: fixed; z-index: 4000;
+    width: 420px; max-width: 95vw;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    flex-direction: column;
   }
   #probe-safety-overlay.open { display: flex; }
   #probe-safety-modal {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 10px; width: 420px; max-width: 95vw;
-    padding: 28px 24px; display: flex; flex-direction: column;
+    padding: 20px 24px; display: flex; flex-direction: column;
     align-items: center; gap: 18px; text-align: center;
   }
   #probe-safety-title { font-size: 15px; font-weight: 700; color: var(--text); }
@@ -256,16 +256,15 @@
 
   /* Probe stock height input modal */
   #probe-stock-overlay {
-    display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,0.75); z-index: 4000;
-    align-items: center; justify-content: center;
+    display: none; position: fixed; z-index: 4000;
+    width: 380px; max-width: 95vw;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    flex-direction: column;
   }
   #probe-stock-overlay.open { display: flex; }
   #probe-stock-modal {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 10px; width: 380px; max-width: 95vw;
-    padding: 28px 24px; display: flex; flex-direction: column;
-    gap: 16px;
+    padding: 16px 24px 20px; display: flex; flex-direction: column; gap: 16px;
   }
   #probe-stock-title { font-size: 15px; font-weight: 700; color: var(--accent); }
   #probe-stock-inst  { font-size: 12px; color: var(--muted); line-height: 1.6; }
@@ -290,17 +289,15 @@
   .probe-ref-label { font-size: 13px; font-weight: 700; color: var(--text); text-align: center; }
   .probe-ref-desc { font-size: 11px; color: var(--muted); line-height: 1.5; text-align: center; }
 
-  /* Settings modal */
-  #settings-overlay {
-    display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,0.6); z-index: 3000;
-    align-items: center; justify-content: center;
-  }
-  #settings-overlay.open { display: flex; }
+  /* Settings modal — free-floating, no backdrop */
+  #settings-overlay { display: none; position: fixed; z-index: 3000; }
+  #settings-overlay.open { display: block; }
   #settings-modal {
+    position: fixed; z-index: 3000;
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 8px; width: 740px; max-width: 95vw;
     height: 75vh; max-height: 600px; display: flex; flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
   }
   #settings-header {
     display: flex; align-items: center; justify-content: space-between;
@@ -513,40 +510,49 @@
   .ovr-apply-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
   /* Feed scale card */
-  .feed-scale-card { cursor: pointer; transition: border-color 0.15s, background 0.15s; }
-  .feed-scale-card:hover { border-color: var(--accent); background: var(--surface2); }
+  .feed-scale-card { cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.15s; }
+  .feed-scale-card:hover { background: var(--surface2); }
+  .feed-scale-active { border-color: var(--yellow) !important; }
+  .feed-scale-active .stat-label,
+  .feed-scale-active .stat-sub { color: var(--yellow); }
+  .spindle-scale-active { border-color: var(--accent) !important; }
+  .spindle-scale-active .stat-label,
+  .spindle-scale-active .stat-sub { color: var(--accent); }
   .feed-scale-dot { display:inline-block; width:7px; height:7px; border-radius:50%;
     background:var(--muted); vertical-align:middle; }
   .feed-scale-dot.pending { background:var(--yellow); }
   .feed-scale-dot.applied { background:var(--green); }
 
   /* Feed scale modal */
-  #feed-scale-overlay {
-    display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6);
-    z-index:1100; align-items:center; justify-content:center;
+  /* ── Draggable floating panels (feed / spindle) ── */
+  .float-panel {
+    display:none; position:fixed; background:var(--surface); border:1px solid var(--border);
+    border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.55); min-width:260px;
+    z-index:1100; user-select:none;
   }
-  #feed-scale-overlay.open { display:flex; }
-  #feed-scale-modal {
-    background:var(--surface); border:1px solid var(--border); border-radius:12px;
-    padding:0; min-width:300px; max-width:380px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,0.5);
-  }
-  .fsm-header {
+  .float-panel.open { display:block; }
+  .float-panel-header {
     display:flex; align-items:center; justify-content:space-between;
-    padding:14px 18px 10px; border-bottom:1px solid var(--border);
+    padding:10px 14px 8px; border-bottom:1px solid var(--border);
+    border-radius:12px 12px 0 0; cursor:grab;
   }
-  .fsm-title { font-size:15px; font-weight:700; color:var(--text); }
-  .fsm-close { background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer; padding:0 4px; }
-  .fsm-close:hover { color:var(--text); }
-  .fsm-body { padding:18px; display:flex; flex-direction:column; gap:10px; }
+  .float-panel-header:active { cursor:grabbing; }
+  .float-panel-title { font-size:11px; font-weight:700; text-transform:uppercase;
+    letter-spacing:1px; color:var(--muted); }
+  .float-panel-close { background:none; border:none; color:var(--muted);
+    font-size:16px; cursor:pointer; padding:0 2px; line-height:1; }
+  .float-panel-close:hover { color:var(--text); }
+  .float-panel-body { padding:14px 18px 18px; display:flex; flex-direction:column; gap:8px; }
+  .scale-section-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--muted); text-align:center; margin-bottom:-4px; }
+  .scale-divider { border-top:1px solid var(--border); margin:4px 0; }
   .fsm-value-row { text-align:center; }
   .fsm-pct { font-size:56px; font-weight:700; color:var(--accent); font-variant-numeric:tabular-nums;
     font-family:'Courier New',monospace; }
   .fsm-pct-label { font-size:22px; color:var(--muted); }
   .fsm-status-row { text-align:center; min-height:18px; }
   .fsm-apply { width:100%; padding:10px; font-size:14px; margin-top:4px; }
-  .fsm-row-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px;
-    color:var(--muted); margin-bottom:2px; }
-  .fsm-divider { border:none; border-top:1px solid var(--border); margin:12px 0; }
+  .fsm-live-note { text-align:center; font-size:10px; color:var(--muted);
+    text-transform:uppercase; letter-spacing:1px; }
 
   /* Load toggle buttons — fixed width sized for 12-char label at 10px uppercase + letter-spacing */
   .load-btn {
@@ -633,11 +639,15 @@
   }
   .hz-btn:hover { filter: brightness(1.4); }
   .hz-btn:active { transform: scale(0.94); }
-  .hz-btn.all     { border-color: var(--accent); color: var(--accent); }
-  .hz-btn.zero-all { border-color: var(--yellow); color: var(--yellow); }
+  .hz-btn.all      { grid-column: span 1; background: var(--surface); color: var(--muted); border-color: var(--border); }
+  .hz-btn.zero-all { background: var(--surface); color: var(--muted); border-color: var(--border); }
+  /* Homed: text turns teal (home) or yellow (zero), border unchanged */
+  .hz-btn.btn-homed  { color: var(--accent); }
+  .hz-btn.btn-zeroed { color: var(--yellow); }
+  /* All buttons get the full outline treatment when all axes homed */
+  .hz-btn.all.btn-homed      { border-color: var(--accent); }
+  .hz-btn.zero-all.btn-zeroed { border-color: var(--yellow); }
   .load-btn:hover { filter: none; border-color: var(--green); }
-  .hz-btn.all { grid-column: span 1; background: var(--surface); border-color: var(--accent); color: var(--accent); }
-  .hz-btn.zero-all { border-color: var(--yellow); color: var(--yellow); background: var(--surface); }
   .state-idle       { background: #1a2a1a; color: var(--green);  border-color: var(--green); }
   .state-running    { background: #1a2a00; color: var(--yellow); border-color: var(--yellow); animation: pulse 1s infinite; }
   .state-paused     { background: #2a1a00; color: var(--accent2); border-color: var(--accent2); }
@@ -1471,6 +1481,7 @@
     padding: 8px 10px;
     border-radius: 8px;
     transition: background 0.1s;
+    cursor: pointer;
   }
   .fm-item:hover { background: var(--surface2); }
   .fm-icon { font-size: 16px; flex-shrink: 0; width: 22px; text-align: center; }
@@ -1648,7 +1659,8 @@
   body.kiosk-mode.local-kiosk #dark-confirm-overlay,
   body.kiosk-mode.local-kiosk #probe-stock-overlay,
   body.kiosk-mode.local-kiosk #settings-overlay,
-  body.kiosk-mode.local-kiosk #feed-scale-overlay,
+  body.kiosk-mode.local-kiosk #feed-panel,
+  body.kiosk-mode.local-kiosk #spindle-panel,
   body.kiosk-mode.local-kiosk #gref-overlay,
   body.kiosk-mode.local-kiosk #fm-overlay,
   body.kiosk-mode.local-kiosk #wifi-pw-overlay,
@@ -1949,8 +1961,11 @@
 
 <!-- ERROR LOG MODAL -->
 <div id="probe-safety-overlay">
+  <div class="float-panel-header">
+    <span class="float-panel-title">⚡ Probe Circuit Check</span>
+    <button class="float-panel-close" onclick="probeSafetyCancel()">✕</button>
+  </div>
   <div id="probe-safety-modal">
-    <div id="probe-safety-title">⚡ Probe Circuit Verification</div>
     <div id="probe-safety-inst">Touch the probe block to the tip of your bit.<br>The indicator will turn green when the circuit is detected.</div>
     <div id="probe-safety-indicator">⬤</div>
     <div id="probe-safety-status">Waiting for contact…</div>
@@ -1962,8 +1977,11 @@
 </div>
 
 <div id="probe-stock-overlay">
+  <div class="float-panel-header">
+    <span class="float-panel-title">Probe Z — Select Reference</span>
+    <button class="float-panel-close" onclick="probeStockCancel()">✕</button>
+  </div>
   <div id="probe-stock-modal">
-    <div id="probe-stock-title">Probe Z — Select Reference</div>
     <div id="probe-stock-inst">Place probe block on the reference surface.<br>Block height: <strong id="probe-stock-block-dim"></strong>mm</div>
     <div class="probe-ref-options">
       <div class="probe-ref-card" id="probe-ref-surface" onclick="probeRefSelectCard('surface')">
@@ -2023,11 +2041,11 @@
   </div>
 </div>
 
-<div id="settings-overlay" onclick="if(event.target===this)closeSettings()">
+<div id="settings-overlay">
   <div id="settings-modal">
-    <div id="settings-header">
-      <span>⚙ Settings</span>
-      <button class="settings-btn" onclick="closeSettings()">✕</button>
+    <div id="settings-header" class="float-panel-header">
+      <span class="float-panel-title">⚙ Settings</span>
+      <button class="float-panel-close" onclick="closeSettings()">✕</button>
     </div>
     <div id="settings-tabs">
       <div class="stab active"  onclick="switchSettingsTab('general')">General</div>
@@ -2091,6 +2109,13 @@
             <select class="settings-select" id="cfg-warn-zero-z">
               <option value="1">Enabled</option>
               <option value="0">Disabled</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-label">Advanced mode</div><div class="settings-sub">Enables feed &amp; spindle scale override buttons</div></div>
+            <select class="settings-select" id="cfg-advanced-mode">
+              <option value="0">Disabled</option>
+              <option value="1">Enabled</option>
             </select>
           </div>
         </div>
@@ -2513,59 +2538,55 @@
   <div class="stat stat-axis" id="stat-card-y"><div class="stat-label">Y · WCS</div><div class="stat-value y" id="dro-wcs-y">—</div><div class="stat-sub">ABS <span id="dro-abs-y">—</span> &nbsp;OFF <span id="dro-off-y">—</span></div></div>
   <div class="stat stat-axis" id="stat-card-z"><div class="stat-label">Z · WCS</div><div class="stat-value z" id="dro-wcs-z">—</div><div class="stat-sub">ABS <span id="dro-abs-z">—</span> &nbsp;OFF <span id="dro-off-z">—</span></div></div>
 
-  <div class="stat override-stat feed-scale-card" onclick="openScaleModal()" title="Click to adjust feed &amp; spindle scale">
+  <div class="stat override-stat feed-scale-card" id="stat-card-feed-scale" onclick="toggleScalePanel()" title="Click to open run scales">
     <div class="stat-label">Feed mm/min</div>
     <div class="stat-value feed" id="stat-feed-mmpm">—</div>
     <div class="stat-sub">Scale <span id="stat-feed">100</span>% &nbsp;<span id="feed-scale-dot" class="feed-scale-dot"></span></div>
   </div>
-  <div class="stat override-stat feed-scale-card" onclick="openScaleModal()" title="Click to adjust feed &amp; spindle scale">
+  <div class="stat override-stat feed-scale-card" id="stat-card-spindle-scale" onclick="toggleScalePanel()" title="Click to open run scales">
     <div class="stat-label">Spindle RPM</div>
     <div class="stat-value speed" id="stat-speed">—</div>
     <div class="stat-sub">Scale <span id="stat-spindle-ovr">100</span>% &nbsp;<span id="spindle-scale-dot" class="feed-scale-dot"></span></div>
   </div>
 </div>
 
-<!-- JOB SCALING MODAL (feed + spindle pre-run scale) -->
-<div id="feed-scale-overlay" onclick="if(event.target===this)closeScaleModal()">
-  <div id="feed-scale-modal">
-    <div class="fsm-header">
-      <span class="fsm-title">Job Scaling</span>
-      <button class="fsm-close" onclick="closeScaleModal()">✕</button>
+<!-- RUN SCALES PANEL (draggable, pre-run F+S rewrite) -->
+<div id="scale-panel" class="float-panel" style="right:20px;top:80px">
+  <div class="float-panel-header">
+    <span class="float-panel-title">Run Scales</span>
+    <button class="float-panel-close" onclick="toggleScalePanel()">✕</button>
+  </div>
+  <div class="float-panel-body">
+    <div class="scale-section-label">Feed Rate</div>
+    <div class="fsm-value-row">
+      <span class="fsm-pct" id="fsm-pct">100</span><span class="fsm-pct-label">%</span>
     </div>
-    <div class="fsm-body">
-      <div class="fsm-row-label">Feed Rate</div>
-      <div class="fsm-value-row">
-        <span class="fsm-pct" id="fsm-pct">100</span><span class="fsm-pct-label">%</span>
-      </div>
-      <input type="range" class="ovr-slider" id="ovr-feed-slider" min="10" max="150" step="5" value="100"
-             oninput="setOverrideAbs('feed', +this.value)">
-      <div class="override-row" style="justify-content:center;margin-top:6px;">
-        <button class="ovr-btn" onclick="setOverride('feed',-10)">−10</button>
-        <button class="ovr-btn" onclick="setOverride('feed',-5)">−5</button>
-        <button class="ovr-btn" onclick="setOverride('feed',+5)">+5</button>
-        <button class="ovr-btn" onclick="setOverride('feed',+10)">+10</button>
-      </div>
-
-      <div class="fsm-divider"></div>
-
-      <div class="fsm-row-label">Spindle Speed</div>
-      <div class="fsm-value-row">
-        <span class="fsm-pct" id="fsm-spindle-pct">100</span><span class="fsm-pct-label">%</span>
-      </div>
-      <input type="range" class="ovr-slider" id="ovr-spindle-slider" min="10" max="150" step="5" value="100"
-             oninput="setOverrideAbs('spindle', +this.value)">
-      <div class="override-row" style="justify-content:center;margin-top:6px;">
-        <button class="ovr-btn" onclick="setOverride('spindle',-10)">−10</button>
-        <button class="ovr-btn" onclick="setOverride('spindle',-5)">−5</button>
-        <button class="ovr-btn" onclick="setOverride('spindle',+5)">+5</button>
-        <button class="ovr-btn" onclick="setOverride('spindle',+10)">+10</button>
-      </div>
-
-      <div class="fsm-status-row" style="margin-top:10px;">
-        <span id="feed-scale-status" class="ovr-status-idle">— no scale applied —</span>
-      </div>
-      <button id="feed-scale-btn" class="ovr-apply-btn fsm-apply" onclick="applyFeedScale()">Apply Scale &amp; Close</button>
+    <input type="range" class="ovr-slider" id="ovr-feed-slider" min="10" max="150" step="5" value="100"
+           oninput="setOverrideAbs('feed', +this.value)">
+    <div class="override-row" style="justify-content:center;margin-top:4px;">
+      <button class="ovr-btn" onclick="setOverride('feed',-10)">−10</button>
+      <button class="ovr-btn" onclick="setOverride('feed',-5)">−5</button>
+      <button class="ovr-btn" onclick="setOverride('feed',+5)">+5</button>
+      <button class="ovr-btn" onclick="setOverride('feed',+10)">+10</button>
     </div>
+    <div class="scale-divider"></div>
+    <div class="scale-section-label">Spindle Speed</div>
+    <div class="fsm-value-row">
+      <span class="fsm-pct" id="fsm-spindle-pct">100</span><span class="fsm-pct-label">%</span>
+    </div>
+    <div id="spindle-cap-note" style="visibility:hidden;font-size:11px;color:var(--red);text-align:center;line-height:1.2;height:14px;margin-bottom:2px;"></div>
+    <input type="range" class="ovr-slider" id="ovr-spindle-slider" min="10" max="150" step="5" value="100"
+           oninput="setOverrideAbs('spindle', +this.value)">
+    <div class="override-row" style="justify-content:center;margin-top:4px;">
+      <button class="ovr-btn" onclick="setOverride('spindle',-10)">−10</button>
+      <button class="ovr-btn" onclick="setOverride('spindle',-5)">−5</button>
+      <button class="ovr-btn" onclick="setOverride('spindle',+5)">+5</button>
+      <button class="ovr-btn" onclick="setOverride('spindle',+10)">+10</button>
+    </div>
+    <div class="fsm-status-row">
+      <span id="feed-scale-status" class="ovr-status-idle">— no scale applied —</span>
+    </div>
+    <button id="feed-scale-btn" class="ovr-apply-btn fsm-apply" onclick="applyScales()">Apply Scale</button>
   </div>
 </div>
 
@@ -2651,18 +2672,18 @@
     <div class="sidebar-col" id="scol-setup">
       <div class="section-title">Home</div>
       <div class="axis-grid" id="home-grid">
-        <button class="hz-btn all" onclick="homeAxis('all')">All</button>
-        <button class="hz-btn" onclick="homeAxis('x')">X</button>
-        <button class="hz-btn" onclick="homeAxis('y')">Y</button>
-        <button class="hz-btn" onclick="homeAxis('z')">Z</button>
+        <button class="hz-btn all" id="btn-home-all" onclick="homeAxis('all')">All</button>
+        <button class="hz-btn" id="btn-home-x" onclick="homeAxis('x')">X</button>
+        <button class="hz-btn" id="btn-home-y" onclick="homeAxis('y')">Y</button>
+        <button class="hz-btn" id="btn-home-z" onclick="homeAxis('z')">Z</button>
       </div>
 
       <div class="section-title">Zero</div>
       <div class="axis-grid" id="zero-grid">
-        <button class="hz-btn zero-all" onclick="zeroAxis('all')">All</button>
-        <button class="hz-btn" onclick="zeroAxis('x')">X</button>
-        <button class="hz-btn" onclick="zeroAxis('y')">Y</button>
-        <button class="hz-btn" onclick="zeroAxis('z')">Z</button>
+        <button class="hz-btn zero-all" id="btn-zero-all" onclick="zeroAxis('all')">All</button>
+        <button class="hz-btn" id="btn-zero-x" onclick="zeroAxis('x')">X</button>
+        <button class="hz-btn" id="btn-zero-y" onclick="zeroAxis('y')">Y</button>
+        <button class="hz-btn" id="btn-zero-z" onclick="zeroAxis('z')">Z</button>
       </div>
 
       <!-- Desktop only: Probe Z lives here; kiosk moves it to scol-zprobe -->
@@ -2835,7 +2856,7 @@ function escHtml(s) {
 const WS_URL  = `ws://${location.host}/websocket`; // same-origin always
 const API_URL = ``; // relative URLs — works for both proxy and direct bbctrl
 const SAFE_Z  = 50; // mm to retract before repositioning on resume
-const UI_VERSION             = '1.3.0'; // Rift by AlienWoodshop LLC
+const UI_VERSION             = '1.3.2-nightly.20260414'; // Rift by AlienWoodshop LLC
 const ENABLE_RESUME          = false; // set true to re-enable resume-from-stop feature
 const ENABLE_MACROS          = false; // set true to re-enable macro buttons
 const ENABLE_ROTARY          = false; // set true to show rotary axis toggle
@@ -2875,6 +2896,7 @@ window.addEventListener('unhandledrejection', e => {
   uiLog(`UNHANDLED PROMISE: ${e.reason}`, 'ERROR');
 });
 let gcodeLines = [];
+let _originalGcodeLines = [];  // always the pre-scale source; applyScales reads this, never the _fs_ copy
 let totalLines = 0;
 let fileExtents = null; // { minX, maxX, minY, maxY, minZ, maxZ } in WCS coords
 let lastMachineState = 'idle';
@@ -2978,9 +3000,21 @@ function updateUI(data) {
   }
   // Homed state — motor map: X=0, Y=1, Z=3
   if ('0homed' in data || '1homed' in data || '3homed' in data) {
-    document.getElementById('stat-card-x').classList.toggle('homed', !!state['0homed']);
-    document.getElementById('stat-card-y').classList.toggle('homed', !!state['1homed']);
-    document.getElementById('stat-card-z').classList.toggle('homed', !!state['3homed']);
+    const hX = !!state['0homed'], hY = !!state['1homed'], hZ = !!state['3homed'];
+    const allHomed = hX && hY && hZ;
+    document.getElementById('stat-card-x').classList.toggle('homed', hX);
+    document.getElementById('stat-card-y').classList.toggle('homed', hY);
+    document.getElementById('stat-card-z').classList.toggle('homed', hZ);
+    // Home buttons → teal when homed
+    document.getElementById('btn-home-x').classList.toggle('btn-homed', hX);
+    document.getElementById('btn-home-y').classList.toggle('btn-homed', hY);
+    document.getElementById('btn-home-z').classList.toggle('btn-homed', hZ);
+    document.getElementById('btn-home-all').classList.toggle('btn-homed', allHomed);
+    // Zero buttons → yellow when homed (machine in known state = zeroing is meaningful)
+    document.getElementById('btn-zero-x').classList.toggle('btn-zeroed', hX);
+    document.getElementById('btn-zero-y').classList.toggle('btn-zeroed', hY);
+    document.getElementById('btn-zero-z').classList.toggle('btn-zeroed', hZ);
+    document.getElementById('btn-zero-all').classList.toggle('btn-zeroed', allHomed);
   }
 
   // fo = feed override in tenths of % (1000 = 100%)
@@ -2989,26 +3023,21 @@ function updateUI(data) {
   // resets fo to 1000 on every F-command, so we don't sync the slider from WS fo.
   // Instead, re-apply the user's override whenever the controller sends a new feed delta.
   if ('feed' in data || 'v' in data || 'fo' in data || 'cycle' in data) {
-    // Show actual velocity from controller; idle transition zeroes it below.
-    document.getElementById('stat-feed-mmpm').textContent = (+(state.v || 0)).toFixed(0);
+    // bbctrl reports `v` in m/min (config max-velocity=10 = 10,000mm/min).
+    // Multiply by 1000 for mm/min. Fall back to programmed F value near-zero (idle/decel).
+    const vMmpm = (+(state.v || 0)) * 1000;
+    const feedDisplay = vMmpm >= 10 ? vMmpm : (+(state.feed || 0));
+    document.getElementById('stat-feed-mmpm').textContent = feedDisplay.toFixed(0);
     document.getElementById('stat-feed').textContent      = _feedScaleAppliedPct;
   }
   if ('so' in data) {
-    if (_userSpindleOverride !== 100) _sendOverride('spindle', _userSpindleOverride);
-    const soPct = _userSpindleOverride !== 100 ? _userSpindleOverride : Math.round(+(state.so || 1000) / 10);
+    // Show controller's current speed override pct. Don't auto-re-apply — user clicks Send Speed explicitly.
+    const soPct = Math.round(+(state.so || 1000) / 10);
     document.getElementById('stat-spindle-ovr').textContent = soPct;
-    const ss = document.getElementById('ovr-spindle-slider');
-    if (ss && +ss.value !== soPct) ss.value = Math.min(150, Math.max(10, soPct));
   }
   if ('speed' in data || 's' in data) {
     const spd = +(data.speed !== undefined ? data.speed : (data.s !== undefined ? data.s : 0));
     document.getElementById('stat-speed').textContent = spd.toFixed(0);
-    // Track programmed speed (GCode S value). Ignore echoes of our own sent speed.
-    if (Math.abs(spd - _sentSpindleSpeed) > 10) {
-      _programmedSpindleSpeed = spd;
-      // GCode set a new S value — re-apply user spindle override if active
-      if (_userSpindleOverride !== 100 && spd > 0) _applySpindleOverride();
-    }
   }
 
   // Load relay states — bbctrl uses {n}oa (output active): 1oa=L1, 2oa=L2
@@ -3137,7 +3166,7 @@ function updateUI(data) {
     document.getElementById('selected-file-label').innerHTML =
       data.selected ? `File: <span>${escHtml(data.selected)}</span>` : 'No file selected';
     setSelectedFileDisplay(data.selected || null);
-    if (data.selected) loadGCode(data.selected);
+    if (data.selected) loadGCode(data.selected, false);  // preserve scale — bbctrl reverts selected after stop
   }
 
 
@@ -3395,26 +3424,7 @@ function setMachineState(s) {
   }
   if (s !== 'running') {
     stopProgressTimer();
-    // Reset overrides so next job starts clean
     if (s === 'idle') {
-      _userSpindleOverride = 100;
-      const ss = document.getElementById('ovr-spindle-slider'); if (ss) ss.value = 100;
-      document.getElementById('stat-spindle-ovr').textContent = 100;
-      // If job ran with a scaled file, reload the original so next Start uses original speeds
-      if (_feedScaleSourceFile) {
-        const src = _feedScaleSourceFile;
-        _userFeedOverride = 100; _userSpindleOverride = 100;
-        _feedScaleAppliedPct = 100; _spindleScaleAppliedPct = 100;
-        _feedScaleSourceFile = '';
-        loadGCode(src).then(() => {
-          document.getElementById('selected-file-label').innerHTML =
-            `File: <span>${escHtml(src)}</span>`;
-          setSelectedFileDisplay(src);
-        });
-      } else {
-        _userFeedOverride = 100; _userSpindleOverride = 100;
-        _feedScaleAppliedPct = 100; _spindleScaleAppliedPct = 100;
-      }
       _updateFeedScaleStatus();
     }
     // Update progress bar label for non-running states
@@ -3549,6 +3559,9 @@ function populateFileTree(gcodeList, flatFiles) {
     // No gcode_list — fall back to flat files from WS
     fmFiles = (flatFiles || []).map(f => f.replace(/^[+\-]/, '')).filter(f => f && !f.endsWith('/'));
   }
+  // Suppress files we just deleted — bbctrl watchdog may re-add them briefly before
+  // the server-side delete takes effect. _verifyDelete checks after a delay.
+  if (_pendingDeletes.size) fmFiles = fmFiles.filter(f => !_pendingDeletes.has(f));
   // Refresh file display now that folder map is built
   if (_currentSelectedFile) setSelectedFileDisplay(_currentSelectedFile);
 }
@@ -3559,7 +3572,9 @@ async function selectFile(filename) {
 }
 
 // ── GCODE VIEWER ──
-function loadGCode(filename) {
+// resetScale=true  → user explicitly picked a new file; clear applied pcts
+// resetScale=false → WS/internal reload; preserve applied pcts (bbctrl reverts selected after stop)
+function loadGCode(filename, resetScale = true) {
   uiLog(`LOAD FILE: ${filename}`);
   return new Promise((resolve) => {
     const wrap = document.getElementById('file-load-bar-wrap');
@@ -3583,10 +3598,27 @@ function loadGCode(filename) {
       parseAndRender3D(gcodeLines);
       _estimatedJobSeconds = estimateJobTime(gcodeLines);
       if (lastMachineState !== 'running') showFileReadyLabel();
-      // If a fresh (non-scaled) file was loaded, reset the applied state
-      if (!xhr.responseURL.includes('_fs_')) {
-        _feedScaleAppliedPct = 100;
+      if (!filename.startsWith('_fs_')) {
+        // Original file — store as the scale source; only reset applied pcts if the user
+        // explicitly chose a new file (resetScale=true). WS-triggered reloads preserve them.
+        _originalGcodeLines = gcodeLines.slice();
+        _maxProgrammedS = _computeMaxS(_originalGcodeLines);
+        if (resetScale) {
+          _feedScaleAppliedPct    = 100;
+          _spindleScaleAppliedPct = 100;
+        }
         _updateFeedScaleStatus();
+      } else {
+        // Scaled file loaded (e.g. on page refresh) — fetch original in background so
+        // applyScales always rewrites from the unscaled source
+        const origName = filename.replace(/^_fs_/, '');
+        fetch(`${API_URL}/api/file/${encodeURIComponent(origName)}`)
+          .then(r => r.ok ? r.text() : Promise.reject())
+          .then(text => {
+            _originalGcodeLines = text.split('\n');
+            _maxProgrammedS = _computeMaxS(_originalGcodeLines);
+          })
+          .catch(() => {});
       }
       setTimeout(() => { wrap.style.display = 'none'; bar.style.width = '0%'; wrap.classList.add('indeterminate'); }, 400);
       resolve();
@@ -3637,17 +3669,29 @@ function highlightLine(lineNum) {
 
 // ── XY ORIGIN ──
 async function goToZOrigin() {
-  const wcsZ = (+(state.zp || 0)) - (+(state.offset_z || 0));
+  const offsetZ = +(state.offset_z || 0);
+  const wcsZ = (+(state.zp || 0)) - offsetZ;
   if (!await darkConfirm(`Move Z to work zero?\n\nCurrent Z WCS: ${wcsZ.toFixed(3)}\n\nThe Z axis will move to Z=0. Make sure the path is clear.`)) return;
-  const code = `M70\nG90\nG0 Z0\nM72`;
+  // WCS Z=0 in machine coords = offset_z
+  const machZ = offsetZ.toFixed(3);
+  const code = `M70\nG90\nG0 Z${machZ}\nM72`;
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(code);
 }
 
 async function goToXYOrigin() {
-  const wcsX = (+(state.xp || 0)) - (+(state.offset_x || 0));
-  const wcsY = (+(state.yp || 0)) - (+(state.offset_y || 0));
-  if (!await darkConfirm(`Move to XY work zero?\n\nCurrent WCS: X${wcsX.toFixed(3)}  Y${wcsY.toFixed(3)}\n\nZ will retract to safe height first.`)) return;
-  const code = `M70\nG90\nG0 Z0\nG0 X0 Y0\nM72`;
+  const offsetX = +(state.offset_x || 0);
+  const offsetY = +(state.offset_y || 0);
+  const offsetZ = +(state.offset_z || 0);
+  const wcsX = (+(state.xp || 0)) - offsetX;
+  const wcsY = (+(state.yp || 0)) - offsetY;
+  const wcsZ = (+(state.zp || 0)) - offsetZ;
+  if (!await darkConfirm(`Move to XY work zero?\n\nCurrent WCS: X${wcsX.toFixed(3)}  Y${wcsY.toFixed(3)}  Z${wcsZ.toFixed(3)}\n\nZ will retract to 50mm above work zero if needed, then move XY to origin.`)) return;
+  // WCS (0,0) in machine coords = (offset_x, offset_y); WCS Z=50 = machine Z = offset_z + 50
+  const machX = offsetX.toFixed(3);
+  const machY = offsetY.toFixed(3);
+  const machRetractZ = (offsetZ + 50).toFixed(3);
+  const retract = wcsZ < 50 ? `G0 Z${machRetractZ}\n` : '';
+  const code = `M70\nG90\n${retract}G0 X${machX} Y${machY}\nM72`;
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(code);
 }
 
@@ -3664,10 +3708,10 @@ let _programmedSpindleSpeed = 0;  // last S value from GCode (before our overrid
 let _sentSpindleSpeed       = 0;  // last RPM we sent (to ignore our own WS echo)
 let _spindleMaxRPM          = 0;  // cached from controller config (0 = unconstrained)
 let _spindleMinRPM          = 0;  // cached from controller config
+let _maxProgrammedS         = 0;  // highest S value in the loaded source file
 
 function setOverride(type, delta) {
-  const pctId = type === 'feed' ? 'stat-feed' : 'stat-spindle-ovr';
-  const cur   = +(document.getElementById(pctId).textContent) || 100;
+  const cur = type === 'feed' ? _userFeedOverride : _userSpindleOverride;
   setOverrideAbs(type, cur + delta);
 }
 
@@ -3681,8 +3725,8 @@ function setOverrideAbs(type, pct) {
   if (type === 'feed') {
     _userFeedOverride = pct;
     _updateFeedScaleStatus();
-    // mm/min display: actual velocity when fast enough, else programmed feed
-    document.getElementById('stat-feed-mmpm').textContent = (+(state.v || 0)).toFixed(0);
+    const vMmpm2 = (+(state.v || 0)) * 1000;
+    document.getElementById('stat-feed-mmpm').textContent = (vMmpm2 >= 10 ? vMmpm2 : (+(state.feed || 0))).toFixed(0);
   } else {
     _userSpindleOverride = pct;
     _updateFeedScaleStatus();
@@ -3696,33 +3740,123 @@ let _feedScaleAppliedPct    = 100; // feed pct baked into the currently loaded f
 let _spindleScaleAppliedPct = 100; // spindle pct baked into the currently loaded file
 let _feedScaleSourceFile    = '';  // original filename before any scaling
 
-function openScaleModal()  {
-  document.getElementById('feed-scale-overlay').classList.add('open');
+function toggleScalePanel() {
+  if (!settings.advancedMode) return;
+  const p = document.getElementById('scale-panel');
+  p.classList.toggle('open');
+  if (p.classList.contains('open') && !p._posInited) {
+    p._posInited = true;
+    p.style.right = 'auto';
+    p.style.left  = Math.round((window.innerWidth  - p.offsetWidth)  / 2) + 'px';
+    p.style.top   = Math.round((window.innerHeight - p.offsetHeight) / 2) + 'px';
+  }
   _updateFeedScaleStatus();
 }
-function closeScaleModal() {
-  document.getElementById('feed-scale-overlay').classList.remove('open');
-}
-// Legacy aliases kept for any remaining references
+// Legacy aliases
+function toggleFeedPanel()     { toggleScalePanel(); }
+function toggleSpindlePanel()  { toggleScalePanel(); }
+function openScaleModal()      { if (!settings.advancedMode) return; document.getElementById('scale-panel').classList.add('open'); _updateFeedScaleStatus(); }
+function closeScaleModal()     { document.getElementById('scale-panel').classList.remove('open'); }
 function openFeedScaleModal()  { openScaleModal(); }
 function closeFeedScaleModal() { closeScaleModal(); }
+
+// ── Draggable panels ──────────────────────────────────────────────────────────
+// Uses transform:translate so left/right/top are never touched during drag —
+// no position conflict, no snap. tx/ty accumulate the total drag offset.
+
+function makeDraggable(panel) {
+  const handle = panel.querySelector('.float-panel-header');
+  let dragging = false, startX = 0, startY = 0, tx = 0, ty = 0;
+
+  handle.addEventListener('mousedown', function(e) {
+    if (e.target.closest('button')) return;
+    dragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    tx += e.clientX - startX;
+    ty += e.clientY - startY;
+    startX = e.clientX;
+    startY = e.clientY;
+    panel.style.transform = 'translate(' + tx + 'px,' + ty + 'px)';
+  });
+
+  document.addEventListener('mouseup', function() { dragging = false; });
+}
+
+function _centerPanel(el) {
+  if (!el._posInited) {
+    el._posInited = true;
+    el.style.left = Math.max(0, Math.round((window.innerWidth  - el.offsetWidth)  / 2)) + 'px';
+    el.style.top  = Math.max(0, Math.round((window.innerHeight - el.offsetHeight) / 2)) + 'px';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  makeDraggable(document.getElementById('scale-panel'));
+  makeDraggable(document.getElementById('probe-stock-overlay'));
+  makeDraggable(document.getElementById('probe-safety-overlay'));
+  makeDraggable(document.getElementById('settings-modal'));
+
+  // Fetch spindle limits at startup so MDI safety check works without opening Settings
+  fetch(`${API_URL}/api/config/load`)
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(cfg => {
+      const tool = cfg.tool || {};
+      _spindleMaxRPM = parseFloat(tool['max-spin']) || 0;
+      _spindleMinRPM = parseFloat(tool['min-spin']) || 0;
+    })
+    .catch(() => {});
+});
+
+function _applyAdvancedMode() {
+  const enabled = !!settings.advancedMode;
+  // Close the panel if it's open and mode is being disabled
+  if (!enabled) document.getElementById('scale-panel').classList.remove('open');
+  // Dim the stat cards so it's clear they're not clickable
+  ['stat-card-feed-scale', 'stat-card-spindle-scale'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.cursor = enabled ? '' : 'default';
+  });
+}
+
+function _computeMaxS(lines) {
+  let max = 0;
+  for (const line of lines) {
+    const m = line.match(/[Ss](\d+(?:\.\d*)?)/);
+    if (m) max = Math.max(max, parseFloat(m[1]));
+  }
+  return max;
+}
 
 function _updateFeedScaleStatus() {
   const fPct  = _userFeedOverride;
   const sPct  = _userSpindleOverride;
-  const dirty = fPct !== _feedScaleAppliedPct || sPct !== _spindleScaleAppliedPct;
+  const feedDirty    = fPct !== _feedScaleAppliedPct;
+  const spindleDirty = sPct !== _spindleScaleAppliedPct;
+  const anyDirty     = feedDirty || spindleDirty;
 
-  // Modal displays
+  // Panel displays
   const fsmF = document.getElementById('fsm-pct');
   const fsmS = document.getElementById('fsm-spindle-pct');
   if (fsmF) fsmF.textContent = fPct;
   if (fsmS) fsmS.textContent = sPct;
 
-  // Card sub-labels show applied pct
+  // Card sub-labels show applied pcts
   const cardF = document.getElementById('stat-feed');
   const cardS = document.getElementById('stat-spindle-ovr');
   if (cardF) cardF.textContent = _feedScaleAppliedPct;
   if (cardS) cardS.textContent = _spindleScaleAppliedPct;
+
+  // Highlight card border + text when scale is active (≠100%)
+  const feedCard    = document.getElementById('stat-card-feed-scale');
+  const spindleCard = document.getElementById('stat-card-spindle-scale');
+  if (feedCard)    feedCard.classList.toggle('feed-scale-active',    _feedScaleAppliedPct    !== 100);
+  if (spindleCard) spindleCard.classList.toggle('spindle-scale-active', _spindleScaleAppliedPct !== 100);
 
   // Sliders
   const fs = document.getElementById('ovr-feed-slider');
@@ -3730,62 +3864,70 @@ function _updateFeedScaleStatus() {
   if (fs && +fs.value !== fPct) fs.value = fPct;
   if (ss && +ss.value !== sPct) ss.value = sPct;
 
-  // Dots
+  // Dots — pending if dirty, applied (green) if ≠100, else none
   const fDot = document.getElementById('feed-scale-dot');
   const sDot = document.getElementById('spindle-scale-dot');
   const dotClass = (applied, pending) =>
     pending !== applied ? 'feed-scale-dot pending' : applied !== 100 ? 'feed-scale-dot applied' : 'feed-scale-dot';
-  if (fDot) fDot.className = dotClass(_feedScaleAppliedPct,    fPct);
+  if (fDot) fDot.className = dotClass(_feedScaleAppliedPct, fPct);
   if (sDot) sDot.className = dotClass(_spindleScaleAppliedPct, sPct);
 
-  // Status line
+  // Status line and Apply button
   const statusEl = document.getElementById('feed-scale-status');
   const btn      = document.getElementById('feed-scale-btn');
+  // Compute effective spindle pct after clamping to max RPM; update cap note
+  let sEffPct = sPct;
+  const capNote = document.getElementById('spindle-cap-note');
+  if (_spindleMaxRPM > 0 && _maxProgrammedS > 0) {
+    const wouldBeRPM = Math.round(_maxProgrammedS * sPct / 100);
+    if (wouldBeRPM > _spindleMaxRPM) {
+      sEffPct = Math.floor(_spindleMaxRPM / _maxProgrammedS * 100);
+      if (capNote) { capNote.textContent = `capped at ${_spindleMaxRPM} RPM (eff. ${sEffPct}%)`; capNote.style.visibility = 'visible'; }
+    } else {
+      if (capNote) { capNote.textContent = ''; capNote.style.visibility = 'hidden'; }
+    }
+  } else {
+    if (capNote) { capNote.textContent = ''; capNote.style.visibility = 'hidden'; }
+  }
   if (statusEl) {
-    const clampNote = (_spindleMaxRPM > 0 || _spindleMinRPM > 0)
-      ? ` (clamped ${_spindleMinRPM}–${_spindleMaxRPM} RPM)`
-      : '';
-    if (!dirty && fPct === 100 && sPct === 100) {
+    if (!anyDirty && fPct === 100 && sPct === 100) {
       statusEl.className   = 'ovr-status-idle';
       statusEl.textContent = '— no scale applied —';
-    } else if (dirty) {
+    } else if (anyDirty) {
       statusEl.className   = 'ovr-status-pending';
-      statusEl.textContent = `Feed ${fPct}%  ·  Spindle ${sPct}%${clampNote} — pending`;
+      statusEl.textContent = `Feed ${fPct}%  ·  Spindle ${sEffPct}% — pending`;
     } else {
       statusEl.className   = 'ovr-status-applied';
-      statusEl.textContent = `✓ Feed ${fPct}%  ·  Spindle ${sPct}%${clampNote} — ready`;
+      statusEl.textContent = `✓ Feed ${fPct}%  ·  Spindle ${sEffPct}% applied`;
     }
   }
-  if (btn) btn.disabled = gcodeLines.length === 0 || !dirty;
+  if (btn) btn.disabled = gcodeLines.length === 0 || !anyDirty;
 }
 
-async function applyFeedScale() {
-  if (gcodeLines.length === 0) return;
+async function applyScales() {
+  const sourceLines = _originalGcodeLines.length ? _originalGcodeLines : gcodeLines;
+  if (sourceLines.length === 0) return;
   const btn = document.getElementById('feed-scale-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Applying…'; }
 
   const fPct = _userFeedOverride;
-  uiLog(`APPLY SCALE feed=${fPct}% spindle=${_userSpindleOverride}%`);
   const sPct = _userSpindleOverride;
+  uiLog(`APPLY SCALES feed=${fPct}% spindle=${sPct}%`);
   const fFactor = fPct / 100;
   const sFactor = sPct / 100;
   const sourceName = (state.selected || 'job.ngc').replace(/^_fs_/, '');
   const scaledName = `_fs_${sourceName}`;
 
-  // Spindle clamp: respect controller's min/max RPM if set
-  const sMax = _spindleMaxRPM > 0 ? _spindleMaxRPM : Infinity;
-  const sMin = _spindleMinRPM > 0 ? _spindleMinRPM : 0;
-
-  // Rewrite F-words (feed) and S-words (spindle speed) in the GCode
-  const scaled = gcodeLines.map(line =>
+  // Always rewrite from the original source lines, not the currently loaded (possibly scaled) lines
+  const scaled = sourceLines.map(line =>
     line
       .replace(/([Ff])(\d+\.?\d*)/g, (_, f, val) => f + (parseFloat(val) * fFactor).toFixed(1))
       .replace(/([Ss])(\d+\.?\d*)/g, (_, s, val) => {
-        const raw = parseFloat(val);
-        if (raw === 0) return s + '0'; // S0 = spindle off, preserve
-        const scaled = Math.round(Math.min(sMax, Math.max(sMin, raw * sFactor)));
-        return s + scaled;
-      })
+          let rpm = Math.round(parseFloat(val) * sFactor);
+          if (_spindleMaxRPM > 0) rpm = Math.min(rpm, _spindleMaxRPM);
+          if (_spindleMinRPM > 0 && rpm > 0) rpm = Math.max(rpm, _spindleMinRPM);
+          return s + rpm;
+        })
   ).join('\n');
 
   try {
@@ -3799,26 +3941,25 @@ async function applyFeedScale() {
     document.getElementById('selected-file-label').innerHTML =
       `File: <span>${escHtml(scaledName)} (F${fPct}% S${sPct}%)</span>`;
     setSelectedFileDisplay(scaledName);
-    closeScaleModal();
+    document.getElementById('scale-panel').classList.remove('open');
+    // Persist scale state so sliders survive a page refresh
+    settings.runScaleFeed           = fPct;
+    settings.runScaleSpindle        = sPct;
+    settings.runScaleFeedApplied    = fPct;
+    settings.runScaleSpindleApplied = sPct;
+    fetch(`${API_URL}/ui-settings`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(settings)
+    }).catch(() => {});
   } catch(e) {
     const statusEl = document.getElementById('feed-scale-status');
     if (statusEl) { statusEl.className = 'ovr-status-pending'; statusEl.textContent = 'Upload failed'; }
   }
-  if (btn) btn.textContent = 'Apply Scale & Close';
+  if (btn) btn.textContent = 'Apply Scale';
   _updateFeedScaleStatus();
 }
+function applyFeedScale() { return applyScales(); }  // legacy alias
 
-// (Legacy stub — feed override via config API doesn't work on bbctrl)
-function _sendFeedOverride(_pct) {}
-
-// Spindle override: send actual target RPM as GCode S command.
-// bbctrl does not implement so via config — direct GCode is the only reliable path.
-function _applySpindleOverride() {
-  if (_programmedSpindleSpeed <= 0 || !ws || ws.readyState !== WebSocket.OPEN) return;
-  const target = Math.round(_programmedSpindleSpeed * _userSpindleOverride / 100);
-  _sentSpindleSpeed = target;
-  ws.send(`S${target}`);
-}
 
 // ── JOG ──
 // bbctrl accepts raw GCode strings over WebSocket
@@ -3876,14 +4017,32 @@ function mdiSend() {
   const input = document.getElementById('mdi-input');
   const cmd = input.value.trim();
   if (!cmd) return;
+
+  // ── Spindle speed safety check ──────────────────────────────────────────────
+  if (_spindleMaxRPM > 0) {
+    const sMatch = cmd.match(/[Ss](\d+(?:\.\d*)?)/);
+    if (sMatch) {
+      const reqRPM = parseFloat(sMatch[1]);
+      if (reqRPM > _spindleMaxRPM) {
+        uiLog(`MDI BLOCKED: S${reqRPM} exceeds max ${_spindleMaxRPM} RPM`, 'WARN');
+        mdiHistory.unshift({ text: `BLOCKED: S${reqRPM} exceeds max ${_spindleMaxRPM} RPM`, isError: true });
+        if (mdiHistory.length > MDI_MAX_HIST) mdiHistory.pop();
+        mdiRenderHistory();
+        input.focus();
+        return;
+      }
+    }
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
   uiLog(`MDI: ${cmd}`);
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(cmd);
     scheduleErrorCheck();
     // Add to history (deduplicate — bump to top if already exists)
-    const idx = mdiHistory.indexOf(cmd);
-    if (idx !== -1) mdiHistory.splice(idx, 1);
-    mdiHistory.unshift(cmd);
+    const existing = mdiHistory.findIndex(e => !e.isError && e.text === cmd);
+    if (existing !== -1) mdiHistory.splice(existing, 1);
+    mdiHistory.unshift({ text: cmd });
     if (mdiHistory.length > MDI_MAX_HIST) mdiHistory.pop();
     mdiRenderHistory();
     input.value = '';
@@ -3894,11 +4053,13 @@ function mdiSend() {
 function mdiRenderHistory() {
   const el = document.getElementById('mdi-history');
   if (!mdiHistory.length) { el.innerHTML = '<div style="font-family:\'Courier New\',monospace;font-size:11px;color:var(--border);padding:2px 0">No history</div>'; return; }
-  el.innerHTML = mdiHistory.map((cmd, idx) =>
-    `<div class="mdi-hist-item" data-mdi-idx="${idx}" title="${escHtml(cmd)}">${escHtml(cmd)}</div>`
+  el.innerHTML = mdiHistory.map((item, idx) =>
+    item.isError
+      ? `<div class="mdi-hist-item" style="color:var(--red);cursor:default;" title="${escHtml(item.text)}">${escHtml(item.text)}</div>`
+      : `<div class="mdi-hist-item" data-mdi-idx="${idx}" title="${escHtml(item.text)}">${escHtml(item.text)}</div>`
   ).join('');
-  el.querySelectorAll('.mdi-hist-item').forEach(function(div) {
-    div.addEventListener('click', function() { mdiInsert(mdiHistory[+this.dataset.mdiIdx]); });
+  el.querySelectorAll('.mdi-hist-item[data-mdi-idx]').forEach(function(div) {
+    div.addEventListener('click', function() { mdiInsert(mdiHistory[+this.dataset.mdiIdx].text); });
   });
 }
 
@@ -3941,6 +4102,7 @@ async function homeAxis(axis) {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
     } catch(e) { showErrorBanner(`Home failed: ${e.message}`, true); }
   } else {
+    if (!await darkConfirm(`Home ${axis.toUpperCase()}? The machine will move to the ${axis.toUpperCase()} limit switch.`)) return;
     uiLog(`HOME axis ${axis.toUpperCase()}`);
     // Try REST first, fall back to GCode over WS
     const res = await fetch(`${API_URL}/api/home/${axis.toLowerCase()}`, { method: 'PUT' }).catch(() => null);
@@ -3983,6 +4145,7 @@ const SETTINGS_DEFAULTS = {
   probeSafety:    true,    // require circuit check before probing
   warnSoftLimits:     true,   // pre-flight check: warn if file extents exceed soft limits
   warnZeroZ:          true,   // confirm dialog when zeroing Z or all axes
+  advancedMode:       false,  // unlocks feed/spindle scale override buttons
   autoCheckUpdates:   true,   // check GitHub for new Rift releases on startup
   updateChannel:      'stable', // 'stable' = latest release only; 'nightly' = includes pre-releases
 };
@@ -4008,6 +4171,14 @@ async function loadSettings() {
       settings = Object.assign({}, SETTINGS_DEFAULTS, saved);
     } catch(e2) { settings = Object.assign({}, SETTINGS_DEFAULTS); }
   }
+  // Restore run scale state (persisted when Apply is clicked)
+  if (saved.runScaleFeed           !== undefined) _userFeedOverride       = saved.runScaleFeed;
+  if (saved.runScaleSpindle        !== undefined) _userSpindleOverride    = saved.runScaleSpindle;
+  if (saved.runScaleFeedApplied    !== undefined) _feedScaleAppliedPct    = saved.runScaleFeedApplied;
+  if (saved.runScaleSpindleApplied !== undefined) _spindleScaleAppliedPct = saved.runScaleSpindleApplied;
+  _updateFeedScaleStatus();
+  _applyAdvancedMode();
+
   // Sync probe dimensions from controller config (source of truth for hardware)
   try {
     const cfgRes = await fetch(`${API_URL}/api/config/load`);
@@ -4044,7 +4215,7 @@ function switchSettingsTab(tab) {
 let _cachedCfg = null;
 
 async function openSettings() {
-  await loadSettings();
+  try { await loadSettings(); } catch(e) { /* show modal anyway */ }
   document.getElementById('cfg-units').value          = settings.units;
   document.getElementById('cfg-theme').value          = settings.theme || 'dark';
   document.getElementById('cfg-dev-mode').checked     = !!settings.devMode;
@@ -4061,6 +4232,7 @@ async function openSettings() {
   document.getElementById('cfg-probe-safety').value   = settings.probeSafety ? '1' : '0';
   document.getElementById('cfg-warn-soft-limits').value    = settings.warnSoftLimits !== false ? '1' : '0';
   document.getElementById('cfg-warn-zero-z').value         = settings.warnZeroZ !== false ? '1' : '0';
+  document.getElementById('cfg-advanced-mode').value       = settings.advancedMode ? '1' : '0';
   document.getElementById('cfg-auto-check-updates').value  = settings.autoCheckUpdates !== false ? '1' : '0';
   document.getElementById('cfg-update-channel').value      = settings.updateChannel || 'stable';
   document.getElementById('cfg-path-accuracy').value  = settings.pathAccuracy;
@@ -4068,6 +4240,8 @@ async function openSettings() {
   document.getElementById('cfg-cnc-host').value = localStorage.getItem('cnc_host') || DEFAULT_HOST;
   document.getElementById('cfg-host-note').style.display = _isLocalhost ? 'none' : '';
   document.getElementById('settings-overlay').classList.add('open');
+  const _sm = document.getElementById('settings-modal');
+  _centerPanel(_sm);
   // Load controller config for Motors/Tool/IO/GCode tabs
   loadControllerConfig();
 }
@@ -4257,6 +4431,8 @@ async function saveSettings() {
   settings.probeSafety     = document.getElementById('cfg-probe-safety').value === '1';
   settings.warnSoftLimits      = document.getElementById('cfg-warn-soft-limits').value === '1';
   settings.warnZeroZ           = document.getElementById('cfg-warn-zero-z').value === '1';
+  settings.advancedMode        = document.getElementById('cfg-advanced-mode').value === '1';
+  _applyAdvancedMode();
   settings.autoCheckUpdates    = document.getElementById('cfg-auto-check-updates').value === '1';
   settings.updateChannel       = document.getElementById('cfg-update-channel').value || 'stable';
   settings.pathAccuracy    = parseFloat(document.getElementById('cfg-path-accuracy').value) || SETTINGS_DEFAULTS.pathAccuracy;
@@ -4461,7 +4637,9 @@ function runProbeSafetyCheck() {
     document.getElementById('probe-safety-status').textContent = 'Touch probe to bit to verify circuit…';
     document.getElementById('probe-safety-status').className = '';
     document.getElementById('probe-safety-continue').disabled = true;
-    document.getElementById('probe-safety-overlay').classList.add('open');
+    const _psa = document.getElementById('probe-safety-overlay');
+    _psa.classList.add('open');
+    _centerPanel(_psa);
 
     // Snapshot current state — we only care about fields that transition from falsy→truthy
     const snapshot = {};
@@ -4535,7 +4713,9 @@ function askProbeReference() {
     const input = document.getElementById('probe-thickness-input');
     input.oninput = probeThicknessUpdate;
     input.onkeydown = e => { if (e.key === 'Enter') probeRefNext(); if (e.key === 'Escape') probeStockCancel(); };
-    document.getElementById('probe-stock-overlay').classList.add('open');
+    const _pso = document.getElementById('probe-stock-overlay');
+    _pso.classList.add('open');
+    _centerPanel(_pso);
   });
 }
 
@@ -4806,6 +4986,15 @@ async function machineStart() {
   }
   const _selFileLbl = document.getElementById('selected-file-label');
   uiLog('START job: ' + ((_selFileLbl && _selFileLbl.textContent) || 'unknown'));
+  // If a scale was applied, re-select the _fs_ file before starting.
+  // After a job stops, bbctrl reverts state.selected to the original file; our WS handler
+  // then GETs the original (which re-selects it on the controller). We need to re-select
+  // the scaled file so Start actually runs the scaled version.
+  if (_feedScaleSourceFile && (_feedScaleAppliedPct !== 100 || _spindleScaleAppliedPct !== 100)) {
+    try {
+      await fetch(`${API_URL}/api/file/${encodeURIComponent('_fs_' + _feedScaleSourceFile)}`);
+    } catch(e) { /* if _fs_ file is gone, just run whatever is selected */ }
+  }
   try {
     const r = await fetch(`${API_URL}/api/start`, { method: 'PUT' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -5334,6 +5523,7 @@ function fmtETA(secsRemaining) {
 // ── FILE MANAGER ──
 let fmPath = [];   // current folder stack e.g. ['fixtures']
 let fmFiles = [];  // raw file list from controller
+const _pendingDeletes = new Set(); // files deleted locally but not yet confirmed gone by server
 
 let _currentSelectedFile = null;
 function setSelectedFileDisplay(path) {
@@ -5427,14 +5617,20 @@ function fmRender() {
     list.querySelectorAll('[data-fm-idx]').forEach(function(row) {
       var idx = +row.dataset.fmIdx;
       var item = items[idx];
+      // Whole row click — load file or enter folder (buttons/checkbox stop propagation)
+      row.addEventListener('click', function(e) {
+        if (e.target.closest('[data-fm-action]') || e.target.closest('.fm-cb')) return;
+        if (item.type === 'file')   fmLoad(item.name);
+        else if (item.type === 'folder') fmEnter(item.name);
+      });
       row.querySelectorAll('[data-fm-action]').forEach(function(el) {
         el.addEventListener('click', function(e) {
           e.stopPropagation();
           var action = el.dataset.fmAction;
-          if (action === 'enter')     fmEnter(item.name);
+          if (action === 'enter')          fmEnter(item.name);
           else if (action === 'delfolder') fmDeleteFolder(item.name);
-          else if (action === 'load') fmLoad(item.name);
-          else if (action === 'del')  fmDelete(item.name);
+          else if (action === 'load')      fmLoad(item.name);
+          else if (action === 'del')       fmDelete(item.name);
         });
       });
     });
@@ -5481,9 +5677,13 @@ async function fmBulkDelete() {
     try {
       const res = await fetch(`${API_URL}/api/file/${encodeURIComponent(fp)}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
+      _pendingDeletes.add(fp);
       fmRemoveFromState(fp);
+      setTimeout(() => _verifyDelete(fp), 3000);
     } catch(e) { failed++; }
   }
+  // Save updated gcode_list so WS doesn't bring deleted files back
+  try { await fmSaveConfig(); } catch(e) { /* non-fatal */ }
   fmSetStatus(failed ? `Done — ${failed} failed` : `Deleted ${paths.length} file(s)`);
   document.getElementById('fm-bulk-bar').classList.remove('visible');
   fmRender();
@@ -5508,10 +5708,30 @@ async function fmDelete(filepath) {
     const res = await fetch(`${API_URL}/api/file/${encodeURIComponent(filepath)}`, { method: 'DELETE' });
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
     uiLog(`FILE DELETE: ${filepath}`, 'INFO');
+    _pendingDeletes.add(filepath);
     fmRemoveFromState(filepath);
+    // Save updated gcode_list to bbctrl config — without this, WS keeps sending
+    // the old gcode_list (which still has the file) and it reappears after every tick
+    try { await fmSaveConfig(); } catch(e) { /* non-fatal */ }
     fmSetStatus(`Deleted ${filepath}`);
     fmRender();
+    setTimeout(() => _verifyDelete(filepath), 3000);
   } catch(e) { fmSetStatus('Delete failed: ' + e.message); }
+}
+
+function _verifyDelete(filepath) {
+  _pendingDeletes.delete(filepath);
+  // Check if server still has the file (bbctrl watchdog re-added it after disk rescan)
+  const stillPresent = (state.gcode_list || []).some(folder =>
+    (folder.files || []).some(f => f.file_name === filepath)
+  ) || (state.files || []).some(f => f.replace(/^[+\-]/, '') === filepath);
+  if (stillPresent) {
+    // Delete didn't stick — re-populate so the file reappears with an error notice
+    populateFileTree(state.gcode_list || null, state.files || []);
+    fmRender();
+    showErrorBanner(`Delete failed for "${filepath}" — the controller could not remove this file. It may be locked or require SSH access to remove manually.`, true);
+    fmSetStatus(`Delete failed — "${filepath}" still on controller`);
+  }
 }
 
 // Remove a file from fmFiles and the cached WS state so re-opening doesn't resurrect it
