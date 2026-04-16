@@ -13,6 +13,7 @@ PI_HOST="${CNC_HOST:-192.168.1.130}"
 PI_USER="${CNC_USER:-bbmc}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC="$SCRIPT_DIR/index.html"
+MOBILE="$SCRIPT_DIR/mobile.html"
 MANIFEST="$SCRIPT_DIR/manifest.json"
 BOOT_PNG="$SCRIPT_DIR/rift-boot.png"
 SHUTDOWN_PNG="$SCRIPT_DIR/rift-shutdown.png"
@@ -50,8 +51,9 @@ eval "$SSH_CMD -o StrictHostKeyChecking=no $PI_USER@$PI_HOST \
      fi'"
 
 # Copy via /tmp then sudo mv (http dir is root-owned)
-echo "Copying index.html, manifest.json, and splash PNGs..."
+echo "Copying index.html, mobile.html, manifest.json, and splash PNGs..."
 eval "$SCP_CMD -o StrictHostKeyChecking=no $SRC $PI_USER@$PI_HOST:/tmp/rift-index.html"
+eval "$SCP_CMD -o StrictHostKeyChecking=no $MOBILE $PI_USER@$PI_HOST:/tmp/rift-mobile.html"
 eval "$SCP_CMD -o StrictHostKeyChecking=no $MANIFEST $PI_USER@$PI_HOST:/tmp/rift-manifest.json"
 eval "$SCP_CMD -o StrictHostKeyChecking=no $BOOT_PNG $PI_USER@$PI_HOST:/tmp/rift-boot.png"
 eval "$SCP_CMD -o StrictHostKeyChecking=no $SHUTDOWN_PNG $PI_USER@$PI_HOST:/tmp/rift-shutdown.png"
@@ -60,6 +62,8 @@ eval "$SSH_CMD -o StrictHostKeyChecking=no $PI_USER@$PI_HOST \
         cp /tmp/rift-index.html \\\"$HTTP_DIR/index.html\\\" &&
         chmod 644 \\\"$HTTP_DIR/index.html\\\" &&
         touch \\\"$HTTP_DIR/index.html\\\" &&
+        cp /tmp/rift-mobile.html \\\"$HTTP_DIR/mobile.html\\\" &&
+        chmod 644 \\\"$HTTP_DIR/mobile.html\\\" &&
         cp /tmp/rift-manifest.json \\\"$HTTP_DIR/manifest.json\\\" &&
         chmod 644 \\\"$HTTP_DIR/manifest.json\\\" &&
         PLYMOUTH=/usr/share/plymouth/themes/onefinity &&
@@ -67,7 +71,7 @@ eval "$SSH_CMD -o StrictHostKeyChecking=no $PI_USER@$PI_HOST \
         cp /tmp/rift-boot.png \\\"\\\$PLYMOUTH/boot.png\\\" &&
         cp /tmp/rift-shutdown.png \\\"\\\$PLYMOUTH/shutdown.png\\\" &&
         update-initramfs -u 2>/dev/null || true &&
-        rm /tmp/rift-index.html /tmp/rift-manifest.json /tmp/rift-boot.png /tmp/rift-shutdown.png
+        rm /tmp/rift-index.html /tmp/rift-mobile.html /tmp/rift-manifest.json /tmp/rift-boot.png /tmp/rift-shutdown.png
     \"'"
 
 echo ""
