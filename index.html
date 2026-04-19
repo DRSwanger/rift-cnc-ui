@@ -2623,7 +2623,7 @@
     <div id="fm-breadcrumb"></div>
     <div id="fm-toolbar">
       <label class="fm-tool-btn" for="fm-file-input">⬆ Upload Files</label>
-      <input type="file" id="fm-file-input" multiple accept=".ngc,.nc,.gcode,.tap,.txt"
+      <input type="file" id="fm-file-input" multiple accept=".ngc,.nc,.gcode,.gc,.tap,.txt"
              onchange="fmUploadFiles(this.files)">
       <button class="fm-tool-btn" onclick="fmToggleNewFolder()">📁 New Folder</button>
       <button class="fm-tool-btn" onclick="fmToggleSelectAll()" id="fm-select-all-btn">☐ Select All</button>
@@ -2910,7 +2910,7 @@ function escHtml(s) {
 const WS_URL  = `ws://${location.host}/websocket`; // same-origin always
 const API_URL = ``; // relative URLs — works for both proxy and direct bbctrl
 const SAFE_Z  = 50; // mm to retract before repositioning on resume
-const UI_VERSION             = '1.3.0-nightly.20260415'; // Rift by AlienWoodshop LLC
+const UI_VERSION             = '1.3.2'; // Rift by AlienWoodshop LLC
 const ENABLE_RESUME          = false; // set true to re-enable resume-from-stop feature
 const ENABLE_MACROS          = false; // set true to re-enable macro buttons
 const ENABLE_ROTARY          = false; // set true to show rotary axis toggle
@@ -2927,6 +2927,16 @@ let ws;
 // Ring buffer for the in-browser Logs tab (populated below; also forwarded to proxy if available)
 const _uiLogBuf = [];
 const _UI_LOG_MAX = 2000;
+// Proxy-only endpoints (/ui-log, /api/log-since, /ui-settings) return 404/405 when
+// bbctrl is accessed directly. After the first failure we stop calling them —
+// otherwise every user action generates a failed fetch, which over a long session
+// accumulates into real CPU/memory pressure on the remote browser.
+let _proxyEndpoints = true;
+function _markProxyDown() {
+  if (!_proxyEndpoints) return;
+  _proxyEndpoints = false;
+  if (typeof stopLogPoll === 'function') stopLogPoll();
+}
 
 function uiLog(msg, level = 'ACTION') {
   const lvl = level.toLowerCase();
@@ -2939,7 +2949,11 @@ function uiLog(msg, level = 'ACTION') {
   _uiLogBuf.push({ ts, level: lvl, msg: String(msg) });
   if (_uiLogBuf.length > _UI_LOG_MAX) _uiLogBuf.shift();
   // Forward to proxy action log if reachable
-  fetch('/ui-log', { method: 'POST', body: line }).catch(() => {});
+  if (_proxyEndpoints) {
+    fetch('/ui-log', { method: 'POST', body: line })
+      .then(r => { if (r.status === 404 || r.status === 405) _markProxyDown(); })
+      .catch(() => {});
+  }
 }
 
 // Capture unhandled JS errors and promise rejections
@@ -3175,16 +3189,7 @@ function updateUI(data) {
     if (cycle === 'homing' || xx === 'HOMING') { _wasHoming = true; _lastHomingAt = Date.now(); }
     // NOTE: _wasHoming is intentionally NOT cleared here.
     // setMachineState clears it AFTER the idle-post-homing check so the check can fire.
-    let ms;
-    if      (cycle === 'run'     || xx === 'RUNNING')            ms = 'running';
-    else if (cycle === 'holding' || xx === 'HOLDING')            ms = 'paused';
-    else if (cycle === 'homing'  || xx === 'HOMING')             ms = 'running';
-    else if (cycle === 'jogging' || xx === 'JOGGING')            ms = 'idle';
-    else if (xx === 'ESTOPPED' || xx === 'FAULT')                 ms = 'estopped';
-    else if (xx === 'ERROR' || xx === 'ALARM')                   ms = 'error';
-    else if (xx === 'READY'  || xx === 'IDLE' || cycle === 'idle') ms = 'idle';
-    else                                                         ms = 'idle';
-    setMachineState(ms);
+    setMachineState(deriveMachineState(cycle, xx));
   }
 
   // pr = pause/fault reason. Build a useful message from WS state immediately —
@@ -3234,8 +3239,12 @@ function updateUI(data) {
     const pct = Math.min(100, (data.line / totalLines) * 100);
     _jobPct = pct;
     document.getElementById('progress-bar').style.width = pct + '%';
-    document.getElementById('gcode-line-info').textContent = `Line ${data.line} / ${totalLines}`;
-    highlightLine(data.line);
+    // Homing/jogging cycles emit line deltas that would yank the cursor around awkwardly.
+    const _cyc = state.cycle || '';
+    if (_cyc !== 'homing' && _cyc !== 'jogging') {
+      document.getElementById('gcode-line-info').textContent = `Line ${data.line} / ${totalLines}`;
+      highlightLine(data.line);
+    }
     // updateProgressLabel() will pick up _jobPct on its next tick
     // Throttled progress color refresh (100ms) for 3D view
     if (viewToggles.progress) {
@@ -3476,10 +3485,11 @@ function stopLogPoll() {
 let _logPolling = false;
 
 async function pollLog() {
-  if (_logPolling) return;
+  if (_logPolling || !_proxyEndpoints) return;
   _logPolling = true;
   try {
     const res   = await fetch(`${API_URL}/api/log-since?pos=${Math.max(0, _logCursor)}`);
+    if (res.status === 404 || res.status === 405) { _markProxyDown(); _logPolling = false; return; }
     const total = parseInt(res.headers.get('X-Log-Total') || '0');
     const text  = await res.text();
 
@@ -3709,8 +3719,22 @@ function loadGCode(filename, resetScale = true) {
       gcodeLines = xhr.responseText.split('\n');
       totalLines = gcodeLines.length;
       renderGCode(gcodeLines);
-      parseAndRender3D(gcodeLines);
-      _estimatedJobSeconds = estimateJobTime(gcodeLines);
+      // Defer the heavy O(n) passes so the text viewer paints immediately.
+      // On a Pi with a 100k-line file, parseAndRender3D + estimateJobTime add
+      // ~1-2s of main-thread work that used to feel like a full UI hang.
+      requestAnimationFrame(() => setTimeout(() => {
+        parseAndRender3D(gcodeLines);
+        // Instant client-side estimate as a fallback; refine with bbctrl's
+        // planner time (chord vs arc length, accel modeling, dwells) once ready.
+        _estimatedJobSeconds = estimateJobTime(gcodeLines);
+        if (lastMachineState !== 'running') showFileReadyLabel();
+        _fetchBbctrlPlannerTime(filename).then(t => {
+          if (t && t > 0) {
+            _estimatedJobSeconds = Math.ceil(t);
+            if (lastMachineState !== 'running') showFileReadyLabel();
+          }
+        });
+      }, 0));
       if (lastMachineState !== 'running') showFileReadyLabel();
       if (!filename.startsWith('_fs_')) {
         // Original file — store as the scale source; only reset applied pcts if the user
@@ -3749,9 +3773,26 @@ function classifyLine(line) {
   if (l.startsWith('G0 ') || l === 'G0' || l.startsWith('G00')) return 'rapid';
   if (l.startsWith('G1 ') || l === 'G1' || l.startsWith('G01')) return 'cut';
   if (/^G0?2[\s]/.test(l) || /^G0?3[\s]/.test(l)) return 'cut';
-  if (l.startsWith('S') || l.includes(' S') || l.startsWith('M3') || l.startsWith('M5')) return 'spindle';
-  if (l.startsWith('M7') || l.startsWith('M8') || l.startsWith('M9')) return 'coolant';
+  if (l.startsWith('S') || l.includes(' S') || /^M0?[35](\s|$)/.test(l)) return 'spindle';
+  if (/^M[789](\s|$)/.test(l)) return 'coolant';
   return '';
+}
+
+// Map controller cycle + xx to our UI machine state. ESTOP/ERROR intentionally
+// take priority over cycle — the controller can leave cycle='homing' stuck
+// after a limit-switch trip, and without this priority the UI would mask the
+// estop and the Clear E-Stop button would never appear.
+function deriveMachineState(cycle, xx) {
+  cycle = cycle || '';
+  xx    = (xx || '').toUpperCase();
+  if (xx === 'ESTOPPED' || xx === 'FAULT')                   return 'estopped';
+  if (xx === 'ERROR' || xx === 'ALARM')                      return 'error';
+  if (cycle === 'run'     || xx === 'RUNNING')               return 'running';
+  if (cycle === 'holding' || xx === 'HOLDING')               return 'paused';
+  if (cycle === 'homing'  || xx === 'HOMING')                return 'running';
+  if (cycle === 'jogging' || xx === 'JOGGING')               return 'idle';
+  if (xx === 'READY'  || xx === 'IDLE' || cycle === 'idle')  return 'idle';
+  return 'idle';
 }
 
 function highlightSpindleSpeed(line) {
@@ -3759,21 +3800,91 @@ function highlightSpindleSpeed(line) {
              .replace(/([Ff])(\d+\.?\d*)/g, '<span class="feed-rate">$1$2</span>');
 }
 
+// Virtualized gcode viewer.
+//   Small files (< VIRT_THRESHOLD): render every line, current behavior.
+//   Large files: render a windowed slice around the scroll position. Building
+//   100k+ DOM nodes synchronously froze the UI for seconds (trochoidal toolpath
+//   incident, 2026-04-19).
+const VIRT_THRESHOLD = 2000;
+let _virt = null;  // { lines, rowH, currentLine, buffer, start, end, onScroll }
+
+function _renderLineHtml(line, i) {
+  const cls = classifyLine(line);
+  const safe = escHtml(line || '\u00a0');
+  return `<div class="gcode-line ${cls}${_virt && _virt.currentLine === i+1 ? ' current' : ''}" id="gl-${i+1}"${_virt ? ` style="position:absolute;left:0;right:0;top:${i*_virt.rowH}px;"` : ''}>`
+       + `<span class="line-num">${i+1}</span>`
+       + `<span>${highlightSpindleSpeed(safe)}</span>`
+       + `</div>`;
+}
+
+function _measureRowHeight(container) {
+  const probe = document.createElement('div');
+  probe.className = 'gcode-line';
+  probe.style.visibility = 'hidden';
+  probe.innerHTML = '<span class="line-num">1</span><span>G0</span>';
+  container.appendChild(probe);
+  const h = probe.getBoundingClientRect().height || 23;
+  container.removeChild(probe);
+  return h;
+}
+
+function _renderVirtWindow() {
+  if (!_virt) return;
+  const { container, inner, lines, rowH, buffer } = _virt;
+  const viewH = container.clientHeight;
+  const top = container.scrollTop;
+  const first = Math.max(0, Math.floor(top / rowH) - buffer);
+  const last  = Math.min(lines.length, Math.ceil((top + viewH) / rowH) + buffer);
+  if (first === _virt.start && last === _virt.end) return;
+  _virt.start = first; _virt.end = last;
+  let html = '';
+  for (let i = first; i < last; i++) html += _renderLineHtml(lines[i], i);
+  inner.innerHTML = html;
+}
+
 function renderGCode(lines) {
   const container = document.getElementById('gcode-content');
-  container.innerHTML = lines.map((line, i) => {
-    const cls = classifyLine(line);
-    const safe = escHtml(line || '\u00a0');
-    return `<div class="gcode-line ${cls}" id="gl-${i+1}">
-      <span class="line-num">${i+1}</span>
-      <span>${highlightSpindleSpeed(safe)}</span>
-    </div>`;
-  }).join('');
+  if (_virt && _virt.onScroll) {
+    _virt.container.removeEventListener('scroll', _virt.onScroll);
+  }
+  _virt = null;
+  container.innerHTML = '';
+  if (lines.length <= VIRT_THRESHOLD) {
+    container.innerHTML = lines.map((line, i) => _renderLineHtml(line, i)).join('');
+    return;
+  }
+  const rowH = _measureRowHeight(container);
+  const inner = document.createElement('div');
+  inner.style.position = 'relative';
+  inner.style.height = (lines.length * rowH) + 'px';
+  container.appendChild(inner);
+  _virt = { lines, container, inner, rowH, buffer: 30, currentLine: 0, start: -1, end: -1, onScroll: null };
+  _virt.onScroll = () => _renderVirtWindow();
+  container.addEventListener('scroll', _virt.onScroll, { passive: true });
+  container.scrollTop = 0;
+  _renderVirtWindow();
 }
 
 function highlightLine(lineNum) {
   const prev = document.querySelector('.gcode-line.current');
   if (prev) prev.classList.remove('current');
+
+  if (_virt) {
+    _virt.currentLine = lineNum;
+    const { container, rowH, lines } = _virt;
+    const targetTop = (lineNum - 1) * rowH;
+    const viewH = container.clientHeight;
+    const curTop = container.scrollTop;
+    const inView = targetTop >= curTop + 40 && targetTop + rowH <= curTop + viewH - 40;
+    if (!inView) {
+      const dest = Math.max(0, Math.min(lines.length * rowH - viewH, targetTop - viewH / 2));
+      container.scrollTop = dest;
+    }
+    _virt.start = -1;  // force re-render so the current-line class lands even if window unchanged
+    _renderVirtWindow();
+    return;
+  }
+
   const cur = document.getElementById(`gl-${lineNum}`);
   if (cur) {
     cur.classList.add('current');
@@ -4320,6 +4431,43 @@ function switchSettingsTab(tab) {
 
 let _cachedCfg = null;
 
+// Canonical bbctrl tool list. id = `selected-tool` (string). `tool-type` must be
+// the display name from the firmware's enum (`type` override when set, else `name`)
+// or bbctrl falls back to "Disabled" on load and the spindle never actuates.
+const TOOL_LIST = [
+  { id: 'disabled',          name: 'Disabled' },
+  { id: 'router',            name: 'Router (Makita, etc)', type: 'PWM Spindle' },
+  { id: 'laser',             name: 'Laser (J Tech, etc)',  type: 'PWM Spindle' },
+  { id: 'pwm',               name: 'PWM Spindle' },
+  { id: 'em60',              name: 'EM60' },
+  { id: 'redline-vfd',       name: 'Redline VFD' },
+  { id: 'huanyang-vfd',      name: 'Huanyang VFD' },
+  { id: 'custom-modbus-vfd', name: 'Custom Modbus VFD' },
+  { id: 'ac-tech-vfd',       name: 'AC-Tech VFD' },
+  { id: 'nowforever-vfd',    name: 'Nowforever VFD' },
+  { id: 'delta-vfd',         name: 'Delta VFD015M21A (Beta)' },
+  { id: 'yl600-vfd',         name: 'YL600, YL620, YL620-A VFD (Beta)' },
+  { id: 'fr-d700-vfd',       name: 'FR-D700 (Beta)' },
+  { id: 'sunfar-e300-vfd',   name: 'Sunfar E300 (Beta)' },
+  { id: 'omron-mx2-vfd',     name: 'OMRON MX2' },
+  { id: 'v70-vfd',           name: 'V70' },
+];
+
+function toolTypeFor(id) {
+  const t = TOOL_LIST.find(x => x.id === id);
+  return t ? (t.type || t.name) : 'Disabled';
+}
+
+// Known-good Huanyang HY-series register map. Written when user picks Huanyang
+// and regs are empty (no reg editor in Rift — this is the only way to populate).
+const HUANYANG_REGS = [
+  { 'reg-addr': 0x2000, 'reg-value': 0x0001, 'reg-type': 'forward-write' },
+  { 'reg-addr': 0x2000, 'reg-value': 0x0011, 'reg-type': 'reverse-write' },
+  { 'reg-addr': 0x2000, 'reg-value': 0x0008, 'reg-type': 'stop-write' },
+  { 'reg-addr': 0x2001, 'reg-value': 0,      'reg-type': 'freq-scaled-set' },
+  { 'reg-addr': 0,      'reg-value': 400,    'reg-type': 'max-freq-fixed' },
+];
+
 async function openSettings() {
   try { await loadSettings(); } catch(e) { /* show modal anyway */ }
   document.getElementById('cfg-units').value          = settings.units;
@@ -4420,10 +4568,9 @@ function renderToolSettings(cfg) {
   const tool = cfg.tool || {};
   const modbus = cfg['modbus-spindle'] || {};
   const modeOpts = ['disabled','lo-hi','hi-lo','lo-lo','hi-hi'];
-  const toolTypes = ['disabled','pwm-spindle','huanyang-vfd','custom-modbus-vfd','ac-tech-vfd','nowforever-vfd','delta-vfd015m21a','yl600-vfd','fr-d700-vfd','sunfar-vfd','omron-mx2','v70-vfd','galt-g200-g500','durapulse-gs20'];
   const selTool = tool['selected-tool'] || 'disabled';
   document.getElementById('cfg-tool-type').innerHTML =
-    toolTypes.map(o => `<option value="${o}" ${selTool===o?'selected':''}>${o}</option>`).join('');
+    TOOL_LIST.map(t => `<option value="${t.id}" ${selTool===t.id?'selected':''}>${t.name}</option>`).join('');
   document.getElementById('cfg-tool-max-spin').value = tool['max-spin'] != null ? tool['max-spin'] : '';
   document.getElementById('cfg-tool-min-spin').value = tool['min-spin'] != null ? tool['min-spin'] : '';
   // Cache for use in applyFeedScale spindle clamping
@@ -4593,10 +4740,22 @@ async function saveSettings() {
       });
       // Tool
       if (cfg.tool) {
-        cfg.tool['selected-tool']       = document.getElementById('cfg-tool-type').value;
-        cfg.tool['tool-type']           = document.getElementById('cfg-tool-type').options[document.getElementById('cfg-tool-type').selectedIndex].text;
+        const selId = document.getElementById('cfg-tool-type').value;
+        const prevId = cfg.tool['selected-tool'];
+        cfg.tool['selected-tool']       = selId;
+        cfg.tool['tool-type']           = toolTypeFor(selId);
         cfg.tool['max-spin']            = parseFloat(document.getElementById('cfg-tool-max-spin').value) || cfg.tool['max-spin'];
         cfg.tool['min-spin']            = parseFloat(document.getElementById('cfg-tool-min-spin').value) || cfg.tool['min-spin'];
+        // If switching to Huanyang and regs are empty/all-disabled, populate the HY-series preset.
+        if (selId === 'huanyang-vfd' && cfg['modbus-spindle']) {
+          const regs = cfg['modbus-spindle'].regs || [];
+          const hasActive = regs.some(r => r && r['reg-type'] && r['reg-type'] !== 'disabled');
+          if (!hasActive) {
+            while (regs.length < 32) regs.push({ 'reg-addr': 0, 'reg-value': 0, 'reg-type': 'disabled' });
+            HUANYANG_REGS.forEach((r, i) => regs[i] = { ...r });
+            cfg['modbus-spindle'].regs = regs;
+          }
+        }
         // Update cache
         _spindleMaxRPM = parseFloat(cfg.tool['max-spin']) || 0;
         _spindleMinRPM = parseFloat(cfg.tool['min-spin']) || 0;
@@ -5366,7 +5525,21 @@ function init3D() {
   const canvas = document.getElementById('three-canvas');
   const panel  = document.getElementById('canvas-wrap');
 
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  } catch (e) {
+    _3dInitialized = false;
+    canvas.style.display = 'none';
+    const msg = document.createElement('div');
+    msg.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;color:var(--muted);font-family:var(--font);gap:8px;';
+    msg.innerHTML = '<div style="font-size:14px;font-weight:600;color:var(--text);">3D view unavailable</div>'
+                  + '<div style="font-size:12px;max-width:380px;line-height:1.5;">WebGL could not be initialized in this browser. '
+                  + 'Check that hardware acceleration is enabled (Firefox: <code>about:config</code> → <code>webgl.disabled</code> = false, '
+                  + '<code>layers.acceleration.force-enabled</code> = true) or try Chrome / Chromium.</div>'
+                  + '<div style="font-size:11px;opacity:0.7;margin-top:6px;">Error: ' + (e && e.message ? e.message : 'unknown') + '</div>';
+    panel.appendChild(msg);
+    return;
+  }
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setClearColor(_3dColors.bg, 1);
 
@@ -5525,7 +5698,7 @@ function updateCamera() {
 
 function animate() {
   requestAnimationFrame(animate);
-  renderer.render(scene, camera);
+  if (renderer) renderer.render(scene, camera);
 }
 
 function arcPoints(x0, y0, z0, x1, y1, z1, i, j, cw, segs = 48) {
@@ -5549,8 +5722,29 @@ function arcPoints(x0, y0, z0, x1, y1, z1, i, j, cw, segs = 48) {
 }
 
 function parseAndRender3D(lines) {
-  while (toolpathGroup.children.length) toolpathGroup.remove(toolpathGroup.children[0]);
-  if (_bboxHelper) { scene.remove(_bboxHelper); _bboxHelper = null; }
+  // Bail if the 3D renderer failed to initialize (WebGL unavailable) — the
+  // scene/toolpathGroup globals won't exist and every call would throw.
+  if (!renderer || !toolpathGroup) return;
+  // Dispose geometries/materials on the outgoing scene — three.js does NOT reclaim
+  // these automatically. Without this every file load (or scale re-apply) leaks
+  // GPU buffers and JS memory, driving the renderer to >500MB over a long session.
+  while (toolpathGroup.children.length) {
+    const child = toolpathGroup.children[0];
+    child.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) {
+        if (Array.isArray(o.material)) o.material.forEach(m => m.dispose());
+        else o.material.dispose();
+      }
+    });
+    toolpathGroup.remove(child);
+  }
+  if (_bboxHelper) {
+    scene.remove(_bboxHelper);
+    if (_bboxHelper.geometry) _bboxHelper.geometry.dispose();
+    if (_bboxHelper.material) _bboxHelper.material.dispose();
+    _bboxHelper = null;
+  }
   _cutSegData = [];
   _cutLineSegs = null;
 
@@ -6225,6 +6419,31 @@ function estimateJobTime(lines) {
   }
 
   return Math.ceil(totalSec * 1.15); // +15% for acceleration and overhead
+}
+
+// Ask bbctrl's planner for the authoritative run time. It accounts for arc
+// lengths (not chord distances), jerk-limited accel/decel, dwells, and anything
+// else the firmware's motion planner models — much more accurate than our
+// client-side estimate on files with many short segments or arcs.
+//
+// The endpoint lazily analyses the file on first call, so we poll until the
+// `time` field appears. Falls back to null on error or timeout — the caller
+// keeps the client-side estimate in that case.
+async function _fetchBbctrlPlannerTime(filename) {
+  const url = `${API_URL}/api/path/${encodeURIComponent(filename)}`;
+  const deadline = Date.now() + 30000;
+  while (Date.now() < deadline) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) return null;
+      const data = await r.json();
+      if (typeof data.time === 'number' && data.time > 0) return data.time;
+    } catch (e) {
+      return null;
+    }
+    await new Promise(res => setTimeout(res, 500));
+  }
+  return null;
 }
 
 // Helper: set time remaining display without moving the numeric value

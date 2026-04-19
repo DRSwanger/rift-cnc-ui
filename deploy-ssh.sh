@@ -17,6 +17,7 @@ MOBILE="$SCRIPT_DIR/mobile.html"
 MANIFEST="$SCRIPT_DIR/manifest.json"
 BOOT_PNG="$SCRIPT_DIR/rift-boot.png"
 SHUTDOWN_PNG="$SCRIPT_DIR/rift-shutdown.png"
+XINITRC="$SCRIPT_DIR/xinitrc"
 
 # Discover bbctrl http directory on the Pi
 echo "Locating bbctrl http directory on $PI_USER@$PI_HOST..."
@@ -51,12 +52,13 @@ eval "$SSH_CMD -o StrictHostKeyChecking=no $PI_USER@$PI_HOST \
      fi'"
 
 # Copy via /tmp then sudo mv (http dir is root-owned)
-echo "Copying index.html, mobile.html, manifest.json, and splash PNGs..."
+echo "Copying index.html, mobile.html, manifest.json, splash PNGs, and .xinitrc..."
 eval "$SCP_CMD -o StrictHostKeyChecking=no $SRC $PI_USER@$PI_HOST:/tmp/rift-index.html"
 eval "$SCP_CMD -o StrictHostKeyChecking=no $MOBILE $PI_USER@$PI_HOST:/tmp/rift-mobile.html"
 eval "$SCP_CMD -o StrictHostKeyChecking=no $MANIFEST $PI_USER@$PI_HOST:/tmp/rift-manifest.json"
 eval "$SCP_CMD -o StrictHostKeyChecking=no $BOOT_PNG $PI_USER@$PI_HOST:/tmp/rift-boot.png"
 eval "$SCP_CMD -o StrictHostKeyChecking=no $SHUTDOWN_PNG $PI_USER@$PI_HOST:/tmp/rift-shutdown.png"
+eval "$SCP_CMD -o StrictHostKeyChecking=no $XINITRC $PI_USER@$PI_HOST:/tmp/rift-xinitrc"
 eval "$SSH_CMD -o StrictHostKeyChecking=no $PI_USER@$PI_HOST \
     'echo ${SSH_PASS} | sudo -S bash -c \"
         cp /tmp/rift-index.html \\\"$HTTP_DIR/index.html\\\" &&
@@ -71,7 +73,11 @@ eval "$SSH_CMD -o StrictHostKeyChecking=no $PI_USER@$PI_HOST \
         cp /tmp/rift-boot.png \\\"\\\$PLYMOUTH/boot.png\\\" &&
         cp /tmp/rift-shutdown.png \\\"\\\$PLYMOUTH/shutdown.png\\\" &&
         update-initramfs -u 2>/dev/null || true &&
-        rm /tmp/rift-index.html /tmp/rift-mobile.html /tmp/rift-manifest.json /tmp/rift-boot.png /tmp/rift-shutdown.png
+        [ ! -e /home/pi/.xinitrc.orig ] && cp /home/pi/.xinitrc /home/pi/.xinitrc.orig || true &&
+        cp /tmp/rift-xinitrc /home/pi/.xinitrc &&
+        chown pi:pi /home/pi/.xinitrc &&
+        chmod 644 /home/pi/.xinitrc &&
+        rm /tmp/rift-index.html /tmp/rift-mobile.html /tmp/rift-manifest.json /tmp/rift-boot.png /tmp/rift-shutdown.png /tmp/rift-xinitrc
     \"'"
 
 echo ""

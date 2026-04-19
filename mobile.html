@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0f1117">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Rift Mobile</title>
+<link rel="icon" type="image/png" href="data:image/png;base64,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">
+<style>
+  :root {
+    --bg:      #0f1117;
+    --surface: #1a1d27;
+    --sur2:    #22263a;
+    --border:  #2e3347;
+    --text:    #e8eaf6;
+    --muted:   #6b7280;
+    --accent:  #00d4aa;
+    --yellow:  #f5c842;
+    --red:     #ff4d4d;
+    --green:   #22c55e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; height: 100%; overflow: hidden; user-select: none; }
+
+  /* ── Shell: header + scrollable body + pinned controls ── */
+  #app {
+    display: flex; flex-direction: column;
+    height: 100dvh;
+    padding: 6px;
+    padding-top: max(env(safe-area-inset-top), 6px);
+    padding-bottom: max(env(safe-area-inset-bottom), 6px);
+    gap: 5px;
+  }
+  #scroll-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; -webkit-overflow-scrolling: touch; }
+  #controls-section { flex-shrink: 0; }
+
+  /* ── Header ── */
+  #header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 12px; background: var(--surface); border-radius: 10px; border: 1px solid var(--border); flex-shrink: 0;
+  }
+  #logo { font-size: 17px; font-weight: 800; color: var(--accent); letter-spacing: 1px; }
+  #state-badge {
+    font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px;
+    background: var(--sur2); color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  #state-badge.running  { background: #003d2e; color: var(--accent); }
+  #state-badge.holding  { background: #3d2a00; color: var(--yellow); }
+  #state-badge.estopped { background: #3d0000; color: var(--red); }
+  #state-badge.homing   { background: #1a1d40; color: #7b8cde; }
+  #conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); flex-shrink: 0; transition: background 0.3s; }
+  #conn-dot.connected { background: var(--green); }
+
+  /* ── Progress / File ── */
+  #progress-section { background: var(--surface); border-radius: 10px; border: 1px solid var(--border); padding: 7px 12px; flex-shrink: 0; }
+  #file-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  #file-name { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  #file-pick-btn { background: var(--sur2); border: 1px solid var(--border); border-radius: 6px; color: var(--accent); font-size: 11px; font-weight: 600; padding: 3px 9px; cursor: pointer; flex-shrink: 0; }
+  #progress-bar-wrap { height: 4px; background: var(--sur2); border-radius: 2px; overflow: hidden; margin-bottom: 4px; }
+  #progress-bar { height: 100%; width: 0%; background: var(--accent); border-radius: 2px; transition: width 0.5s; }
+  #progress-info { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); }
+
+  /* ── Inline XYZ DRO inside progress section ── */
+  #dro-inline { display: flex; gap: 14px; margin-top: 5px; flex-wrap: nowrap; }
+  .dro-item { display: flex; align-items: baseline; gap: 4px; }
+  .dro-lbl { font-size: 10px; font-weight: 700; color: var(--muted); letter-spacing: 1px; }
+  .dro-lbl.homed { color: var(--accent); }
+  .dro-val { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+
+  /* ── Feed / Spindle — compact single-line ── */
+  #stats-section { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px; display: flex; align-items: baseline; gap: 6px; }
+  .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; }
+  .stat-value { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+  .stat-unit  { font-size: 10px; color: var(--muted); margin-left: auto; }
+
+  /* ── Outputs ── */
+  #outputs-section { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .output-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 7px 10px; display: flex; align-items: center; gap: 7px; cursor: pointer; color: var(--text); font-size: 12px; font-weight: 600; }
+  .output-btn .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); flex-shrink: 0; transition: background 0.2s; }
+  .output-btn.active .dot { background: var(--accent); }
+  .output-btn.active { border-color: var(--accent); }
+
+  /* ── Home / Zero ── */
+  #hz-section { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .hz-group { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 6px 8px; }
+  .hz-group-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+  .hz-btn-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 4px; }
+  .hz-btn { background: var(--sur2); border: 1px solid var(--border); border-radius: 6px; font-size: 11px; font-weight: 700; height: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .hz-btn:active { border-color: var(--accent); }
+  .home-btn { color: var(--accent); }
+  .zero-btn { color: var(--yellow); }
+
+  /* ── Jog ── */
+  #jog-step-row { display: flex; gap: 5px; justify-content: center; margin-bottom: 5px; }
+  .step-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 11px; font-weight: 600; padding: 4px 14px; cursor: pointer; }
+  .step-btn.active { border-color: var(--accent); color: var(--accent); }
+  #jog-grid { display: grid; grid-template-columns: 44px 1fr 1fr 1fr 44px; grid-template-rows: 40px 40px 40px; gap: 4px; align-items: stretch; }
+  .jog-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 18px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .jog-btn:active { background: var(--sur2); border-color: var(--accent); }
+  .jog-z { font-size: 11px; font-weight: 700; color: var(--muted); }
+
+  /* ── E-STOP bar — pinned between header and scroll-body ── */
+  #estop-bar { flex-shrink: 0; }
+  #btn-estop { width: 100%; border: none; border-radius: 10px; background: var(--red); color: #fff; font-size: 15px; font-weight: 800; height: 44px; cursor: pointer; letter-spacing: 1px; transition: filter 0.1s, transform 0.08s; }
+  #btn-estop:active { filter: brightness(0.85); transform: scale(0.97); }
+
+  /* ── Controls — always at bottom ── */
+  #controls-section { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; flex-shrink: 0; }
+  .ctrl-btn { border: none; border-radius: 10px; font-size: 12px; font-weight: 700; height: 36px; cursor: pointer; transition: filter 0.1s, transform 0.08s; letter-spacing: 0.3px; }
+  .ctrl-btn:active { filter: brightness(0.85); transform: scale(0.97); }
+  .ctrl-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+  #btn-start { background: var(--accent); color: #000; }
+  #btn-pause { background: var(--yellow); color: #000; }
+  #btn-stop  { background: var(--sur2); color: var(--text); border: 1px solid var(--border); }
+
+  /* ── File picker sheet ── */
+  #file-sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200; display: none; align-items: flex-end; }
+  #file-sheet-backdrop.open { display: flex; }
+  #file-sheet { width: 100%; background: var(--surface); border-radius: 16px 16px 0 0; border-top: 1px solid var(--border); max-height: 70dvh; display: flex; flex-direction: column; }
+  #file-sheet-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  #file-sheet-title { font-size: 14px; font-weight: 700; }
+  #file-sheet-close { background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; padding: 0 4px; }
+  #file-sheet-list { overflow-y: auto; padding: 4px 0; }
+  .file-item { padding: 12px 16px; font-size: 13px; color: var(--text); cursor: pointer; border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-item:last-child { border-bottom: none; }
+  .file-item:active { background: var(--sur2); }
+  .file-item.selected { color: var(--accent); }
+
+  /* ── Connection overlay ── */
+  #conn-overlay { position: fixed; inset: 0; background: rgba(15,17,23,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; z-index: 300; }
+  #conn-overlay.hidden { display: none; }
+  #conn-overlay span { color: var(--muted); font-size: 14px; }
+  .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="conn-overlay">
+  <div class="spinner"></div>
+  <span>Connecting to Rift…</span>
+</div>
+
+<div id="file-sheet-backdrop" onclick="if(event.target===this)closeFilePicker()">
+  <div id="file-sheet">
+    <div id="file-sheet-header">
+      <span id="file-sheet-title">Select File</span>
+      <button id="file-sheet-close" onclick="closeFilePicker()">✕</button>
+    </div>
+    <div id="file-sheet-list"></div>
+  </div>
+</div>
+
+<div id="app">
+
+  <!-- Header -->
+  <div id="header" style="flex-shrink:0">
+    <span id="logo">Rift</span>
+    <span id="state-badge">—</span>
+    <div id="conn-dot"></div>
+  </div>
+
+  <!-- E-STOP — pinned just below header -->
+  <div id="estop-bar">
+    <button id="btn-estop" onclick="machineEStop()">⚠ E-STOP</button>
+  </div>
+
+  <!-- Scrollable body -->
+  <div id="scroll-body">
+
+    <!-- Progress / File / DRO combined -->
+    <div id="progress-section">
+      <div id="file-row">
+        <div id="file-name">No file selected</div>
+        <button id="file-pick-btn" onclick="openFilePicker()">Change</button>
+      </div>
+      <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+      <div id="progress-info">
+        <span id="progress-line">—</span>
+        <span id="progress-pct">—</span>
+      </div>
+      <div id="dro-inline">
+        <div class="dro-item"><span class="dro-lbl" id="lbl-x">X</span><span class="dro-val" id="val-x">—</span></div>
+        <div class="dro-item"><span class="dro-lbl" id="lbl-y">Y</span><span class="dro-val" id="val-y">—</span></div>
+        <div class="dro-item"><span class="dro-lbl" id="lbl-z">Z</span><span class="dro-val" id="val-z">—</span></div>
+      </div>
+    </div>
+
+    <!-- Feed / Spindle -->
+    <div id="stats-section">
+      <div class="stat-card">
+        <span class="stat-label">Feed</span>
+        <span class="stat-value" id="val-feed">—</span>
+        <span class="stat-unit">mm/min</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">RPM</span>
+        <span class="stat-value" id="val-spindle">—</span>
+      </div>
+    </div>
+
+    <!-- Outputs -->
+    <div id="outputs-section">
+      <button class="output-btn" id="btn-pump" onclick="toggleOutput(0)">
+        <div class="dot"></div><span>Water Pump</span>
+      </button>
+      <button class="output-btn" id="btn-vacuum" onclick="toggleOutput(1)">
+        <div class="dot"></div><span>Vacuum</span>
+      </button>
+    </div>
+
+    <!-- Home / Zero -->
+    <div id="hz-section">
+      <div class="hz-group">
+        <div class="hz-group-label">Home</div>
+        <div class="hz-btn-row">
+          <div class="hz-btn home-btn" onclick="homeAxis('all')">All</div>
+          <div class="hz-btn home-btn" onclick="homeAxis('x')">X</div>
+          <div class="hz-btn home-btn" onclick="homeAxis('y')">Y</div>
+          <div class="hz-btn home-btn" onclick="homeAxis('z')">Z</div>
+        </div>
+      </div>
+      <div class="hz-group">
+        <div class="hz-group-label">Zero</div>
+        <div class="hz-btn-row">
+          <div class="hz-btn zero-btn" onclick="zeroAxis('all')">All</div>
+          <div class="hz-btn zero-btn" onclick="zeroAxis('x')">X</div>
+          <div class="hz-btn zero-btn" onclick="zeroAxis('y')">Y</div>
+          <div class="hz-btn zero-btn" onclick="zeroAxis('z')">Z</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Jog -->
+    <div>
+      <div id="jog-step-row">
+        <div class="step-btn" onclick="setStep(0.1)">0.1</div>
+        <div class="step-btn active" onclick="setStep(1)">1</div>
+        <div class="step-btn" onclick="setStep(10)">10</div>
+        <div class="step-btn" onclick="setStep(100)">100</div>
+      </div>
+      <div id="jog-grid">
+        <div class="jog-btn jog-z" onclick="jog('Z',1)">Z+</div>
+        <div></div>
+        <div class="jog-btn" onclick="jog('Y',1)">▲</div>
+        <div></div>
+        <div></div>
+
+        <div></div>
+        <div class="jog-btn" onclick="jog('X',-1)">◀</div>
+        <div class="jog-btn" style="font-size:10px;color:var(--muted);cursor:default;">JOG</div>
+        <div class="jog-btn" onclick="jog('X',1)">▶</div>
+        <div></div>
+
+        <div class="jog-btn jog-z" onclick="jog('Z',-1)">Z−</div>
+        <div></div>
+        <div class="jog-btn" onclick="jog('Y',-1)">▼</div>
+        <div></div>
+        <div></div>
+      </div>
+    </div>
+
+  </div><!-- /scroll-body -->
+
+  <!-- Controls — pinned to bottom -->
+  <div id="controls-section">
+    <button class="ctrl-btn" id="btn-start" onclick="machineStart()">START</button>
+    <button class="ctrl-btn" id="btn-pause" onclick="machinePause()">PAUSE</button>
+    <button class="ctrl-btn" id="btn-stop"  onclick="machineStop()">STOP</button>
+  </div>
+
+</div>
+
+<script>
+const API_URL = window.location.origin;
+let ws = null, state = {}, totalLines = 0, jogStep = 1, machineState = 'idle', fileList = [];
+
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/websocket`);
+  ws.onopen = () => {
+    document.getElementById('conn-dot').classList.add('connected');
+    document.getElementById('conn-overlay').classList.add('hidden');
+  };
+  ws.onclose = ws.onerror = () => {
+    document.getElementById('conn-dot').classList.remove('connected');
+    document.getElementById('conn-overlay').classList.remove('hidden');
+    setTimeout(connect, 2000);
+  };
+  ws.onmessage = e => {
+    try { const d = JSON.parse(e.data); Object.assign(state, d); updateUI(d); } catch(_) {}
+  };
+}
+
+function fmt(v, dec=3) { return (+(v||0)).toFixed(dec); }
+
+function updateUI(data) {
+  // XYZ WCS
+  const wcsX = (+(state.xp||0)) - (+(state.offset_x||0));
+  const wcsY = (+(state.yp||0)) - (+(state.offset_y||0));
+  const wcsZ = (+(state.zp||0)) - (+(state.offset_z||0));
+  document.getElementById('val-x').textContent = fmt(wcsX);
+  document.getElementById('val-y').textContent = fmt(wcsY);
+  document.getElementById('val-z').textContent = fmt(wcsZ);
+  document.getElementById('lbl-x').className = 'dro-lbl' + (state['0homed'] ? ' homed' : '');
+  document.getElementById('lbl-y').className = 'dro-lbl' + (state['1homed'] ? ' homed' : '');
+  document.getElementById('lbl-z').className = 'dro-lbl' + (state['3homed'] ? ' homed' : '');
+
+  // Feed / spindle
+  const vMmpm = (+(state.v||0)) * 1000;
+  document.getElementById('val-feed').textContent    = Math.round(vMmpm >= 10 ? vMmpm : (+(state.feed||0))) || '—';
+  document.getElementById('val-spindle').textContent = Math.round(+(state.s||0)) || '—';
+
+  // Machine state + button gating
+  if ('xx' in data) {
+    const xx = (state.xx || '').toLowerCase();
+    machineState = xx;
+    const badge = document.getElementById('state-badge');
+    badge.textContent = xx || '—';
+    badge.className = ['running','holding','estopped','homing'].reduce((c,s) => xx.includes(s) ? s : c, '');
+    const running = xx === 'running', holding = xx === 'holding';
+    const stopped = ['idle','ready',''].includes(xx), estopped = xx === 'estopped';
+    document.getElementById('btn-start').disabled = running || estopped;
+    document.getElementById('btn-pause').disabled = (!running && !holding) || estopped;
+    document.getElementById('btn-pause').textContent = holding ? 'RESUME' : 'PAUSE';
+    document.getElementById('btn-stop').disabled  = stopped || estopped;
+  }
+
+  // Progress
+  if ('line' in data && totalLines > 0) {
+    const pct = Math.min(100, (data.line / totalLines) * 100);
+    document.getElementById('progress-bar').style.width = pct.toFixed(1) + '%';
+    document.getElementById('progress-line').textContent = `Line ${data.line} / ${totalLines}`;
+    document.getElementById('progress-pct').textContent = pct.toFixed(0) + '%';
+  }
+
+  // Selected file
+  if ('selected' in data) {
+    const f = state.selected || '';
+    document.getElementById('file-name').textContent = f || 'No file selected';
+    if (f) loadFileMeta(f);
+  }
+
+  // File list from WS state
+  if ('files' in data && Array.isArray(data.files)) fileList = data.files;
+
+  // Outputs
+  if ('1oa' in data || '2oa' in data) {
+    document.getElementById('btn-pump').classList.toggle('active', !!state['1oa']);
+    document.getElementById('btn-vacuum').classList.toggle('active', !!state['2oa']);
+  }
+}
+
+let _lastFile = '';
+async function loadFileMeta(filename) {
+  if (filename === _lastFile) return;
+  _lastFile = filename;
+  try {
+    const r = await fetch(`${API_URL}/api/file/${encodeURIComponent(filename)}`);
+    if (!r.ok) return;
+    const text = await r.text();
+    totalLines = text.split('\n').filter(l => {
+      const t = l.trim().replace(/;.*/, '').replace(/\(.*?\)/g,'').trim();
+      return t && !t.startsWith('(') && !t.startsWith('%');
+    }).length;
+  } catch(_) {}
+}
+
+async function openFilePicker() {
+  try {
+    const r = await fetch(`${API_URL}/api/config/load`);
+    if (r.ok) { const cfg = await r.json(); if (cfg.gcode_list) fileList = cfg.gcode_list; }
+  } catch(_) {}
+  const list = document.getElementById('file-sheet-list');
+  list.innerHTML = fileList.length
+    ? fileList.map(f => `<div class="file-item${f===state.selected?' selected':''}" onclick="selectFile('${f.replace(/'/g,"\\'")}'">${f}</div>`).join('')
+    : '<div style="padding:24px 16px;color:var(--muted);font-size:13px;text-align:center">No files on controller</div>';
+  document.getElementById('file-sheet-backdrop').classList.add('open');
+}
+function closeFilePicker() { document.getElementById('file-sheet-backdrop').classList.remove('open'); }
+async function selectFile(f) {
+  closeFilePicker();
+  try { await fetch(`${API_URL}/api/file/${encodeURIComponent(f)}`, { method: 'PUT' }); _lastFile=''; loadFileMeta(f); } catch(_) {}
+}
+
+function setStep(s) {
+  jogStep = s;
+  document.querySelectorAll('.step-btn').forEach(b => b.classList.toggle('active', parseFloat(b.textContent) === s));
+}
+function jog(axis, dir) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(`M70\nG91\nG0 ${axis}${(dir*jogStep).toFixed(3)}\nM72`);
+}
+
+async function homeAxis(axis) {
+  if (!confirm(`Home ${axis==='all'?'all axes':axis.toUpperCase()}?`)) return;
+  if (axis === 'all') {
+    await fetch(`${API_URL}/api/home`, { method: 'PUT' }).catch(() => {});
+  } else {
+    const res = await fetch(`${API_URL}/api/home/${axis.toLowerCase()}`, { method: 'PUT' }).catch(() => null);
+    if (!res || !res.ok) {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(`G28.2 ${axis.toUpperCase()}0`);
+    }
+  }
+}
+function zeroAxis(axis) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(axis==='all' ? 'G92 X0 Y0 Z0' : `G92 ${axis.toUpperCase()}0`);
+}
+
+function toggleOutput(idx) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  const on0=!!state['1oa'], on1=!!state['2oa'];
+  ws.send(idx===0
+    ? (on0 ? (on1?'M8':'M9') : (on1?'M7\nM8':'M7'))
+    : (on1 ? (on0?'M7':'M9') : (on0?'M7\nM8':'M8')));
+}
+
+async function machineStart() {
+  try { const r = await fetch(`${API_URL}/api/start`,{method:'PUT'}); if(!r.ok) alert(`Start failed: ${r.status}`); }
+  catch(e) { alert('Start failed'); }
+}
+async function machinePause() {
+  await fetch(`${API_URL}/api/${machineState==='holding'?'start':'pause'}`,{method:'PUT'}).catch(()=>{});
+}
+async function machineStop() {
+  if (!confirm('Stop the job?')) return;
+  await fetch(`${API_URL}/api/stop`,{method:'PUT'}).catch(()=>{});
+}
+async function machineEStop() {
+  if (!confirm('EMERGENCY STOP?')) return;
+  await fetch(`${API_URL}/api/estop`,{method:'PUT'}).catch(()=>{});
+}
+
+connect();
+</script>
+</body>
+</html>

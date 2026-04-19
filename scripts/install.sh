@@ -69,3 +69,20 @@ if [ -f "$BOOT_SRC" ] && [ -d "$PLYMOUTH_DIR" ]; then
     cp "$SHUTDOWN_SRC" "$PLYMOUTH_DIR/shutdown.png"
     update-initramfs -u 2>/dev/null && echo "Plymouth splash updated" || echo "Plymouth splash copied (initramfs update skipped)"
 fi
+
+# ── Patch .xinitrc kiosk watchdog ──
+# Stock bbctrl 1.6.6 checks HDMI state 0x40001 every second. On HDMI DMT
+# displays that check fails every iteration, which hammers chromium with
+# reload IPCs (~5500 page reloads/day). Watchdog version only relaunches
+# if chromium has actually exited.
+XINITRC_SRC="$(dirname "$0")/../xinitrc"
+if [ -f "$XINITRC_SRC" ]; then
+    if [ ! -e /home/pi/.xinitrc.orig ]; then
+        cp /home/pi/.xinitrc /home/pi/.xinitrc.orig
+        echo "Original .xinitrc backed up as .xinitrc.orig"
+    fi
+    cp "$XINITRC_SRC" /home/pi/.xinitrc
+    chown pi:pi /home/pi/.xinitrc
+    chmod 644 /home/pi/.xinitrc
+    echo ".xinitrc kiosk watchdog installed (takes effect on next X restart / reboot)"
+fi

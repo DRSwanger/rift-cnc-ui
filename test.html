@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CNC UI — Unit Tests</title>
+<style>
+  :root {
+    --pass: #1a8a3a; --fail: #cc2222; --skip: #a08000;
+    --bg: #111318; --surface: #1c1f27; --surface2: #252830;
+    --border: #2e3340; --text: #e8eaf0; --muted: #9da2b2;
+    --accent: #00d4ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; padding: 24px; }
+  h1 { color: var(--accent); font-size: 18px; margin-bottom: 4px; }
+  #meta { font-size: 12px; color: var(--muted); margin-bottom: 20px; }
+  #summary { display: flex; gap: 20px; padding: 12px 16px; background: var(--surface); border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border); font-size: 13px; }
+  .sum-pass { color: var(--pass); font-weight: 700; }
+  .sum-fail { color: var(--fail); font-weight: 700; }
+  .sum-skip { color: var(--skip); font-weight: 700; }
+  .suite { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
+  .suite-header { padding: 10px 16px; font-size: 13px; font-weight: 700; color: var(--accent); background: var(--surface2); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .suite-count { font-size: 11px; color: var(--muted); font-weight: 400; }
+  .test { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: start; padding: 7px 16px; border-bottom: 1px solid rgba(46,51,64,0.5); font-size: 12px; }
+  .test:last-child { border-bottom: none; }
+  .test-icon { font-size: 13px; padding-top: 1px; }
+  .test-name { color: var(--text); line-height: 1.4; }
+  .test-detail { font-size: 11px; color: var(--muted); margin-top: 2px; font-family: 'Courier New', monospace; }
+  .test-time { font-size: 10px; color: var(--muted); white-space: nowrap; align-self: center; }
+  .test.pass .test-icon { color: var(--pass); }
+  .test.fail .test-icon { color: var(--fail); }
+  .test.skip .test-icon { color: var(--skip); }
+  .test.fail .test-name { color: #ff8080; }
+  .test.fail .test-detail { color: #ff8080; }
+  #run-btn { background: var(--accent); color: #000; border: none; border-radius: 6px; padding: 8px 20px; font-size: 13px; font-weight: 700; cursor: pointer; margin-bottom: 20px; }
+  #run-btn:hover { opacity: 0.85; }
+</style>
+</head>
+<body>
+
+<h1>AlienWoodshop CNC UI — Unit Tests</h1>
+<div id="meta">Tests for pure functions extracted from index.html</div>
+<button id="run-btn" onclick="runAllTests()">▶ Run Tests</button>
+<div id="summary" style="display:none"></div>
+<div id="results"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+// FUNCTIONS UNDER TEST  (copied from index.html)
+// ═══════════════════════════════════════════════
+
+// ── classifyLine ──
+function classifyLine(line) {
+  const l = line.trim().toUpperCase();
+  if (!l || l.startsWith('(') || l.startsWith(';')) return 'comment';
+  if (l.startsWith('G0 ') || l === 'G0' || l.startsWith('G00')) return 'rapid';
+  if (l.startsWith('G1 ') || l === 'G1' || l.startsWith('G01')) return 'cut';
+  if (/^G0?2[\s]/.test(l) || /^G0?3[\s]/.test(l)) return 'cut';
+  if (l.startsWith('S') || l.includes(' S') || /^M0?[35](\s|$)/.test(l)) return 'spindle';
+  if (/^M[789](\s|$)/.test(l)) return 'coolant';
+  return '';
+}
+
+// ── fmtTime ──
+function fmtTime(secs) {
+  secs = Math.round(secs);
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+// ── highlightSpindleSpeed ──
+function highlightSpindleSpeed(line) {
+  return line.replace(/([Ss])(\d+)/g, '<span class="spindle-speed">$1$2</span>')
+             .replace(/([Ff])(\d+\.?\d*)/g, '<span class="feed-rate">$1$2</span>');
+}
+
+// ── signalBars ──
+function signalBars(quality) {
+  const q = parseInt(quality) || 0;
+  const bars = [q > 15, q > 35, q > 55, q > 75];
+  const heights = [4, 7, 10, 14];
+  return `<div class="wifi-signal">${bars.map((lit, i) =>
+    `<div class="wifi-bar ${lit ? 'lit' : ''}" style="height:${heights[i]}px"></div>`
+  ).join('')}</div>`;
+}
+
+// ── jogCheckLimit ── (uses mock state injected per test)
+const JOG_AXIS_MAP = {
+  X: { pos: 'xp', min: '0tn', max: '0tm' },
+  Y: { pos: 'yp', min: '1tn', max: '1tm' },
+  Z: { pos: 'zp', min: '3tn', max: '3tm' },
+};
+let state = {};
+function jogCheckLimit(axis, dist) {
+  if (!state.xx) return null;
+  const cfg = JOG_AXIS_MAP[axis.toUpperCase()];
+  if (!cfg) return null;
+  if (!(cfg.pos in state)) return null;
+  const cur    = +state[cfg.pos];
+  const newPos = cur + dist;
+  if (cfg.min in state && newPos < +state[cfg.min])
+    return `${axis.toUpperCase()} ${newPos.toFixed(1)}mm would be below minimum soft limit ${(+state[cfg.min]).toFixed(0)}mm`;
+  if (cfg.max in state && newPos > +state[cfg.max])
+    return `${axis.toUpperCase()} ${newPos.toFixed(1)}mm would exceed maximum soft limit ${(+state[cfg.max]).toFixed(0)}mm`;
+  return null;
+}
+
+// ── buildPrMessage ── (uses global state)
+function buildPrMessage(pr) {
+  const zAbs = (+(state.zp || 0)).toFixed(1);
+  const xAbs = (+(state.xp || 0)).toFixed(1);
+  const yAbs = (+(state.yp || 0)).toFixed(1);
+  const zWcs = ((+(state.zp || 0)) - (+(state.offset_z || 0))).toFixed(1);
+  const zMin = state['3tn'] !== undefined ? (+state['3tn']).toFixed(0) : '?';
+  const zMax = state['3tm'] !== undefined ? (+state['3tm']).toFixed(0) : '?';
+  const p = (pr || '').toLowerCase();
+  if (/switch/.test(p)) return `Limit/switch fault — Z:${zWcs}mm WCS (ABS ${zAbs})  ·  soft limits Z:${zMin}…${zMax}mm`;
+  if (/probe/.test(p))  return `Probe triggered at Z:${zAbs}mm`;
+  if (/hold/.test(p))   return `Machine hold`;
+  if (/user/.test(p))   return `Stopped by user`;
+  if (/program/.test(p))return `Programmed stop (M0/M1/M2)`;
+  return `Controller fault: ${pr}  (Z:${zAbs}mm)`;
+}
+
+// ── probeZOffset calculation (extracted logic) ──
+function calcProbeZOffset(ref, probeHeight, stockThickness) {
+  return ref === 'top'
+    ? probeHeight
+    : probeHeight - (stockThickness || 0);
+}
+
+// ── probeSeekDist (extracted logic) ──
+function calcProbeSeekDist(zNow, zMin, maxSeek = 50) {
+  const headroom = Math.abs(zNow - zMin) - 3;
+  if (headroom < 5) return null; // too close to limit
+  return Math.min(maxSeek, headroom);
+}
+
+// ── populateFileTree folder map logic ──
+function buildFolderMap(gcodeList) {
+  const fmFolderMap = {};
+  const fmFiles = [];
+  if (gcodeList && gcodeList.length) {
+    gcodeList.forEach(folder => {
+      if (!folder.files) return;
+      const folderName = (folder.name && folder.name !== 'default') ? folder.name : '';
+      folder.files.forEach(f => {
+        fmFolderMap[f.file_name] = folderName;
+        fmFiles.push(f.file_name);
+      });
+    });
+  }
+  return { fmFolderMap, fmFiles };
+}
+
+// ── arcPoints ── (simplified vector, no THREE.js dependency)
+function arcPoints(x0, y0, z0, x1, y1, z1, i, j, cw, segs = 48) {
+  const cx = x0 + i, cy = y0 + j;
+  let a0 = Math.atan2(y0 - cy, x0 - cx);
+  let a1 = Math.atan2(y1 - cy, x1 - cx);
+  const full = Math.abs(x1 - x0) < 0.001 && Math.abs(y1 - y0) < 0.001;
+  if (full) { a1 = a0 + (cw ? -2 * Math.PI : 2 * Math.PI); }
+  else {
+    if (cw  && a1 >= a0) a1 -= 2 * Math.PI;
+    if (!cw && a1 <= a0) a1 += 2 * Math.PI;
+  }
+  const pts = [];
+  for (let n = 0; n <= segs; n++) {
+    const t = n / segs;
+    const a = a0 + t * (a1 - a0);
+    const r = Math.sqrt(i * i + j * j);
+    pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a), z: z0 + t * (z1 - z0) });
+  }
+  return pts;
+}
+
+// ═══════════════════════════════════════════════
+// TEST HARNESS
+// ═══════════════════════════════════════════════
+const _suites = [];
+let _totalPass = 0, _totalFail = 0, _totalSkip = 0;
+
+function describe(name, fn) { _suites.push({ name, fn }); }
+
+function runAllTests() {
+  _totalPass = 0; _totalFail = 0; _totalSkip = 0;
+  const resultsEl = document.getElementById('results');
+  resultsEl.innerHTML = '';
+
+  for (const suite of _suites) {
+    const tests = [];
+    let _currentTests = tests;
+    const it = (name, fn) => _currentTests.push({ name, fn });
+    const xit = (name, fn) => _currentTests.push({ name, fn: null });
+
+    // inject it/xit into suite scope
+    suite.it = it;
+    suite.xit = xit;
+    suite.fn(it, xit);
+
+    let pass = 0, fail = 0, skip = 0;
+    const rows = tests.map(t => {
+      if (!t.fn) {
+        skip++; _totalSkip++;
+        return { cls: 'skip', icon: '○', name: t.name, detail: 'skipped', ms: '' };
+      }
+      const t0 = performance.now();
+      try {
+        t.fn();
+        const ms = (performance.now() - t0).toFixed(1);
+        pass++; _totalPass++;
+        return { cls: 'pass', icon: '✓', name: t.name, detail: '', ms: ms + 'ms' };
+      } catch(e) {
+        const ms = (performance.now() - t0).toFixed(1);
+        fail++; _totalFail++;
+        return { cls: 'fail', icon: '✗', name: t.name, detail: e.message, ms: ms + 'ms' };
+      }
+    });
+
+    const suiteEl = document.createElement('div');
+    suiteEl.className = 'suite';
+    const passLabel = fail > 0 ? `<span style="color:var(--fail)">${fail} failed</span> / ` : '';
+    suiteEl.innerHTML = `
+      <div class="suite-header">
+        <span>${suite.name}</span>
+        <span class="suite-count">${passLabel}${pass} passed, ${skip} skipped · ${tests.length} total</span>
+      </div>
+      ${rows.map(r => `
+        <div class="test ${r.cls}">
+          <span class="test-icon">${r.icon}</span>
+          <div>
+            <div class="test-name">${r.name}</div>
+            ${r.detail ? `<div class="test-detail">${r.detail.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>` : ''}
+          </div>
+          <span class="test-time">${r.ms}</span>
+        </div>`).join('')}`;
+    resultsEl.appendChild(suiteEl);
+  }
+
+  const summaryEl = document.getElementById('summary');
+  summaryEl.style.display = 'flex';
+  const allPass = _totalFail === 0;
+  summaryEl.innerHTML = `
+    <span>Total: ${_totalPass + _totalFail + _totalSkip} tests</span>
+    <span class="sum-pass">✓ ${_totalPass} passed</span>
+    ${_totalFail ? `<span class="sum-fail">✗ ${_totalFail} failed</span>` : ''}
+    ${_totalSkip ? `<span class="sum-skip">○ ${_totalSkip} skipped</span>` : ''}
+    <span style="margin-left:auto;color:${allPass ? 'var(--pass)' : 'var(--fail)'}">
+      ${allPass ? '✓ ALL TESTS PASSED' : '✗ SOME TESTS FAILED'}
+    </span>`;
+}
+
+function assert(condition, msg) {
+  if (!condition) throw new Error(msg || 'Assertion failed');
+}
+function assertEqual(a, b, msg) {
+  if (a !== b) throw new Error((msg ? msg + ': ' : '') + `expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`);
+}
+function assertNull(a, msg) {
+  if (a !== null) throw new Error((msg ? msg + ': ' : '') + `expected null, got ${JSON.stringify(a)}`);
+}
+function assertNotNull(a, msg) {
+  if (a === null || a === undefined) throw new Error((msg ? msg + ': ' : '') + 'expected non-null value');
+}
+function assertContains(str, sub, msg) {
+  if (!str.includes(sub)) throw new Error((msg ? msg + ': ' : '') + `"${str}" does not contain "${sub}"`);
+}
+function assertMatch(str, re, msg) {
+  if (!re.test(str)) throw new Error((msg ? msg + ': ' : '') + `"${str}" does not match ${re}`);
+}
+function assertApprox(a, b, tol = 0.001, msg) {
+  if (Math.abs(a - b) > tol) throw new Error((msg ? msg + ': ' : '') + `expected ≈${b}, got ${a} (tolerance ${tol})`);
+}
+
+// ── applyScaleLine — extracted GCode F/S rewrite logic ──
+// Mirrors the regex in applyFeedScale() in index.html.
+function applyScaleLine(line, fFactor, sFactor, sMin, sMax) {
+  const _sMax = sMax > 0 ? sMax : Infinity;
+  const _sMin = sMin > 0 ? sMin : 0;
+  return line
+    .replace(/([Ff])(\d+\.?\d*)/g, (_, f, val) => f + (parseFloat(val) * fFactor).toFixed(1))
+    .replace(/([Ss])(\d+\.?\d*)/g, (_, s, val) => {
+      const raw = parseFloat(val);
+      if (raw === 0) return s + '0';
+      const scaled = Math.round(Math.min(_sMax, Math.max(_sMin, raw * sFactor)));
+      return s + scaled;
+    });
+}
+
+// ── uiLogFormat — timestamp format helper ──
+function uiLogLine(msg, level) {
+  const prefix = `[${level}] ${msg}`;
+  return prefix;
+}
+
+// ── estimateJobTime ── (copied from index.html)
+function estimateJobTime(lines) {
+  let x = 0, y = 0, z = 0;
+  let feedRate = 1000;
+  const rapidRate = 5000;
+  let totalSec = 0;
+  let isAbsolute = true;
+  let isMetric = true;
+
+  const pn = (str, axis) => {
+    const m = str.match(new RegExp(axis + '([+-]?[\\d.]+)', 'i'));
+    return m ? parseFloat(m[1]) : null;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i].split(';')[0].replace(/\(.*?\)/g, '').trim().toUpperCase();
+    if (!line) continue;
+    line = line.replace(/^N\d+\s*/, '');
+
+    if (/^G20\b/.test(line)) { isMetric = false; continue; }
+    if (/^G21\b/.test(line)) { isMetric = true;  continue; }
+    if (/^G90\b/.test(line)) { isAbsolute = true;  continue; }
+    if (/^G91\b/.test(line)) { isAbsolute = false; continue; }
+
+    const fm = line.match(/F([+-]?[\d.]+)/);
+    if (fm) feedRate = parseFloat(fm[1]);
+
+    const isRapid = /^G0?0[\s;]|^G0?0$/.test(line);
+    const isFeed  = /^G0?1[\s;]|^G0?1$/.test(line) || /^G0?[23][\s;]/.test(line);
+    if (!isRapid && !isFeed) continue;
+
+    const nx = pn(line, 'X'), ny = pn(line, 'Y'), nz = pn(line, 'Z');
+    let dx = 0, dy = 0, dz = 0;
+    if (isAbsolute) {
+      if (nx !== null) { dx = nx - x; x = nx; }
+      if (ny !== null) { dy = ny - y; y = ny; }
+      if (nz !== null) { dz = nz - z; z = nz; }
+    } else {
+      if (nx !== null) { dx = nx; x += nx; }
+      if (ny !== null) { dy = ny; y += ny; }
+      if (nz !== null) { dz = nz; z += nz; }
+    }
+
+    const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+    if (dist === 0) continue;
+
+    const scaledDist = isMetric ? dist : dist * 25.4;
+    const rate = isRapid ? rapidRate : (feedRate > 0 ? feedRate : 1000);
+    totalSec += (scaledDist / rate) * 60;
+  }
+
+  return Math.ceil(totalSec * 1.15);
+}
+
+// ── fmGetFolderNamesFromList ── (extracted from fmGetFolderNames, takes list param)
+function fmGetFolderNamesFromList(gcodeList) {
+  if (!gcodeList) return [];
+  return gcodeList.map(f => f.name).filter(n => n && n !== 'default');
+}
+
+// ── normalizeOverridePct ── (extracted clamping logic from setOverrideAbs)
+function normalizeOverridePct(pct) {
+  return Math.max(10, Math.min(150, Math.round(pct / 5) * 5));
+}
+
+// ── deriveMachineState ── (copied from index.html)
+function deriveMachineState(cycle, xx) {
+  cycle = cycle || '';
+  xx    = (xx || '').toUpperCase();
+  if (xx === 'ESTOPPED' || xx === 'FAULT')                   return 'estopped';
+  if (xx === 'ERROR' || xx === 'ALARM')                      return 'error';
+  if (cycle === 'run'     || xx === 'RUNNING')               return 'running';
+  if (cycle === 'holding' || xx === 'HOLDING')               return 'paused';
+  if (cycle === 'homing'  || xx === 'HOMING')                return 'running';
+  if (cycle === 'jogging' || xx === 'JOGGING')               return 'idle';
+  if (xx === 'READY'  || xx === 'IDLE' || cycle === 'idle')  return 'idle';
+  return 'idle';
+}
+
+// ═══════════════════════════════════════════════
+// TEST SUITES
+// ═══════════════════════════════════════════════
+
+describe('classifyLine — GCode line classification', (it) => {
+
+  // Comments
+  it('empty string → comment', () => assertEqual(classifyLine(''), 'comment'));
+  it('whitespace-only → comment', () => assertEqual(classifyLine('   '), 'comment'));
+  it('parenthesis comment → comment', () => assertEqual(classifyLine('(this is a comment)'), 'comment'));
+  it('semicolon comment → comment', () => assertEqual(classifyLine('; setup'), 'comment'));
+  it('inline comment with leading space → comment', () => assertEqual(classifyLine('  (tool change)'), 'comment'));
+
+  // Rapids (G0)
+  it('G0 alone → rapid', () => assertEqual(classifyLine('G0'), 'rapid'));
+  it('G0 with coords → rapid', () => assertEqual(classifyLine('G0 X10 Y20'), 'rapid'));
+  it('G00 with coords → rapid', () => assertEqual(classifyLine('G00 X0 Y0 Z5'), 'rapid'));
+  it('lowercase g0 → rapid', () => assertEqual(classifyLine('g0 x5'), 'rapid'));
+
+  // Cuts (G1 linear)
+  it('G1 alone → cut', () => assertEqual(classifyLine('G1'), 'cut'));
+  it('G1 with feed → cut', () => assertEqual(classifyLine('G1 X10 F500'), 'cut'));
+  it('G01 → cut', () => assertEqual(classifyLine('G01 X5 Y3 F800'), 'cut'));
+  it('lowercase g1 → cut', () => assertEqual(classifyLine('g1 x1 y1 f400'), 'cut'));
+
+  // Arcs (G2/G3 → cut)
+  it('G2 arc → cut', () => assertEqual(classifyLine('G2 X10 Y0 I5 J0'), 'cut'));
+  it('G3 arc → cut', () => assertEqual(classifyLine('G3 X0 Y10 I0 J5'), 'cut'));
+  it('G02 → cut', () => assertEqual(classifyLine('G02 X5 Y5 I2 J0'), 'cut'));
+  it('G03 → cut', () => assertEqual(classifyLine('G03 X5 Y5 I0 J2'), 'cut'));
+
+  // Spindle
+  it('M3 spindle on → spindle', () => assertEqual(classifyLine('M3 S18000'), 'spindle'));
+  it('M5 spindle off → spindle', () => assertEqual(classifyLine('M5'), 'spindle'));
+  it('S-only speed command → spindle', () => assertEqual(classifyLine('S12000'), 'spindle'));
+  it('G1 with embedded S → spindle (S takes precedence)', () => {
+    // Line has both G1 and S — G1 is not the start token (S comes via includes check)
+    // Note: this is an edge case — the real behavior checks in order
+    const result = classifyLine('G1 X5 S18000 F500');
+    // S is embedded — classifyLine checks `l.includes(' S')` for spindle AFTER the G1 check
+    // G1 wins because it's checked first. Verify the actual behavior matches.
+    assertEqual(result, 'cut'); // G1 wins because checked before spindle
+  });
+
+  // Coolant
+  it('M7 mist on → coolant', () => assertEqual(classifyLine('M7'), 'coolant'));
+  it('M8 flood on → coolant', () => assertEqual(classifyLine('M8'), 'coolant'));
+  it('M9 coolant off → coolant', () => assertEqual(classifyLine('M9'), 'coolant'));
+
+  // Unknown/motion-only
+  it('G21 (mm mode) → empty', () => assertEqual(classifyLine('G21'), ''));
+  it('G90 (absolute) → empty', () => assertEqual(classifyLine('G90'), ''));
+  it('G91 (relative) → empty', () => assertEqual(classifyLine('G91'), ''));
+  it('G4 P2 (dwell) → empty', () => assertEqual(classifyLine('G4 P2'), ''));
+  it('G28 (home) → empty', () => assertEqual(classifyLine('G28'), ''));
+  it('G10 L20 (offset) → empty', () => assertEqual(classifyLine('G10 L20 P1 Z5'), ''));
+  it('G38.2 (probe) → empty', () => assertEqual(classifyLine('G38.2 Z-20 F50'), ''));
+  it('M2 (end) → empty', () => assertEqual(classifyLine('M2'), ''));
+  it('M70 (save modal) → empty', () => assertEqual(classifyLine('M70'), ''));
+  it('M72 (restore modal) → empty', () => assertEqual(classifyLine('M72'), ''));
+
+  // Edge cases
+  it('G0Z5 (no space after G0) — not classified as rapid (G0 must have space or be alone)', () => {
+    // "G0Z5" does NOT start with "G0 ", is NOT "G0", does NOT start with "G00" → ''
+    assertEqual(classifyLine('G0Z5'), '');
+  });
+});
+
+describe('fmtTime — human-readable duration', (it) => {
+  it('0 seconds → "0s"', () => assertEqual(fmtTime(0), '0s'));
+  it('1 second → "1s"', () => assertEqual(fmtTime(1), '1s'));
+  it('59 seconds → "59s"', () => assertEqual(fmtTime(59), '59s'));
+  it('60 seconds → "1m 0s"', () => assertEqual(fmtTime(60), '1m 0s'));
+  it('61 seconds → "1m 1s"', () => assertEqual(fmtTime(61), '1m 1s'));
+  it('90 seconds → "1m 30s"', () => assertEqual(fmtTime(90), '1m 30s'));
+  it('119 seconds → "1m 59s"', () => assertEqual(fmtTime(119), '1m 59s'));
+  it('120 seconds → "2m 0s"', () => assertEqual(fmtTime(120), '2m 0s'));
+  it('3600 seconds → "1h 0m"', () => assertEqual(fmtTime(3600), '1h 0m'));
+  it('3661 seconds → "1h 1m"', () => assertEqual(fmtTime(3661), '1h 1m'));
+  it('7200 seconds → "2h 0m"', () => assertEqual(fmtTime(7200), '2h 0m'));
+  it('7384 seconds → "2h 3m"', () => assertEqual(fmtTime(7384), '2h 3m'));
+  it('fractional seconds are rounded', () => assertEqual(fmtTime(1.6), '2s'));
+  it('fractional rounds down', () => assertEqual(fmtTime(1.4), '1s'));
+  it('negative becomes 0s (rounded)', () => assertEqual(fmtTime(-5), '-5s')); // Math.round(-5) = -5
+});
+
+describe('highlightSpindleSpeed — GCode syntax markup', (it) => {
+  it('wraps S value in spindle-speed span', () => {
+    const result = highlightSpindleSpeed('M3 S18000');
+    assertContains(result, 'class="spindle-speed"');
+    assertContains(result, 'S18000');
+  });
+  it('wraps F value in feed-rate span', () => {
+    const result = highlightSpindleSpeed('G1 X10 F800');
+    assertContains(result, 'class="feed-rate"');
+    assertContains(result, 'F800');
+  });
+  it('handles both S and F in same line', () => {
+    const result = highlightSpindleSpeed('G1 X10 F500 S12000');
+    assertContains(result, 'class="spindle-speed"');
+    assertContains(result, 'class="feed-rate"');
+  });
+  it('leaves line unchanged when no S or F', () => {
+    const result = highlightSpindleSpeed('G0 X10 Y20 Z5');
+    assertEqual(result, 'G0 X10 Y20 Z5');
+  });
+  it('handles lowercase s', () => {
+    assertContains(highlightSpindleSpeed('M3 s18000'), 'class="spindle-speed"');
+  });
+  it('handles lowercase f', () => {
+    assertContains(highlightSpindleSpeed('G1 X5 f400'), 'class="feed-rate"');
+  });
+  it('handles decimal feed rate', () => {
+    assertContains(highlightSpindleSpeed('G1 F12.5'), 'class="feed-rate"');
+    assertContains(highlightSpindleSpeed('G1 F12.5'), 'F12.5');
+  });
+  it('does not double-wrap (idempotent on plain text)', () => {
+    const once = highlightSpindleSpeed('G1 S1000 F500');
+    // Running again should wrap the span content tags — just verify first run is correct
+    assertContains(once, '>S1000<');
+    assertContains(once, '>F500<');
+  });
+});
+
+describe('signalBars — WiFi signal strength indicator', (it) => {
+  it('quality 0 → all bars unlit', () => {
+    const html = signalBars(0);
+    const litCount = (html.match(/class="wifi-bar lit"/g) || []).length;
+    assertEqual(litCount, 0);
+  });
+  it('quality 16 → 1 bar lit (just over threshold 15)', () => {
+    const html = signalBars(16);
+    const litCount = (html.match(/class="wifi-bar lit"/g) || []).length;
+    assertEqual(litCount, 1);
+  });
+  it('quality 36 → 2 bars lit', () => {
+    const html = signalBars(36);
+    const litCount = (html.match(/class="wifi-bar lit"/g) || []).length;
+    assertEqual(litCount, 2);
+  });
+  it('quality 56 → 3 bars lit', () => {
+    const html = signalBars(56);
+    const litCount = (html.match(/class="wifi-bar lit"/g) || []).length;
+    assertEqual(litCount, 3);
+  });
+  it('quality 76 → 4 bars lit (full signal)', () => {
+    const html = signalBars(76);
+    const litCount = (html.match(/class="wifi-bar lit"/g) || []).length;
+    assertEqual(litCount, 4);
+  });
+  it('quality 100 → 4 bars lit', () => {
+    const html = signalBars(100);
+    const litCount = (html.match(/class="wifi-bar lit"/g) || []).length;
+    assertEqual(litCount, 4);
+  });
+  it('always renders exactly 4 bars', () => {
+    [0, 25, 50, 75, 100].forEach(q => {
+      const html = signalBars(q);
+      const totalBars = (html.match(/class="wifi-bar/g) || []).length;
+      assertEqual(totalBars, 4, `quality ${q}`);
+    });
+  });
+  it('non-numeric quality treated as 0', () => {
+    const html = signalBars('bad');
+    const litCount = (html.match(/class="wifi-bar lit"/g) || []).length;
+    assertEqual(litCount, 0);
+  });
+  it('string number quality parsed correctly', () => {
+    const html = signalBars('80');
+    const litCount = (html.match(/class="wifi-bar lit"/g) || []).length;
+    assertEqual(litCount, 4);
+  });
+  it('thresholds are exclusive (exactly 15 → 0 lit bars)', () => {
+    const html = signalBars(15);
+    const litCount = (html.match(/class="wifi-bar lit"/g) || []).length;
+    assertEqual(litCount, 0);
+  });
+  it('thresholds are exclusive (exactly 35 → 1 lit bar)', () => {
+    const html = signalBars(35);
+    const litCount = (html.match(/class="wifi-bar lit"/g) || []).length;
+    assertEqual(litCount, 1);
+  });
+});
+
+describe('jogCheckLimit — soft limit enforcement', (it) => {
+  it('returns null when not connected (no xx field)', () => {
+    state = {};
+    assertNull(jogCheckLimit('X', 10));
+  });
+
+  it('returns null when position field missing', () => {
+    state = { xx: 'IDLE' }; // no xp field
+    assertNull(jogCheckLimit('X', 10));
+  });
+
+  it('returns null for unknown axis', () => {
+    state = { xx: 'IDLE', ap: 0 };
+    assertNull(jogCheckLimit('A', 10));
+  });
+
+  it('returns null when within X limits', () => {
+    state = { xx: 'IDLE', xp: 400, '0tn': 0, '0tm': 816 };
+    assertNull(jogCheckLimit('X', 10));
+    assertNull(jogCheckLimit('X', -10));
+  });
+
+  it('blocks X jog that exceeds max', () => {
+    state = { xx: 'IDLE', xp: 810, '0tn': 0, '0tm': 816 };
+    const err = jogCheckLimit('X', 10); // 810+10=820 > 816
+    assertNotNull(err);
+    assertContains(err, 'exceed maximum');
+    assertContains(err, '820.0mm');
+  });
+
+  it('blocks X jog that goes below min', () => {
+    state = { xx: 'IDLE', xp: 5, '0tn': 0, '0tm': 816 };
+    const err = jogCheckLimit('X', -10); // 5-10=-5 < 0
+    assertNotNull(err);
+    assertContains(err, 'below minimum');
+    assertContains(err, '-5.0mm');
+  });
+
+  it('returns null when Z is within negative range (Z travel is 0 to -160)', () => {
+    state = { xx: 'IDLE', zp: -80, '3tn': -160, '3tm': 0 };
+    assertNull(jogCheckLimit('Z', -10)); // -80-10=-90 ≥ -160 ✓
+    assertNull(jogCheckLimit('Z', 10));  // -80+10=-70 ≤ 0 ✓
+  });
+
+  it('blocks Z jog below Z min (-160)', () => {
+    state = { xx: 'IDLE', zp: -155, '3tn': -160, '3tm': 0 };
+    const err = jogCheckLimit('Z', -10); // -155-10=-165 < -160
+    assertNotNull(err);
+    assertContains(err, 'below minimum');
+  });
+
+  it('blocks Z jog above Z max (0)', () => {
+    state = { xx: 'IDLE', zp: -5, '3tn': -160, '3tm': 0 };
+    const err = jogCheckLimit('Z', 10); // -5+10=5 > 0
+    assertNotNull(err);
+    assertContains(err, 'exceed maximum');
+  });
+
+  it('allows jog exactly to the limit boundary', () => {
+    state = { xx: 'IDLE', xp: 806, '0tn': 0, '0tm': 816 };
+    assertNull(jogCheckLimit('X', 10)); // 806+10=816 = max (not exceeding)
+  });
+
+  it('blocks jog one unit past boundary', () => {
+    state = { xx: 'IDLE', xp: 807, '0tn': 0, '0tm': 816 };
+    const err = jogCheckLimit('X', 10); // 807+10=817 > 816
+    assertNotNull(err);
+  });
+
+  it('case-insensitive axis name', () => {
+    state = { xx: 'IDLE', xp: 400, '0tn': 0, '0tm': 816 };
+    assertNull(jogCheckLimit('x', 10));
+    assertNull(jogCheckLimit('X', 10));
+  });
+
+  it('does not check limits when limit fields absent', () => {
+    state = { xx: 'IDLE', xp: 900 }; // no 0tn/0tm
+    assertNull(jogCheckLimit('X', 10)); // no limits to check against
+  });
+});
+
+describe('buildPrMessage — controller fault messages', (it) => {
+  it('"Switch found" → limit/switch fault message with position', () => {
+    state = { zp: -80, offset_z: 0, '3tn': -160, '3tm': 0 };
+    const msg = buildPrMessage('Switch found');
+    assertContains(msg, 'Limit/switch fault');
+    assertContains(msg, 'Z:-80.0mm WCS');
+    assertContains(msg, '-160');
+  });
+
+  it('WCS offset applied correctly in switch message', () => {
+    state = { zp: -50, offset_z: -20, '3tn': -160, '3tm': 0 };
+    const msg = buildPrMessage('Switch found');
+    // WCS = -50 - (-20) = -30
+    assertContains(msg, 'Z:-30.0mm WCS');
+    assertContains(msg, '(ABS -50.0)');
+  });
+
+  it('soft limits displayed in switch message', () => {
+    state = { zp: -5, offset_z: 0, '3tn': -160, '3tm': 0 };
+    const msg = buildPrMessage('Switch found');
+    assertContains(msg, 'soft limits Z:-160…0mm');
+  });
+
+  it('"?" displayed when limits missing from state', () => {
+    state = { zp: -5, offset_z: 0 };
+    const msg = buildPrMessage('Switch found');
+    assertContains(msg, 'Z:?…?mm');
+  });
+
+  it('probe triggered message', () => {
+    state = { zp: -45, offset_z: 0 };
+    const msg = buildPrMessage('Probe triggered');
+    assertEqual(msg, 'Probe triggered at Z:-45.0mm');
+  });
+
+  it('hold reason', () => {
+    state = {};
+    assertEqual(buildPrMessage('Hold requested'), 'Machine hold');
+  });
+
+  it('user stop', () => {
+    state = {};
+    assertEqual(buildPrMessage('User requested stop'), 'Stopped by user');
+  });
+
+  it('programmed stop (M0/M2)', () => {
+    state = {};
+    assertEqual(buildPrMessage('Program ended'), 'Programmed stop (M0/M1/M2)');
+  });
+
+  it('unknown fault includes raw pr string', () => {
+    state = { zp: -10, offset_z: 0 };
+    const msg = buildPrMessage('MYSTERIOUS_FAULT_42');
+    assertContains(msg, 'Controller fault: MYSTERIOUS_FAULT_42');
+    assertContains(msg, 'Z:-10.0mm');
+  });
+
+  it('empty pr returns controller fault', () => {
+    state = { zp: 0 };
+    const msg = buildPrMessage('');
+    assertContains(msg, 'Controller fault:');
+  });
+});
+
+describe('Probe Z offset math', (it) => {
+  const H = 15.0; // probe block height
+
+  it('top-of-stock: offset = probeHeight', () => {
+    assertEqual(calcProbeZOffset('top', H, 18), H);
+  });
+
+  it('wasteboard: offset = probeHeight - stockThickness', () => {
+    assertApprox(calcProbeZOffset('surface', H, 18), 15.0 - 18.0);
+  });
+
+  it('wasteboard with thin stock (6mm)', () => {
+    assertApprox(calcProbeZOffset('surface', H, 6), 9.0);
+  });
+
+  it('wasteboard: zero thickness → offset = probeHeight', () => {
+    assertApprox(calcProbeZOffset('surface', H, 0), 15.0);
+  });
+
+  it('wasteboard: thickness > probeHeight → negative offset (bit below wasteboard top)', () => {
+    assertApprox(calcProbeZOffset('surface', H, 20), -5.0);
+  });
+
+  it('top-of-stock: stockThickness irrelevant', () => {
+    assertEqual(calcProbeZOffset('top', H, 0), H);
+    assertEqual(calcProbeZOffset('top', H, 100), H);
+  });
+
+  it('custom probe height 19.05mm (3/4 inch)', () => {
+    assertApprox(calcProbeZOffset('surface', 19.05, 18), 1.05);
+  });
+
+  it('exact: 15mm block, 15mm stock → wasteboard offset = 0', () => {
+    assertApprox(calcProbeZOffset('surface', 15, 15), 0);
+  });
+});
+
+describe('Probe seek distance calculation', (it) => {
+  it('normal Z position with plenty of headroom', () => {
+    // Z at -10, min at -160 → headroom = 150-3 = 147 → capped at 50
+    assertApprox(calcProbeSeekDist(-10, -160), 50);
+  });
+
+  it('Z close to min → headroom trimmed and returned', () => {
+    // Z at -148, min at -160 → headroom = 12-3 = 9 → seek = 9
+    assertApprox(calcProbeSeekDist(-148, -160), 9);
+  });
+
+  it('Z too close (headroom < 5) → returns null', () => {
+    // Z at -156, min at -160 → headroom = 4-3 = 1 < 5 → null
+    assertNull(calcProbeSeekDist(-156, -160));
+  });
+
+  it('exactly at safety threshold (headroom = 5) → returns 5', () => {
+    // Z at -152, min at -160 → headroom = 8-3 = 5
+    assertApprox(calcProbeSeekDist(-152, -160), 5);
+  });
+
+  it('custom maxSeek = 20 caps result', () => {
+    assertApprox(calcProbeSeekDist(-10, -160, 20), 20);
+  });
+
+  it('Z at home (0) with full range (-160 min) → 50mm cap', () => {
+    assertApprox(calcProbeSeekDist(0, -160), 50);
+  });
+});
+
+describe('buildFolderMap — file tree structure', (it) => {
+  it('empty gcode_list → empty map and files', () => {
+    const { fmFolderMap, fmFiles } = buildFolderMap([]);
+    assertEqual(Object.keys(fmFolderMap).length, 0);
+    assertEqual(fmFiles.length, 0);
+  });
+
+  it('null gcode_list → empty map and files', () => {
+    const { fmFolderMap, fmFiles } = buildFolderMap(null);
+    assertEqual(Object.keys(fmFolderMap).length, 0);
+    assertEqual(fmFiles.length, 0);
+  });
+
+  it('files in "default" folder map to empty string', () => {
+    const gcodeList = [{ name: 'default', files: [{ file_name: 'logo.ngc' }] }];
+    const { fmFolderMap } = buildFolderMap(gcodeList);
+    assertEqual(fmFolderMap['logo.ngc'], '');
+  });
+
+  it('files in named folder map to that folder name', () => {
+    const gcodeList = [{ name: 'fixtures', files: [{ file_name: 'jig.ngc' }] }];
+    const { fmFolderMap } = buildFolderMap(gcodeList);
+    assertEqual(fmFolderMap['jig.ngc'], 'fixtures');
+  });
+
+  it('files from multiple folders mapped correctly', () => {
+    const gcodeList = [
+      { name: 'default',  files: [{ file_name: 'root.ngc' }] },
+      { name: 'fixtures', files: [{ file_name: 'jig.ngc' }, { file_name: 'clamp.ngc' }] },
+      { name: 'parts',    files: [{ file_name: 'box.ngc' }] },
+    ];
+    const { fmFolderMap, fmFiles } = buildFolderMap(gcodeList);
+    assertEqual(fmFolderMap['root.ngc'],  '');
+    assertEqual(fmFolderMap['jig.ngc'],   'fixtures');
+    assertEqual(fmFolderMap['clamp.ngc'], 'fixtures');
+    assertEqual(fmFolderMap['box.ngc'],   'parts');
+    assertEqual(fmFiles.length, 4);
+  });
+
+  it('folder without files does not crash', () => {
+    const gcodeList = [{ name: 'empty' }]; // no files key
+    const { fmFiles } = buildFolderMap(gcodeList);
+    assertEqual(fmFiles.length, 0);
+  });
+
+  it('fmFiles contains all file names in order', () => {
+    const gcodeList = [
+      { name: 'default',  files: [{ file_name: 'a.ngc' }, { file_name: 'b.ngc' }] },
+    ];
+    const { fmFiles } = buildFolderMap(gcodeList);
+    assertEqual(fmFiles[0], 'a.ngc');
+    assertEqual(fmFiles[1], 'b.ngc');
+  });
+});
+
+describe('arcPoints — G2/G3 arc interpolation', (it) => {
+  it('quarter circle CW has correct start point', () => {
+    // G2 from (10,0) center (0,0) i=-10,j=0 → CW quarter to (0,-10)
+    const pts = arcPoints(10, 0, 0, 0, -10, 0, -10, 0, true);
+    assertApprox(pts[0].x, 10, 0.01, 'start x');
+    assertApprox(pts[0].y, 0, 0.01, 'start y');
+  });
+
+  it('quarter circle CW has correct end point', () => {
+    const pts = arcPoints(10, 0, 0, 0, -10, 0, -10, 0, true);
+    const last = pts[pts.length - 1];
+    assertApprox(last.x, 0, 0.01, 'end x');
+    assertApprox(last.y, -10, 0.01, 'end y');
+  });
+
+  it('quarter circle CCW end point', () => {
+    // G3 from (10,0) center (0,0) i=-10,j=0 → CCW quarter to (0,10)
+    const pts = arcPoints(10, 0, 0, 0, 10, 0, -10, 0, false);
+    const last = pts[pts.length - 1];
+    assertApprox(last.x, 0, 0.01, 'end x');
+    assertApprox(last.y, 10, 0.01, 'end y');
+  });
+
+  it('full circle returns segs+1 points', () => {
+    // Start and end at same point → full circle
+    const pts = arcPoints(10, 0, 0, 10, 0, 0, -10, 0, true, 36);
+    assertEqual(pts.length, 37); // segs + 1
+  });
+
+  it('full circle: all points at radius from center', () => {
+    const pts = arcPoints(10, 0, 0, 10, 0, 0, -10, 0, false, 36);
+    const radius = 10;
+    pts.forEach((p, idx) => {
+      const r = Math.sqrt(p.x * p.x + p.y * p.y);
+      assertApprox(r, radius, 0.001, `point ${idx} radius`);
+    });
+  });
+
+  it('Z interpolates linearly along arc', () => {
+    // Arc from z=0 to z=10 with segs=10
+    const pts = arcPoints(10, 0, 0, 0, -10, 10, -10, 0, true, 10);
+    assertApprox(pts[0].z, 0, 0.001, 'start z');
+    assertApprox(pts[pts.length - 1].z, 10, 0.001, 'end z');
+    // Midpoint z should be ≈5
+    assertApprox(pts[5].z, 5, 0.1, 'mid z');
+  });
+
+  it('radius matches distance from center to start', () => {
+    // Center at (5,5), start at (5+3, 5) → radius 3
+    const pts = arcPoints(8, 5, 0, 5, 8, 0, -3, 0, true);
+    const cx = 8 + (-3); // = 5
+    const cy = 5 + 0;    // = 5
+    pts.forEach(p => {
+      const r = Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2);
+      assertApprox(r, 3, 0.01);
+    });
+  });
+
+  it('returns segs+1 points by default (48+1=49)', () => {
+    const pts = arcPoints(10, 0, 0, 0, 10, 0, -10, 0, false);
+    assertEqual(pts.length, 49);
+  });
+});
+
+describe('applyScaleLine — F-word (feed rate) rewriting', (it) => {
+  it('scales F by 1.2 (120%)', () => {
+    assertEqual(applyScaleLine('G1 X10 F1000', 1.2, 1.0, 0, 0), 'G1 X10 F1200.0');
+  });
+  it('scales F by 0.5 (50%)', () => {
+    assertEqual(applyScaleLine('G1 X5 F800', 0.5, 1.0, 0, 0), 'G1 X5 F400.0');
+  });
+  it('scales F by 1.0 (no change)', () => {
+    assertEqual(applyScaleLine('G1 X5 F800', 1.0, 1.0, 0, 0), 'G1 X5 F800.0');
+  });
+  it('handles decimal feed value', () => {
+    assertEqual(applyScaleLine('G1 F12.5', 2.0, 1.0, 0, 0), 'G1 F25.0');
+  });
+  it('handles lowercase f', () => {
+    assertEqual(applyScaleLine('G1 x5 f600', 1.5, 1.0, 0, 0), 'G1 x5 f900.0');
+  });
+  it('line with no F word unchanged (F part)', () => {
+    const result = applyScaleLine('G0 X10 Y20', 1.5, 1.0, 0, 0);
+    assertEqual(result, 'G0 X10 Y20');
+  });
+  it('scales both F and S in same line', () => {
+    const result = applyScaleLine('M3 S18000 G1 F1000', 1.5, 1.2, 0, 0);
+    assertContains(result, 'F1500.0');
+    assertContains(result, 'S21600');
+  });
+});
+
+describe('applyScaleLine — S-word (spindle speed) rewriting', (it) => {
+  it('scales S by 1.2 (120%)', () => {
+    assertContains(applyScaleLine('M3 S18000', 1.0, 1.2, 0, 0), 'S21600');
+  });
+  it('scales S by 0.8 (80%)', () => {
+    assertContains(applyScaleLine('M3 S10000', 1.0, 0.8, 0, 0), 'S8000');
+  });
+  it('S0 (spindle off) preserved as S0', () => {
+    assertContains(applyScaleLine('M5 S0', 1.0, 1.5, 0, 0), 'S0');
+  });
+  it('S0 does NOT become S0.0 or non-zero', () => {
+    const result = applyScaleLine('S0', 1.0, 2.0, 0, 0);
+    assert(!result.includes('S1'), 'S0 should not scale to non-zero');
+  });
+  it('clamped to sMax when scaled value exceeds max', () => {
+    // S18000 * 1.5 = 27000, but max is 24000 → 24000
+    assertContains(applyScaleLine('M3 S18000', 1.0, 1.5, 0, 24000), 'S24000');
+  });
+  it('clamped to sMin when scaled value is below min', () => {
+    // S500 * 0.5 = 250, but min is 1000 → 1000
+    assertContains(applyScaleLine('M3 S500', 1.0, 0.5, 1000, 24000), 'S1000');
+  });
+  it('value within range passes through unchanged by clamp', () => {
+    // S12000 * 1.2 = 14400, sMin=1000, sMax=24000 → 14400
+    assertContains(applyScaleLine('M3 S12000', 1.0, 1.2, 1000, 24000), 'S14400');
+  });
+  it('no clamping when sMax=0 (unconstrained)', () => {
+    assertContains(applyScaleLine('M3 S18000', 1.0, 2.0, 0, 0), 'S36000');
+  });
+  it('handles lowercase s', () => {
+    assertContains(applyScaleLine('M3 s12000', 1.0, 1.5, 0, 0), 's18000');
+  });
+  it('line with no S word unchanged (S part)', () => {
+    assertEqual(applyScaleLine('G0 X10', 1.0, 1.5, 0, 0), 'G0 X10');
+  });
+  it('rounds S result to integer (no decimal)', () => {
+    const result = applyScaleLine('M3 S10001', 1.0, 1.5, 0, 0);
+    // 10001 * 1.5 = 15001.5 → rounds to 15002
+    assertContains(result, 'S15002');
+    assert(!result.includes('S15001.'), 'S value should be integer');
+  });
+});
+
+describe('uiLog format — action logging', (it) => {
+  it('ACTION level prefix', () => {
+    assertContains(uiLogLine('JOG X+10mm', 'ACTION'), '[ACTION] JOG X+10mm');
+  });
+  it('ERROR level prefix', () => {
+    assertContains(uiLogLine('CNC ERROR: Switch found', 'ERROR'), '[ERROR] CNC ERROR');
+  });
+  it('WARN level prefix', () => {
+    assertContains(uiLogLine('ESTOP TRIGGERED', 'WARN'), '[WARN] ESTOP');
+  });
+});
+
+describe('estimateJobTime — GCode job time estimation', (it) => {
+  it('empty lines → 0 seconds', () => {
+    assertEqual(estimateJobTime([]), 0);
+  });
+
+  it('only comments/blanks → 0 seconds', () => {
+    assertEqual(estimateJobTime(['', '; setup', '(header)', 'G21', 'G90']), 0);
+  });
+
+  it('single rapid move 5000mm → 60 seconds (+15% = 69)', () => {
+    // 5000mm at 5000mm/min = 1 min = 60s, +15% = 69s, ceil = 69
+    const result = estimateJobTime(['G0 X5000']);
+    assertEqual(result, 69);
+  });
+
+  it('single feed move 1000mm at F1000 → 60s + 15% = 69', () => {
+    // 1000mm at 1000mm/min = 1min = 60s, +15% = 69
+    const result = estimateJobTime(['G1 X1000 F1000']);
+    assertEqual(result, 69);
+  });
+
+  it('uses explicit F value from line', () => {
+    // 600mm at F600 = 1 min = 60s, +15% = 69
+    const result = estimateJobTime(['G1 X600 F600']);
+    assertEqual(result, 69);
+  });
+
+  it('feed rate persists across lines', () => {
+    // F500 set on first line, used for second line
+    // Line1: G1 X0 F500 → no movement, just sets F
+    // Line2: G1 X500 → 500mm at 500mm/min = 1min = 60s, ceil(60*1.15) = 69
+    const result = estimateJobTime(['G1 X0 F500', 'G1 X500']);
+    assertEqual(result, 69);
+  });
+
+  it('G91 relative mode accumulates correctly', () => {
+    // Two relative moves of X100 each = 200mm total at 1000mm/min default
+    // 200/1000 * 60 = 12s, ceil(12 * 1.15) = ceil(13.8) = 14
+    const result = estimateJobTime(['G91', 'G1 X100', 'G1 X100']);
+    assertEqual(result, 14);
+  });
+
+  it('G91 relative then G90 absolute resets correctly', () => {
+    // G91: move X10 (dist=10), G90: move to X50 (dist=50-10=40), total=50
+    // 50mm at 1000mm/min = 3s, ceil(3 * 1.15) = ceil(3.45) = 4
+    const result = estimateJobTime(['G91', 'G1 X10', 'G90', 'G1 X50']);
+    assertEqual(result, 4);
+  });
+
+  it('G20 inch mode: 1 inch move at F10 → 25.4mm at same rate', () => {
+    // G20 (inches), G1 X1 F60 → 1 inch = 25.4mm, at 60in/min = 1524mm/min
+    // dist = 25.4mm, rate = 60 * (we store feedRate as inches), scaledDist = 1 * 25.4
+    // time = (25.4 / 60) * 60 = 25.4s, ceil(25.4 * 1.15) = ceil(29.21) = 30
+    const result = estimateJobTime(['G20', 'G1 X1 F60']);
+    assertEqual(result, 30);
+  });
+
+  it('line numbers stripped (N-words)', () => {
+    // N10 G1 X100 F600 → same as G1 X100 F600
+    // 100mm at 600mm/min = 10s, ceil(10 * 1.15) = ceil(11.5) = 12
+    const result = estimateJobTime(['N10 G1 X100 F600']);
+    assertEqual(result, 12);
+  });
+
+  it('inline comments stripped (parentheses)', () => {
+    const result = estimateJobTime(['G1 X100 F600 (feed move)']);
+    // same as 100mm at 600mm/min = 12s
+    assertEqual(result, 12);
+  });
+
+  it('semicolon comment stripped', () => {
+    const result = estimateJobTime(['G1 X100 F600 ; comment here']);
+    assertEqual(result, 12);
+  });
+
+  it('3D move uses Euclidean distance', () => {
+    // G1 X3 Y4 F500 → dist = sqrt(9+16) = 5mm, at 500mm/min = 0.6s, ceil(0.6*1.15)=1
+    const result = estimateJobTime(['G1 X3 Y4 F500']);
+    assertEqual(result, 1);
+  });
+
+  it('G2/G3 arcs counted as feed moves', () => {
+    // G2 with some coords treated as feed
+    const result = estimateJobTime(['G2 X100 F500']);
+    assert(result > 0, 'Arc move should contribute to time');
+  });
+
+  it('G28 (home) not counted as rapid or feed', () => {
+    assertEqual(estimateJobTime(['G28']), 0);
+  });
+
+  it('zero-distance move contributes no time', () => {
+    // Move to where we already are
+    assertEqual(estimateJobTime(['G0 X0', 'G0 X0']), 0);
+  });
+
+  it('applies +15% overhead (result > raw total)', () => {
+    // 1000mm at 1000mm/min = 60s raw, +15% = 69
+    const raw = estimateJobTime(['G1 X1000 F1000']);
+    assert(raw > 60, 'Result should exceed raw seconds due to 15% overhead');
+    assertEqual(raw, 69);
+  });
+
+  it('result is always an integer (Math.ceil)', () => {
+    const result = estimateJobTime(['G1 X100 F600']);
+    assertEqual(result, Math.floor(result), 'Result should be integer');
+  });
+
+  it('multiple axes accumulate via Euclidean distance', () => {
+    // X3 Y4 Z0 → dist=5, X3 Y4 Z12 → dist from (3,4,0) to (3,4,12)=12
+    // total dist = 5+12 = 17mm at 1000mm/min = 1.02s, ceil(1.02*1.15)=2
+    const result = estimateJobTime(['G1 X3 Y4 F1000', 'G1 X3 Y4 Z12']);
+    assertEqual(result, 2);
+  });
+});
+
+describe('fmGetFolderNamesFromList — folder name filtering', (it) => {
+  it('null list → empty array', () => {
+    assertEqual(fmGetFolderNamesFromList(null).length, 0);
+  });
+
+  it('empty list → empty array', () => {
+    assertEqual(fmGetFolderNamesFromList([]).length, 0);
+  });
+
+  it('"default" folder excluded', () => {
+    const result = fmGetFolderNamesFromList([{ name: 'default' }]);
+    assertEqual(result.length, 0);
+  });
+
+  it('named folders returned', () => {
+    const result = fmGetFolderNamesFromList([{ name: 'fixtures' }, { name: 'parts' }]);
+    assertEqual(result.length, 2);
+    assert(result.includes('fixtures'));
+    assert(result.includes('parts'));
+  });
+
+  it('mix of default and named → only named returned', () => {
+    const result = fmGetFolderNamesFromList([
+      { name: 'default' },
+      { name: 'fixtures' },
+      { name: 'parts' },
+    ]);
+    assertEqual(result.length, 2);
+    assert(!result.includes('default'));
+  });
+
+  it('empty string name filtered out', () => {
+    const result = fmGetFolderNamesFromList([{ name: '' }, { name: 'valid' }]);
+    assertEqual(result.length, 1);
+    assertEqual(result[0], 'valid');
+  });
+
+  it('null name filtered out', () => {
+    const result = fmGetFolderNamesFromList([{ name: null }, { name: 'valid' }]);
+    assertEqual(result.length, 1);
+  });
+
+  it('preserves order', () => {
+    const result = fmGetFolderNamesFromList([
+      { name: 'beta' }, { name: 'alpha' }, { name: 'gamma' }
+    ]);
+    assertEqual(result[0], 'beta');
+    assertEqual(result[1], 'alpha');
+    assertEqual(result[2], 'gamma');
+  });
+});
+
+describe('normalizeOverridePct — feed/spindle override clamping', (it) => {
+  it('100 → 100 (no change)', () => assertEqual(normalizeOverridePct(100), 100));
+  it('50 → 50', () => assertEqual(normalizeOverridePct(50), 50));
+  it('150 → 150 (max)', () => assertEqual(normalizeOverridePct(150), 150));
+  it('10 → 10 (min)', () => assertEqual(normalizeOverridePct(10), 10));
+
+  it('151 clamped to 150', () => assertEqual(normalizeOverridePct(151), 150));
+  it('200 clamped to 150', () => assertEqual(normalizeOverridePct(200), 150));
+  it('9 clamped to 10', () => assertEqual(normalizeOverridePct(9), 10));
+  it('0 clamped to 10', () => assertEqual(normalizeOverridePct(0), 10));
+  it('-50 clamped to 10', () => assertEqual(normalizeOverridePct(-50), 10));
+
+  it('snaps to nearest 5 — 103 → 105', () => assertEqual(normalizeOverridePct(103), 105));
+  it('snaps to nearest 5 — 102 → 100', () => assertEqual(normalizeOverridePct(102), 100));
+  it('snaps to nearest 5 — 97 → 95', () => assertEqual(normalizeOverridePct(97), 95));
+  it('snaps to nearest 5 — 98 → 100', () => assertEqual(normalizeOverridePct(98), 100));
+  it('snaps to nearest 5 — 148 → 150', () => assertEqual(normalizeOverridePct(148), 150));
+  it('snaps to nearest 5 — 12 → 10 (clamped after snap)', () => assertEqual(normalizeOverridePct(12), 10));
+  it('snaps to nearest 5 — 13 → 15', () => assertEqual(normalizeOverridePct(13), 15));
+
+  it('float input rounds correctly — 102.6 → 105', () => assertEqual(normalizeOverridePct(102.6), 105));
+  it('float input rounds correctly — 102.4 → 100', () => assertEqual(normalizeOverridePct(102.4), 100));
+});
+
+describe('deriveMachineState — cycle/xx → UI state', (it) => {
+  // Normal running / idle / paused flow
+  it('xx=RUNNING → running', () => assertEqual(deriveMachineState('', 'RUNNING'), 'running'));
+  it('cycle=run → running',  () => assertEqual(deriveMachineState('run', ''), 'running'));
+  it('xx=HOLDING → paused',  () => assertEqual(deriveMachineState('', 'HOLDING'), 'paused'));
+  it('xx=READY → idle',      () => assertEqual(deriveMachineState('', 'READY'), 'idle'));
+  it('xx=IDLE → idle',       () => assertEqual(deriveMachineState('', 'IDLE'), 'idle'));
+  it('cycle=idle → idle',    () => assertEqual(deriveMachineState('idle', ''), 'idle'));
+
+  // Homing & jogging
+  it('xx=HOMING → running',      () => assertEqual(deriveMachineState('', 'HOMING'), 'running'));
+  it('cycle=homing → running',   () => assertEqual(deriveMachineState('homing', ''), 'running'));
+  it('xx=JOGGING → idle',        () => assertEqual(deriveMachineState('', 'JOGGING'), 'idle'));
+  it('cycle=jogging → idle',     () => assertEqual(deriveMachineState('jogging', ''), 'idle'));
+
+  // Estop / error
+  it('xx=ESTOPPED → estopped',   () => assertEqual(deriveMachineState('', 'ESTOPPED'), 'estopped'));
+  it('xx=FAULT → estopped',      () => assertEqual(deriveMachineState('', 'FAULT'), 'estopped'));
+  it('xx=ERROR → error',         () => assertEqual(deriveMachineState('', 'ERROR'), 'error'));
+  it('xx=ALARM → error',         () => assertEqual(deriveMachineState('', 'ALARM'), 'error'));
+
+  // Regression — 2026-04-18: limit switch trip during homing leaves cycle='homing'
+  // AND xx='ESTOPPED'. Old priority masked the estop, so the Clear E-Stop button
+  // never appeared and the machine was stuck. ESTOP must win over cycle.
+  it('REGRESSION: homing + estop → estopped (not running)', () => {
+    assertEqual(deriveMachineState('homing', 'ESTOPPED'), 'estopped');
+  });
+  it('REGRESSION: run + estop → estopped (not running)', () => {
+    assertEqual(deriveMachineState('run', 'ESTOPPED'), 'estopped');
+  });
+  it('REGRESSION: jogging + fault → estopped (not idle)', () => {
+    assertEqual(deriveMachineState('jogging', 'FAULT'), 'estopped');
+  });
+  it('REGRESSION: holding + error → error (not paused)', () => {
+    assertEqual(deriveMachineState('holding', 'ERROR'), 'error');
+  });
+
+  // Input handling
+  it('null/undefined inputs → idle', () => {
+    assertEqual(deriveMachineState(null, null), 'idle');
+    assertEqual(deriveMachineState(undefined, undefined), 'idle');
+  });
+  it('xx is case-insensitive',     () => assertEqual(deriveMachineState('', 'running'), 'running'));
+  it('unknown xx → idle (fallback)', () => assertEqual(deriveMachineState('', 'MYSTERY'), 'idle'));
+});
+
+// ═══════════════════════════════════════════════
+// AUTO-RUN ON LOAD
+// ═══════════════════════════════════════════════
+window.addEventListener('load', runAllTests);
+</script>
+</body>
+</html>

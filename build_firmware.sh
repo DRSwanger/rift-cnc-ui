@@ -27,6 +27,7 @@ cp "$SCRIPT_DIR/index.html"           "$BUILD_DIR/$PKG_NAME/src/py/bbctrl/http/i
 cp "$SCRIPT_DIR/manifest.json"        "$BUILD_DIR/$PKG_NAME/src/py/bbctrl/http/manifest.json"
 cp "$SCRIPT_DIR/rift-boot.png"        "$BUILD_DIR/$PKG_NAME/rift-boot.png"
 cp "$SCRIPT_DIR/rift-shutdown.png"    "$BUILD_DIR/$PKG_NAME/rift-shutdown.png"
+cp "$SCRIPT_DIR/xinitrc"              "$BUILD_DIR/$PKG_NAME/xinitrc"
 cp "$SCRIPT_DIR/scripts/install.sh"  "$BUILD_DIR/$PKG_NAME/scripts/install.sh"
 cp "$SCRIPT_DIR/scripts/watchdog.sh" "$BUILD_DIR/$PKG_NAME/scripts/watchdog.sh"
 chmod +x "$BUILD_DIR/$PKG_NAME/scripts/install.sh"
