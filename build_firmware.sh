@@ -7,15 +7,24 @@
 #      ./deploy-ssh.sh
 #
 #   2. Firmware update API (triggers bbctrl update, ~30s, no reboot):
-#      ./build_firmware.sh && curl -X PUT http://192.168.1.130/api/firmware/update \
-#           -F "firmware=@$HOME/Documents/alienwoodshop-cnc.tar.bz2"
+#      ./build_firmware.sh
+#      curl -X PUT http://192.168.1.130/api/firmware/update \
+#           -F "firmware=@$HOME/Documents/rift-cnc-ui-v<version>.tar.bz2"
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PKG_NAME="cnc-ui-custom"
 BUILD_DIR="/tmp/${PKG_NAME}-build"
-OUT_FILE="$HOME/Documents/alienwoodshop-cnc.tar.bz2"
+
+# Derive version from index.html's UI_VERSION so the release asset name matches
+# the repo tag convention (rift-cnc-ui-v<version>.tar.bz2).
+VERSION=$(grep -oE "UI_VERSION\s*=\s*'[^']+'" "$SCRIPT_DIR/index.html" | head -1 | sed -E "s/.*'([^']+)'.*/\1/")
+if [ -z "$VERSION" ]; then
+    echo "ERROR: could not parse UI_VERSION from index.html" >&2
+    exit 1
+fi
+OUT_FILE="$HOME/Documents/rift-cnc-ui-v${VERSION}.tar.bz2"
 
 echo "Building firmware package: $OUT_FILE"
 
