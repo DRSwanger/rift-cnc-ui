@@ -543,6 +543,16 @@
   .float-panel-close { background:none; border:none; color:var(--muted);
     font-size:16px; cursor:pointer; padding:0 2px; line-height:1; }
   .float-panel-close:hover { color:var(--text); }
+  .float-panel-header-actions { display:flex; align-items:center; gap:10px; }
+  /* Compact E-Stop in modal headers — keeps E-Stop reachable while probe dialogs are open
+     without sitting next to Continue/Next. */
+  .modal-estop-btn {
+    background:#8b0000; color:#fff; border:2px solid #ff2222; border-radius:6px;
+    padding:6px 12px; font-size:12px; font-weight:900; letter-spacing:1px;
+    text-transform:uppercase; cursor:pointer; box-shadow:0 0 10px rgba(255,40,40,0.4);
+  }
+  .modal-estop-btn:hover { background:#cc0000; box-shadow:0 0 16px rgba(255,40,40,0.7); }
+  .modal-estop-btn:active { transform:scale(0.96); }
   .float-panel-body { padding:14px 18px 18px; display:flex; flex-direction:column; gap:8px; }
   .scale-section-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--muted); text-align:center; margin-bottom:-4px; }
   .scale-divider { border-top:1px solid var(--border); margin:4px 0; }
@@ -930,6 +940,10 @@
   }
   #btn-files:hover { color: var(--accent); }
   #btn-files:active { transform: scale(0.94); color: var(--accent); }
+  #btn-files:disabled {
+    opacity: 0.4; cursor: not-allowed; border-color: var(--border); color: var(--muted);
+  }
+  #btn-files:disabled:hover { color: var(--muted); }
   #gcode-file-info {
     display: flex;
     flex-direction: column;
@@ -1198,6 +1212,8 @@
     background: rgba(0, 212, 255, 0.08);
     border-left-color: var(--accent);
   }
+  #gcode-content.no-wrap { overflow-x: auto; }
+  #gcode-content.no-wrap .gcode-line { white-space: nowrap; }
   .gcode-line.rapid { color: #ff6b6b; }
   .gcode-line.cut { color: #6bffb5; }
   .gcode-line.spindle { color: var(--accent); font-weight: 600; }
@@ -1986,7 +2002,10 @@
 <div id="probe-safety-overlay">
   <div class="float-panel-header">
     <span class="float-panel-title">⚡ Probe Circuit Check</span>
-    <button class="float-panel-close" onclick="probeSafetyCancel()">✕</button>
+    <div class="float-panel-header-actions">
+      <button class="modal-estop-btn" onclick="machineEStop()">⛔ E-Stop</button>
+      <button class="float-panel-close" onclick="probeSafetyCancel()">✕</button>
+    </div>
   </div>
   <div id="probe-safety-modal">
     <div id="probe-safety-inst">Touch the probe block to the tip of your bit.<br>The indicator will turn green when the circuit is detected.</div>
@@ -2002,7 +2021,10 @@
 <div id="probe-stock-overlay">
   <div class="float-panel-header">
     <span class="float-panel-title">Probe Z — Select Reference</span>
-    <button class="float-panel-close" onclick="probeStockCancel()">✕</button>
+    <div class="float-panel-header-actions">
+      <button class="modal-estop-btn" onclick="machineEStop()">⛔ E-Stop</button>
+      <button class="float-panel-close" onclick="probeStockCancel()">✕</button>
+    </div>
   </div>
   <div id="probe-stock-modal">
     <div id="probe-stock-inst">Place probe block on the reference surface.<br>Block height: <strong id="probe-stock-block-dim"></strong>mm</div>
@@ -2190,8 +2212,8 @@
                 <input class="settings-input" id="cfg-probe-backoff" type="number" step="0.1" min="0.5">
               </div>
               <div class="settings-row">
-                <div><div class="settings-label">Retract after</div><div class="settings-sub">Lift after touch-off (mm)</div></div>
-                <input class="settings-input" id="cfg-probe-retract" type="number" step="0.1" min="0">
+                <div><div class="settings-label">Safe Z after probe</div><div class="settings-sub">Retract to this WCS Z — mm above work zero</div></div>
+                <input class="settings-input" id="cfg-probe-safez" type="number" step="0.1" min="0">
               </div>
             </div>
           </div>
@@ -2673,13 +2695,13 @@
       <div class="section-title">Jog XY</div>
       <div class="jog-grid">
         <div></div>
-        <button class="jog-btn" onclick="jog('Y', 1)">▲</button>
+        <button class="jog-btn" onclick="jog('Y', 1)" style="font-size:15px;">▲ Y+</button>
         <div></div>
-        <button class="jog-btn" onclick="jog('X', -1)">◀</button>
+        <button class="jog-btn" onclick="jog('X', -1)" style="font-size:15px;">◀ X−</button>
         <button class="jog-btn center" onclick="goToXYOrigin()" title="Move to XY work zero" style="cursor:pointer;font-size:10px;color:var(--accent);font-weight:700;">XY Origin</button>
-        <button class="jog-btn" onclick="jog('X', 1)">▶</button>
+        <button class="jog-btn" onclick="jog('X', 1)" style="font-size:15px;">X+ ▶</button>
         <div></div>
-        <button class="jog-btn" onclick="jog('Y', -1)">▼</button>
+        <button class="jog-btn" onclick="jog('Y', -1)" style="font-size:15px;">▼ Y−</button>
         <div></div>
       </div>
 
@@ -2797,6 +2819,7 @@
         <span id="gcode-file-folder"></span>
         <span id="gcode-file-name">No file loaded</span>
       </div>
+      <button id="btn-gcode-wrap" onclick="toggleGcodeWrap()" title="Toggle line wrap" style="background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;">↵ Wrap</button>
     </div>
     <!-- GCode viewer -->
     <div id="gcode-content">
@@ -2910,7 +2933,7 @@ function escHtml(s) {
 const WS_URL  = `ws://${location.host}/websocket`; // same-origin always
 const API_URL = ``; // relative URLs — works for both proxy and direct bbctrl
 const SAFE_Z  = 50; // mm to retract before repositioning on resume
-const UI_VERSION             = '1.3.2'; // Rift by AlienWoodshop LLC
+const UI_VERSION             = '1.3.1-nightly.20260419.7'; // Rift by AlienWoodshop LLC
 const ENABLE_RESUME          = false; // set true to re-enable resume-from-stop feature
 const ENABLE_MACROS          = false; // set true to re-enable macro buttons
 const ENABLE_ROTARY          = false; // set true to show rotary axis toggle
@@ -2977,6 +3000,12 @@ let jobStartTime = null;  // Date.now() when job started
 let _jobPct = 0;          // last known progress % (for ETA calculation)
 let _progressTimer = null;
 let _estimatedJobSeconds = 0; // pre-computed time estimate from loaded GCode
+
+// Persist job start across page refresh so ETA doesn't reset when the tab reloads mid-job.
+const JOB_START_KEY = 'rift_job_start';
+function saveJobStart(t, f) { try { localStorage.setItem(JOB_START_KEY, JSON.stringify({ t, f: f || '' })); } catch(e) {} }
+function readJobStart()     { try { return JSON.parse(localStorage.getItem(JOB_START_KEY) || 'null'); } catch(e) { return null; } }
+function clearJobStart()    { try { localStorage.removeItem(JOB_START_KEY); } catch(e) {} }
 let scene, camera, renderer, toolpathGroup, posMarker;
 let isDragging = false, isPanning = false, lastMouse = {x:0, y:0};
 let _cutSegData = [];     // {from, to, avgZ, lineNum} per cut segment
@@ -3542,9 +3571,22 @@ function setMachineState(s) {
 
   // Job start/stop — lastMachineState is still the OLD state here, so the transition is detected correctly.
   if (s === 'running' && lastMachineState !== 'running') {
-    jobStartTime = Date.now();
+    const fname = state.selected || '';
+    // On fresh page load mid-job, restore the persisted start so ETA/elapsed don't reset.
+    const persisted = readJobStart();
+    if (!jobStartTime && persisted && persisted.f === fname && persisted.t &&
+        (Date.now() - persisted.t) < 24 * 3600 * 1000) {
+      jobStartTime = persisted.t;
+    } else {
+      jobStartTime = Date.now();
+      saveJobStart(jobStartTime, fname);
+    }
     _jobPct = 0;
     startProgressTimer();
+  }
+  // Clear persisted start when job ends so the next job gets a fresh timer.
+  if (s === 'idle' || s === 'estopped' || s === 'error') {
+    if (lastMachineState === 'running' || lastMachineState === 'paused') clearJobStart();
   }
   if (s !== 'running') {
     stopProgressTimer();
@@ -3631,6 +3673,22 @@ function setMachineState(s) {
     _ovrFeed = 1.0; _ovrSpeed = 1.0; updateOverrideDisplay();
     document.getElementById('stat-feed-mmpm').textContent = '0';
   }
+
+  // Disable Files button during running/paused — prevents uploads/deletes from interfering with the job
+  const filesBtn = document.getElementById('btn-files');
+  if (filesBtn) {
+    const jobBusy = (s === 'running' || s === 'paused');
+    filesBtn.disabled = jobBusy;
+    filesBtn.title = jobBusy ? 'Files locked while machine is ' + s : '';
+  }
+
+  // Offer XY zero recovery after a fault clear returns to idle.
+  // Skip if a homing cycle is what brought us to idle (user was already recovering) or a job is running.
+  if (s === 'idle' && (lastMachineState === 'estopped' || lastMachineState === 'error') && !_wasHoming) {
+    offerXyRecovery();
+  }
+  // Fresh fault arms a new recovery offer for the next idle transition
+  if (s === 'estopped' || s === 'error') _recoveryOffered = false;
 
   lastMachineState = s;
 }
@@ -3811,10 +3869,37 @@ let _virt = null;  // { lines, rowH, currentLine, buffer, start, end, onScroll }
 function _renderLineHtml(line, i) {
   const cls = classifyLine(line);
   const safe = escHtml(line || '\u00a0');
-  return `<div class="gcode-line ${cls}${_virt && _virt.currentLine === i+1 ? ' current' : ''}" id="gl-${i+1}"${_virt ? ` style="position:absolute;left:0;right:0;top:${i*_virt.rowH}px;"` : ''}>`
+  // When nowrap is active, let virtualized rows grow wider than the viewport so
+  // horizontal scroll can reveal long lines instead of wrapping them.
+  const rowStyle = _virt
+    ? (_gcodeNoWrap
+        ? ` style="position:absolute;left:0;top:${i*_virt.rowH}px;min-width:100%;"`
+        : ` style="position:absolute;left:0;right:0;top:${i*_virt.rowH}px;"`)
+    : '';
+  return `<div class="gcode-line ${cls}${_virt && _virt.currentLine === i+1 ? ' current' : ''}" id="gl-${i+1}"${rowStyle}>`
        + `<span class="line-num">${i+1}</span>`
        + `<span>${highlightSpindleSpeed(safe)}</span>`
        + `</div>`;
+}
+
+// ── GCODE WRAP TOGGLE ──
+let _gcodeNoWrap = (localStorage.getItem('rift_gcode_nowrap') ?? '1') === '1';
+function _applyGcodeWrap() {
+  const c = document.getElementById('gcode-content');
+  if (!c) return;
+  c.classList.toggle('no-wrap', _gcodeNoWrap);
+  const btn = document.getElementById('btn-gcode-wrap');
+  if (btn) {
+    btn.textContent = _gcodeNoWrap ? '↔ Scroll' : '↵ Wrap';
+    btn.style.color = _gcodeNoWrap ? 'var(--accent)' : 'var(--muted)';
+  }
+}
+function toggleGcodeWrap() {
+  _gcodeNoWrap = !_gcodeNoWrap;
+  localStorage.setItem('rift_gcode_nowrap', _gcodeNoWrap ? '1' : '0');
+  _applyGcodeWrap();
+  // Re-render virtualized rows with new row style
+  if (_virt) { _virt.start = -1; _virt.end = -1; _renderVirtWindow(); }
 }
 
 function _measureRowHeight(container) {
@@ -4016,6 +4101,7 @@ document.addEventListener('DOMContentLoaded', function() {
   makeDraggable(document.getElementById('probe-stock-overlay'));
   makeDraggable(document.getElementById('probe-safety-overlay'));
   makeDraggable(document.getElementById('settings-modal'));
+  _applyGcodeWrap();
 
   // Fetch spindle limits at startup so MDI safety check works without opening Settings
   fetch(`${API_URL}/api/config/load`)
@@ -4342,6 +4428,126 @@ async function zeroAxis(axis) {
   uiLog(`ZERO axis ${axis === 'all' ? 'X Y Z' : axis.toUpperCase()}`);
   const cmd = axis === 'all' ? 'G92 X0 Y0 Z0' : `G92 ${axis.toUpperCase()}0`;
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(cmd);
+  // Snapshot XY work zero so we can recover after a fault + clear wipes G92 offsets.
+  // Z intentionally not captured — after recovery the user re-probes Z at the material surface.
+  if (axis === 'x' || axis === 'y' || axis === 'all') saveXyZeroSnapshot(axis);
+}
+
+// ── XY ZERO SNAPSHOT / RECOVERY ──
+// bbctrl's /api/clear wipes G92 offsets, so a Z-limit trip → clear → rehome loses the user's
+// XY work zero. We snapshot the ABS position at zero-time and offer a guided recovery wizard
+// after the machine returns to idle from estopped/error.
+const XY_SNAP_KEY = 'rift_xy_zero_snap';
+
+function saveXyZeroSnapshot(axis) {
+  try {
+    const prev = JSON.parse(localStorage.getItem(XY_SNAP_KEY) || 'null') || {};
+    // G92 X0 makes offset_x equal to the current ABS X. Predict new offsets without waiting for state.
+    const ox = (axis === 'x' || axis === 'all') ? (+(state.xp || 0)) : (prev.ox ?? +(state.offset_x || 0));
+    const oy = (axis === 'y' || axis === 'all') ? (+(state.yp || 0)) : (prev.oy ?? +(state.offset_y || 0));
+    localStorage.setItem(XY_SNAP_KEY, JSON.stringify({ ox, oy, t: Date.now() }));
+  } catch(e) { /* localStorage full / disabled — non-fatal */ }
+}
+
+function readXyZeroSnapshot() {
+  try { return JSON.parse(localStorage.getItem(XY_SNAP_KEY) || 'null'); }
+  catch(e) { return null; }
+}
+
+function formatSnapAge(t) {
+  const mins = Math.floor((Date.now() - t) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hr ago`;
+  return `${Math.floor(hrs / 24)} days ago`;
+}
+
+let _recoveryRunning = false;
+let _recoveryOffered = false; // avoid re-offering after user declines until next fault
+
+// Wait for a home cycle to complete: state must enter homing/running then return to idle.
+function waitForHomeComplete(timeoutMs = 90000) {
+  return new Promise(resolve => {
+    const start = Date.now();
+    let sawMovement = false;
+    const tick = () => {
+      if (Date.now() - start > timeoutMs) return resolve(false);
+      if (lastMachineState === 'estopped' || lastMachineState === 'error') return resolve(false);
+      if (!sawMovement && lastMachineState !== 'idle') sawMovement = true;
+      if (sawMovement && lastMachineState === 'idle') return resolve(true);
+      setTimeout(tick, 200);
+    };
+    setTimeout(tick, 200);
+  });
+}
+
+async function runXyRecovery() {
+  if (_recoveryRunning) return;
+  const snap = readXyZeroSnapshot();
+  if (!snap) { showToast('No saved XY zero to recover', 'warn'); return; }
+  _recoveryRunning = true;
+  try {
+    uiLog(`RECOVER XY zero (saved ${formatSnapAge(snap.t)}): offset X=${snap.ox.toFixed(3)} Y=${snap.oy.toFixed(3)}`);
+    // Step 1 — bit removal + home Z
+    if (!await darkConfirm(
+      'REMOVE THE BIT from the spindle before continuing.\n\n' +
+      'Z will home first (traveling upward). Press OK when the bit is removed and the path is clear.',
+      'Home Z'
+    )) { _recoveryRunning = false; return; }
+    _homingAxes = 'z';
+    const zRes = await fetch(`${API_URL}/api/home/z`, { method: 'PUT' }).catch(() => null);
+    if (!zRes || !zRes.ok) {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send('G28.2 Z0');
+      else { showErrorBanner('Cannot home Z — not connected', true); _recoveryRunning = false; return; }
+    }
+    if (!await waitForHomeComplete()) {
+      showErrorBanner('Z home did not complete — recovery aborted', true);
+      _recoveryRunning = false; return;
+    }
+    // Step 2 — home X and Y
+    if (!await darkConfirm('Z homed. Homing X and Y next. Press OK to continue.', 'Home X/Y')) {
+      _recoveryRunning = false; return;
+    }
+    _homingAxes = 'x';
+    const xRes = await fetch(`${API_URL}/api/home/x`, { method: 'PUT' }).catch(() => null);
+    if (!xRes || !xRes.ok) { if (ws && ws.readyState === WebSocket.OPEN) ws.send('G28.2 X0'); }
+    if (!await waitForHomeComplete()) { showErrorBanner('X home did not complete — recovery aborted', true); _recoveryRunning = false; return; }
+    _homingAxes = 'y';
+    const yRes = await fetch(`${API_URL}/api/home/y`, { method: 'PUT' }).catch(() => null);
+    if (!yRes || !yRes.ok) { if (ws && ws.readyState === WebSocket.OPEN) ws.send('G28.2 Y0'); }
+    if (!await waitForHomeComplete()) { showErrorBanner('Y home did not complete — recovery aborted', true); _recoveryRunning = false; return; }
+    // Step 3 — restore G54 XY and travel to saved zero
+    // G10 L2 P1 writes the persistent G54 offset — unaffected by the post-home G92.1 that fires above.
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(`G10 L2 P1 X${snap.ox.toFixed(4)} Y${snap.oy.toFixed(4)}`);
+    }
+    if (!await darkConfirm(
+      `XY zero restored. Fast-travel to your saved work zero (X0 Y0 WCS)?\n\n` +
+      `Z stays at the homed position (~50mm WCS). Install bit and re-probe Z after traveling.`,
+      'Travel'
+    )) { _recoveryRunning = false; return; }
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send('G90\nG0 X0 Y0');
+    showToast('XY zero recovered — install bit and re-probe Z', 'info', 6000);
+  } finally {
+    _recoveryRunning = false;
+  }
+}
+
+function offerXyRecovery() {
+  if (_recoveryRunning || _recoveryOffered) return;
+  const snap = readXyZeroSnapshot();
+  if (!snap) return;
+  _recoveryOffered = true;
+  (async () => {
+    const ok = await darkConfirm(
+      `Recover XY work zero?\n\n` +
+      `Saved ${formatSnapAge(snap.t)} at X=${snap.ox.toFixed(2)}  Y=${snap.oy.toFixed(2)} (ABS).\n\n` +
+      `This will home Z (bit removed), then X/Y, then travel to your saved XY zero.`,
+      'Recover', 'Skip'
+    );
+    if (ok) runXyRecovery();
+  })();
 }
 
 // ── SETTINGS ──
@@ -4356,7 +4562,7 @@ const SETTINGS_DEFAULTS = {
   probeFast:      75,      // mm/min first touch
   probeSlow:      25,      // mm/min second touch
   probeBackoff:   0.5,     // mm retract between touches
-  probeRetract:   5.0,     // mm lift after touch-off
+  probeSafeZ:     50.0,    // WCS Z to retract to after probe touch-off (absolute, mm above work zero)
   pathAccuracy:   0.05,    // mm max deviation
   junctionAccel:  200000,  // mm/min²
   probeSafety:    true,    // require circuit check before probing
@@ -4482,7 +4688,7 @@ async function openSettings() {
   document.getElementById('cfg-probe-fast').value     = settings.probeFast;
   document.getElementById('cfg-probe-slow').value     = settings.probeSlow;
   document.getElementById('cfg-probe-backoff').value  = settings.probeBackoff;
-  document.getElementById('cfg-probe-retract').value  = settings.probeRetract;
+  document.getElementById('cfg-probe-safez').value    = settings.probeSafeZ;
   document.getElementById('cfg-probe-safety').value   = settings.probeSafety ? '1' : '0';
   document.getElementById('cfg-warn-soft-limits').value    = settings.warnSoftLimits !== false ? '1' : '0';
   document.getElementById('cfg-warn-zero-z').value         = settings.warnZeroZ !== false ? '1' : '0';
@@ -4682,7 +4888,7 @@ async function saveSettings() {
   settings.probeFast     = parseFloat(document.getElementById('cfg-probe-fast').value)    || SETTINGS_DEFAULTS.probeFast;
   settings.probeSlow     = parseFloat(document.getElementById('cfg-probe-slow').value)    || SETTINGS_DEFAULTS.probeSlow;
   settings.probeBackoff  = parseFloat(document.getElementById('cfg-probe-backoff').value) || SETTINGS_DEFAULTS.probeBackoff;
-  settings.probeRetract  = parseFloat(document.getElementById('cfg-probe-retract').value) || SETTINGS_DEFAULTS.probeRetract;
+  settings.probeSafeZ    = parseFloat(document.getElementById('cfg-probe-safez').value)   || SETTINGS_DEFAULTS.probeSafeZ;
   settings.probeSafety     = document.getElementById('cfg-probe-safety').value === '1';
   settings.warnSoftLimits      = document.getElementById('cfg-warn-soft-limits').value === '1';
   settings.warnZeroZ           = document.getElementById('cfg-warn-zero-z').value === '1';
@@ -5018,7 +5224,7 @@ async function probeZ() {
   const fast    = settings.probeFast.toFixed(0);
   const slow    = settings.probeSlow.toFixed(0);
   const backoff = settings.probeBackoff.toFixed(3);
-  const retract = settings.probeRetract.toFixed(3);
+  const safeZ   = settings.probeSafeZ.toFixed(3);
 
   // Z offset math:
   //   "Zero to top of stock": probe ON TOP of stock → G10 L20 P1 Z{probeHeight}
@@ -5050,9 +5256,7 @@ async function probeZ() {
     'G38.2 Z-3.000 F42',              // slow seek 3mm window @ 42mm/min
     'G90',
     `G10 L20 P1 Z${zOffset}`,         // set WCS Z
-    'G91',
-    `G0 Z${retract}`,                  // lift clear
-    'G90',
+    `G0 Z${safeZ}`,                    // absolute retract to configured safe Z (WCS)
   ].join('\n');
 
   ws.send(probeCmd);
@@ -5072,15 +5276,15 @@ function showProbeProgress(refLabel) {
   if (!ov) {
     ov = document.createElement('div');
     ov.id = 'probe-progress-overlay';
-    ov.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:4500;align-items:center;justify-content:center;';
+    ov.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.45);backdrop-filter:blur(2px);z-index:4500;align-items:center;justify-content:center;';
     ov.innerHTML = `
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:28px 32px;text-align:center;min-width:320px;display:flex;flex-direction:column;gap:14px;">
-        <div id="ppov-icon" style="font-size:36px;">↓</div>
-        <div id="ppov-title" style="font-size:15px;font-weight:700;color:var(--accent);">Probing Z…</div>
-        <div id="ppov-sub" style="font-size:12px;color:var(--muted);"></div>
+      <div style="position:relative;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:32px 36px;text-align:center;min-width:340px;display:flex;flex-direction:column;gap:16px;box-shadow:0 10px 40px rgba(0,0,0,0.5);">
+        <button class="modal-estop-btn" onclick="machineEStop()" style="position:absolute;top:10px;right:10px;">⛔ E-Stop</button>
+        <div id="ppov-icon" style="font-size:40px;">↓</div>
+        <div id="ppov-title" style="font-size:16px;font-weight:700;color:var(--accent);">Probing Z…</div>
+        <div id="ppov-sub" style="font-size:12px;color:var(--text);opacity:0.85;"></div>
         <div style="display:flex;gap:10px;justify-content:center;">
-          <button id="ppov-close" style="display:none" onclick="document.getElementById('probe-progress-overlay').remove()" class="settings-btn">Close</button>
-          <button onclick="machineEStop()" class="settings-btn" style="background:#3a1a1a;border-color:#c62828;color:#ef5350;font-weight:700;">⚡ E-Stop</button>
+          <button id="ppov-close" style="display:none" onclick="document.getElementById('probe-progress-overlay').remove()" class="settings-btn primary">Finish</button>
           <button id="ppov-dismiss" style="display:none" onclick="document.getElementById('probe-progress-overlay').remove()" class="settings-btn">Dismiss</button>
         </div>
       </div>`;
@@ -5120,7 +5324,7 @@ function showProbeProgress(refLabel) {
           document.getElementById('ppov-icon').style.color = '#4caf50';
           document.getElementById('ppov-title').textContent = 'Done — Z zeroed';
           document.getElementById('ppov-close').style.display = '';
-          document.getElementById('ppov-sub').textContent = 'Click Close when ready.';
+          document.getElementById('ppov-sub').textContent = 'Click Finish when ready.';
         }
       } else {
         idleTicks = 0; // still moving, reset counter
@@ -5312,6 +5516,14 @@ async function machineStop() {
   } catch(e) { showErrorBanner(`Stop failed: ${e.message}`, true); }
   // M9 = all coolant off (mist + flood). Send after stop so spindle/vacuum/coolant shut down.
   if (ws && ws.readyState === WebSocket.OPEN) ws.send('M9');
+  // Brief acknowledgement, then auto-clear the hold so the machine returns to idle
+  // without the user having to dismiss a banner on every stop during testing.
+  showToast('Stopped', 'info', 3000);
+  setTimeout(async () => {
+    try {
+      await fetch(`${API_URL}/api/clear`, { method: 'PUT' });
+    } catch(e) { /* best-effort; user can Clear manually if this fails */ }
+  }, 1200);
 }
 
 async function machineEStop() {
@@ -5495,8 +5707,18 @@ async function resumeJob() {
 // ── 3D VIEW TOGGLES ──
 const viewToggles = { grid: true, rapids: true, marker: true, bbox: false, depth: false, progress: false, machine: false };
 
-function toggleView(key) {
-  viewToggles[key] = !viewToggles[key];
+const VIEW_TOGGLES_KEY = 'rift_view_toggles';
+function saveViewToggles() { try { localStorage.setItem(VIEW_TOGGLES_KEY, JSON.stringify(viewToggles)); } catch(e) {} }
+(function loadViewToggles() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(VIEW_TOGGLES_KEY) || 'null');
+    if (saved && typeof saved === 'object') {
+      Object.keys(viewToggles).forEach(k => { if (typeof saved[k] === 'boolean') viewToggles[k] = saved[k]; });
+    }
+  } catch(e) {}
+})();
+
+function applyViewToggle(key) {
   const btn = document.getElementById('vt-' + key);
   if (btn) btn.classList.toggle('on', viewToggles[key]);
   if (key === 'grid'   && window._viewGrid)    window._viewGrid.visible = viewToggles.grid;
@@ -5510,11 +5732,14 @@ function toggleView(key) {
   }
 }
 
+function toggleView(key) {
+  viewToggles[key] = !viewToggles[key];
+  saveViewToggles();
+  applyViewToggle(key);
+}
+
 function initViewToggles() {
-  Object.keys(viewToggles).forEach(k => {
-    const btn = document.getElementById('vt-' + k);
-    if (btn) btn.classList.toggle('on', viewToggles[k]);
-  });
+  Object.keys(viewToggles).forEach(k => applyViewToggle(k));
 }
 
 // ── THREE.JS 3D VIEW ──
@@ -6185,7 +6410,20 @@ function fmToggleSelectAll() {
   fmSelectionChanged();
 }
 
+// Block file ops that could interfere with an in-progress job. Returns true if
+// the caller should proceed (idle, or user confirmed the override).
+async function confirmWhileRunning(action) {
+  const busy = ['running','paused'].includes(lastMachineState);
+  if (!busy) return true;
+  return await darkConfirm(
+    `The machine is ${lastMachineState}. ${action} during a job can interfere with the controller.\n\n` +
+    `Proceed anyway?`,
+    'Proceed', 'Cancel'
+  );
+}
+
 async function fmBulkDelete() {
+  if (!await confirmWhileRunning('Deleting files')) return;
   const paths = fmGetChecked();
   if (!paths.length) return;
   if (!await darkConfirm(`Delete ${paths.length} file(s)?\n\n${paths.join('\n')}\n\nThis cannot be undone.`, 'Delete')) return;
@@ -6221,6 +6459,7 @@ async function fmLoad(filepath) {
 }
 
 async function fmDelete(filepath) {
+  if (!await confirmWhileRunning('Deleting a file')) return;
   if (!await darkConfirm(`Delete "${filepath}"?`, 'Delete')) return;
   try {
     const res = await fetch(`${API_URL}/api/file/${encodeURIComponent(filepath)}`, { method: 'DELETE' });
@@ -6264,6 +6503,7 @@ function fmRemoveFromState(filepath) {
 }
 
 async function fmDeleteFolder(folderName) {
+  if (!await confirmWhileRunning('Deleting a folder')) return;
   const toDelete = fmFiles.filter(f => (fmFolderMap[f] || '') === folderName);
   const msg = toDelete.length
     ? `Delete folder "${folderName}" and its ${toDelete.length} file(s)?`
@@ -6330,6 +6570,7 @@ async function fmCreateFolder() {
 }
 
 async function fmUploadFiles(files) {
+  if (!await confirmWhileRunning('Uploading files')) return;
   const targetFolder = fmPath.length ? fmPath[0] : null; // current display folder (or null = root)
   let count = 0;
   for (const file of files) {
@@ -6521,7 +6762,12 @@ function updateProgressLabel() {
   const stripEl     = null; // removed gcode-progress-strip
 
   if (_jobPct > 1) {
-    const remaining = (elapsed / _jobPct) * (100 - _jobPct);
+    // Line-based projection can drastically underestimate end-of-job heavy cuts
+    // (e.g. slow trochoidal passes). Blend with the planner total countdown so the
+    // ETA can't drop below what the planner expected — whichever is longer wins.
+    const lineRemaining    = (elapsed / _jobPct) * (100 - _jobPct);
+    const plannerRemaining = _estimatedJobSeconds > 0 ? Math.max(0, _estimatedJobSeconds - elapsed) : 0;
+    const remaining = Math.max(lineRemaining, plannerRemaining);
     const pctStr    = _jobPct.toFixed(0);
     if (labelEl) labelEl.textContent = `Running  ${pctStr}%`;
     setProgressTime('', fmtTime(remaining), 'remaining');

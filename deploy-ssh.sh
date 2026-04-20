@@ -12,6 +12,41 @@ set -e
 PI_HOST="${CNC_HOST:-192.168.1.130}"
 PI_USER="${CNC_USER:-bbmc}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Preflight: refuse to deploy while a job is running. Peek at xx via websocket.
+# Override with FORCE=1 to deploy anyway, SKIP_STATE_CHECK=1 to skip the probe entirely.
+if [ -z "$SKIP_STATE_CHECK" ]; then
+    STATE=$(PI_HOST="$PI_HOST" python3 - <<'PY' 2>/dev/null
+import os, sys
+try:
+    import websocket, json
+    ws = websocket.create_connection(f"ws://{os.environ['PI_HOST']}/websocket", timeout=3)
+    msg = json.loads(ws.recv()); ws.close()
+    print(str(msg.get("xx","")).upper())
+except Exception:
+    sys.exit(1)
+PY
+    )
+    case "$STATE" in
+        RUNNING|HOMING|JOGGING|HOLDING|STOPPING|PAUSED|PAUSING)
+            echo "⚠  Machine is $STATE — a job appears to be in progress."
+            if [ "$FORCE" != "1" ]; then
+                read -r -p "Deploy anyway? Type 'yes' to proceed: " ans
+                [ "$ans" = "yes" ] || { echo "Aborted. Use FORCE=1 to skip this prompt."; exit 1; }
+            else
+                echo "FORCE=1 — proceeding."
+            fi
+            ;;
+        "")
+            echo "WARN: could not read machine state (install python3-websocket or set SKIP_STATE_CHECK=1)"
+            [ "$FORCE" = "1" ] || { echo "Aborting for safety. FORCE=1 or SKIP_STATE_CHECK=1 to override."; exit 1; }
+            ;;
+        *)
+            echo "Machine state: $STATE — safe to deploy"
+            ;;
+    esac
+fi
+
 SRC="$SCRIPT_DIR/index.html"
 MOBILE="$SCRIPT_DIR/mobile.html"
 MANIFEST="$SCRIPT_DIR/manifest.json"
