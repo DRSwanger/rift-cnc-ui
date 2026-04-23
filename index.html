@@ -252,6 +252,8 @@
   #dark-confirm-msg {
     font-size: 13px; color: var(--text); line-height: 1.6; white-space: pre-wrap;
   }
+  #dark-confirm-extra { display: none; }
+  #dark-confirm-extra.visible { display: block; }
   .dark-confirm-btns { display: flex; gap: 10px; justify-content: flex-end; }
 
   /* Probe stock height input modal */
@@ -294,8 +296,10 @@
   #settings-overlay.open { display: block; }
   #settings-modal {
     position: fixed; z-index: 3000;
+    /* Pure CSS centering — drag offsets compose via calc() in makeDraggable. */
+    left: 50%; top: 50%; transform: translate(-50%, -50%);
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 8px; width: 740px; max-width: 95vw;
+    border-radius: 8px; width: 880px; max-width: 95vw;
     height: 75vh; max-height: 600px; display: flex; flex-direction: column;
     box-shadow: 0 8px 32px rgba(0,0,0,0.5);
   }
@@ -306,12 +310,10 @@
   }
   #settings-tabs {
     display: flex; gap: 0; border-bottom: 1px solid var(--border); flex-shrink: 0;
-    flex-wrap: nowrap; overflow-x: auto;
+    flex-wrap: wrap; overflow-x: visible;
   }
-  #settings-tabs::-webkit-scrollbar { height: 2px; }
-  #settings-tabs::-webkit-scrollbar-thumb { background: var(--border); }
   .stab {
-    padding: 7px 9px; font-size: 12px; cursor: pointer; color: var(--muted);
+    padding: 6px 8px; font-size: 11px; cursor: pointer; color: var(--muted);
     border-bottom: 2px solid transparent; margin-bottom: -1px;
     transition: color 0.15s; white-space: nowrap; flex-shrink: 0;
   }
@@ -381,6 +383,37 @@
     padding: 10px 12px; background: var(--surface2);
     border-radius: 4px; border-left: 3px solid var(--border);
   }
+
+  /* Compact mode — ~15% tighter than the base settings styles */
+  #stab-general .settings-section,
+  #stab-db25    .settings-section { margin-bottom: 18px; }
+  #stab-general .settings-section-title,
+  #stab-db25    .settings-section-title { font-size: 10px; padding-bottom: 5px; margin-bottom: 10px; }
+  #stab-general .settings-row,
+  #stab-db25    .settings-row { grid-template-columns: 1fr 165px; gap: 6px; margin-bottom: 8px; }
+  #stab-general .settings-label,
+  #stab-db25    .settings-label { font-size: 11px; }
+  #stab-general .settings-sub,
+  #stab-db25    .settings-sub { font-size: 9px; }
+  #stab-general .settings-input,
+  #stab-general .settings-select,
+  #stab-db25    .settings-input,
+  #stab-db25    .settings-select { padding: 4px 6px; font-size: 11px; }
+  #stab-general .settings-note,
+  #stab-db25    .settings-note { font-size: 10px; padding: 8px 10px; }
+
+  /* Controller tab: compact layout */
+  #stab-controller .settings-section { margin-bottom: 7px; }
+  #stab-controller .gamepad-svg-wrap { margin: 2px 0 5px; }
+  #stab-controller .gamepad-svg-wrap svg { width: 200px !important; height: 114px !important; max-width: 100%; }
+  #stab-controller table { font-size: 9.5px; }
+  #stab-controller table th,
+  #stab-controller table td { padding: 2px 6px !important; line-height: 1.15; }
+  #stab-controller table td span[style*="border-radius:50%"] {
+    width: 9px !important; height: 9px !important; margin-right: 4px !important;
+  }
+  #stab-controller .settings-section-title { font-size: 9px; padding-bottom: 3px; margin-bottom: 5px; }
+  #stab-controller .settings-note { font-size: 9px; padding: 5px 8px; margin-top: 7px !important; }
   .settings-footer {
     display: flex; gap: 8px; justify-content: flex-end;
     padding: 12px 16px; border-top: 1px solid var(--border); flex-shrink: 0;
@@ -860,7 +893,9 @@
   .cp-reset { margin-top: 4px; background: var(--sur2); border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 10px; padding: 3px 8px; cursor: pointer; width: 100%; }
   .cp-reset:hover { color: var(--text); }
 
-  #selected-file-label {
+  /* Hidden — filename is still shown in the top bar; this corner label was redundant */
+  #selected-file-label { display: none !important; }
+  #selected-file-label.legacy-styles-below {
     position: absolute;
     bottom: 10px;
     left: 10px;
@@ -2079,6 +2114,7 @@
 <div id="dark-confirm-overlay">
   <div id="dark-confirm-modal">
     <div id="dark-confirm-msg"></div>
+    <div id="dark-confirm-extra"></div>
     <div class="dark-confirm-btns">
       <button class="settings-btn" id="dark-confirm-cancel">Cancel</button>
       <button class="settings-btn primary" id="dark-confirm-ok">OK</button>
@@ -2087,7 +2123,7 @@
 </div>
 
 <div id="settings-overlay">
-  <div id="settings-modal">
+  <div id="settings-modal" data-css-centered="true">
     <div id="settings-header" class="float-panel-header">
       <span class="float-panel-title">⚙ Settings</span>
       <button class="float-panel-close" onclick="closeSettings()">✕</button>
@@ -2104,6 +2140,7 @@
       <div class="stab"         onclick="switchSettingsTab('db25')">DB25</div>
       <div class="stab"         onclick="switchSettingsTab('network')">Network</div>
       <div class="stab"         onclick="switchSettingsTab('system')">System</div>
+      <div class="stab"         onclick="switchSettingsTab('controller')">Controller</div>
       <div class="stab"         onclick="switchSettingsTab('firmware')">Firmware</div>
       <div class="stab"         onclick="switchSettingsTab('about')">About</div>
       <div class="stab" id="stab-logs-tab" onclick="switchSettingsTab('logs')">Logs</div>
@@ -2152,6 +2189,13 @@
           <div class="settings-row">
             <div><div class="settings-label">Zero Z confirmation</div><div class="settings-sub">Confirm dialog when zeroing Z or all axes</div></div>
             <select class="settings-select" id="cfg-warn-zero-z">
+              <option value="1">Enabled</option>
+              <option value="0">Disabled</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-label">Offer XY recovery on boot</div><div class="settings-sub">On first load after reboot, prompt to restore last-saved XY work zero</div></div>
+            <select class="settings-select" id="cfg-offer-recovery-on-boot">
               <option value="1">Enabled</option>
               <option value="0">Disabled</option>
             </select>
@@ -2408,7 +2452,7 @@
             <button class="admin-btn" onclick="shutdownController()">⏻ Shutdown Pi</button>
             <button class="admin-btn danger" onclick="factoryResetController()">⚠ Factory Reset</button>
           </div>
-          <div class="settings-note" style="margin-top:8px;">Factory reset restores all controller settings to BuildBotics defaults. This cannot be undone.</div>
+          <div class="settings-note" style="margin-top:8px;">Factory reset restores all <strong>controller settings</strong> (motors, tool, I/O, limits, offsets, macros) to BuildBotics defaults. The Rift UI itself is not affected. To revert the UI back to Onefinity 1.6.6, see the <strong>Firmware</strong> tab.</div>
         </div>
 
         <div class="settings-section" id="rotary-section" style="display:none;">
@@ -2416,6 +2460,89 @@
           <div class="settings-row">
             <div><div class="settings-label">Rotary Mode</div><div class="settings-sub">Swaps motor 2 between Y-axis clone and A rotary axis</div></div>
             <button class="admin-btn" id="btn-rotary-toggle" onclick="toggleRotary()">Loading…</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONTROLLER -->
+      <div class="stab-panel" id="stab-controller">
+        <div class="settings-section">
+          <div class="settings-section-title">USB Gamepad</div>
+          <div class="gamepad-svg-wrap" style="display:flex;justify-content:center;">
+            <svg viewBox="0 0 420 240" width="360" height="206" style="max-width:100%;">
+              <defs>
+                <linearGradient id="padBody" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0" stop-color="#22262e"/>
+                  <stop offset="1" stop-color="#14161b"/>
+                </linearGradient>
+              </defs>
+              <!-- body -->
+              <path d="M70,60 Q30,60 30,120 Q30,200 90,200 L150,200 Q170,170 210,170 Q250,170 270,200 L330,200 Q390,200 390,120 Q390,60 350,60 Q310,60 280,75 L140,75 Q110,60 70,60 Z"
+                    fill="url(#padBody)" stroke="#2a2e38" stroke-width="1.5"/>
+              <!-- LB / RB -->
+              <rect x="60"  y="48" rx="5" ry="5" width="60" height="14" fill="#2a2e38" stroke="#3a3f4a"/>
+              <rect x="300" y="48" rx="5" ry="5" width="60" height="14" fill="#2a2e38" stroke="#3a3f4a"/>
+              <text x="90"  y="59" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700" font-family="monospace">LB</text>
+              <text x="330" y="59" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700" font-family="monospace">RB</text>
+              <!-- left stick -->
+              <circle cx="100" cy="120" r="24" fill="#17191f" stroke="#3a3f4a" stroke-width="2"/>
+              <circle cx="100" cy="120" r="14" fill="#2a2e38"/>
+              <text x="100" y="162" text-anchor="middle" fill="#d0d6e0" font-size="14" font-weight="700" font-family="monospace">X / Y JOG</text>
+              <!-- right stick -->
+              <circle cx="260" cy="140" r="24" fill="#17191f" stroke="#3a3f4a" stroke-width="2"/>
+              <circle cx="260" cy="140" r="14" fill="#2a2e38"/>
+              <text x="260" y="182" text-anchor="middle" fill="#d0d6e0" font-size="14" font-weight="700" font-family="monospace">Z JOG</text>
+              <!-- d-pad -->
+              <g transform="translate(160,130)">
+                <rect x="-6" y="-18" width="12" height="36" fill="#2a2e38" stroke="#3a3f4a"/>
+                <rect x="-18" y="-6" width="36" height="12" fill="#2a2e38" stroke="#3a3f4a"/>
+                <text x="0" y="38" text-anchor="middle" fill="#d0d6e0" font-size="14" font-weight="700" font-family="monospace">D-PAD</text>
+              </g>
+              <!-- face buttons: X(left) Y(top) B(right) A(bottom) -->
+              <g font-family="monospace" font-size="15" font-weight="800" text-anchor="middle">
+                <circle cx="320" cy="110" r="13" fill="#3a6bd8" stroke="#5a8bfa" stroke-width="1.5"/>
+                <text x="320" y="116" fill="#fff">X</text>
+                <circle cx="344" cy="90"  r="13" fill="#d8b93a" stroke="#fadb5a" stroke-width="1.5"/>
+                <text x="344" y="96" fill="#222">Y</text>
+                <circle cx="368" cy="110" r="13" fill="#d83a3a" stroke="#fa5a5a" stroke-width="1.5"/>
+                <text x="368" y="116" fill="#fff">B</text>
+                <circle cx="344" cy="130" r="13" fill="#3ad858" stroke="#5afa78" stroke-width="1.5"/>
+                <text x="344" y="136" fill="#222">A</text>
+              </g>
+              <!-- speed legend by face buttons -->
+              <text x="297" y="170" text-anchor="start" fill="#d0d6e0" font-size="12" font-weight="700" font-family="monospace">JOG SPEED</text>
+            </svg>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">Bindings</div>
+          <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:6px;">
+            <thead>
+              <tr style="color:var(--muted);text-align:left;border-bottom:1px solid var(--border);">
+                <th style="padding:6px 8px;font-weight:500;">Control</th>
+                <th style="padding:6px 8px;font-weight:500;">Action</th>
+                <th style="padding:6px 8px;font-weight:500;">Notes</th>
+              </tr>
+            </thead>
+            <tbody id="controller-bindings-body">
+              <tr><td style="padding:6px 8px;">Left stick ←/→</td><td style="padding:6px 8px;">Jog X</td><td style="padding:6px 8px;color:var(--muted);">Analog, proportional speed</td></tr>
+              <tr><td style="padding:6px 8px;">Left stick ↑/↓</td><td style="padding:6px 8px;">Jog Y</td><td style="padding:6px 8px;color:var(--muted);">Up = Y+</td></tr>
+              <tr><td style="padding:6px 8px;">Right stick ↑/↓</td><td style="padding:6px 8px;">Jog Z</td><td style="padding:6px 8px;color:var(--muted);">Up = Z+</td></tr>
+              <tr><td style="padding:6px 8px;">Right stick ←/→</td><td style="padding:6px 8px;">Jog A</td><td style="padding:6px 8px;color:var(--muted);">Unused on 3-axis machine</td></tr>
+              <tr><td style="padding:6px 8px;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#3a6bd8;vertical-align:middle;margin-right:6px;"></span>X button</td><td style="padding:6px 8px;">Jog speed 1</td><td style="padding:6px 8px;color:var(--muted);">Slowest</td></tr>
+              <tr><td style="padding:6px 8px;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#3ad858;vertical-align:middle;margin-right:6px;"></span>A button</td><td style="padding:6px 8px;">Jog speed 2</td><td style="padding:6px 8px;color:var(--muted);">Slow</td></tr>
+              <tr><td style="padding:6px 8px;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#d83a3a;vertical-align:middle;margin-right:6px;"></span>B button</td><td style="padding:6px 8px;">Jog speed 3</td><td style="padding:6px 8px;color:var(--muted);">Fast</td></tr>
+              <tr><td style="padding:6px 8px;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#d8b93a;vertical-align:middle;margin-right:6px;"></span>Y button</td><td style="padding:6px 8px;">Jog speed 4</td><td style="padding:6px 8px;color:var(--muted);">Fastest</td></tr>
+              <tr><td style="padding:6px 8px;">LB (left bumper)</td><td style="padding:6px 8px;">Horizontal lock</td><td style="padding:6px 8px;color:var(--muted);">Hold: only X / A jog allowed</td></tr>
+              <tr><td style="padding:6px 8px;">RB (right bumper)</td><td style="padding:6px 8px;">Vertical lock</td><td style="padding:6px 8px;color:var(--muted);">Hold: only Y / Z jog allowed</td></tr>
+              <tr><td style="padding:6px 8px;">D-pad</td><td style="padding:6px 8px;color:var(--muted);">unused</td><td style="padding:6px 8px;color:var(--muted);">Reserved</td></tr>
+              <tr><td style="padding:6px 8px;">Triggers, Start, Back, Guide, stick clicks</td><td style="padding:6px 8px;color:var(--muted);">unused</td><td style="padding:6px 8px;color:var(--muted);">Reserved</td></tr>
+            </tbody>
+          </table>
+
+          <div class="settings-note" style="margin-top:14px;">
+            bbctrl 1.6.6 ships with a hardcoded Xbox-style gamepad mapping. These bindings are read-only.
           </div>
         </div>
       </div>
@@ -2458,10 +2585,10 @@
           <div id="firmware-status" style="font-size:11px;color:var(--muted);margin-top:8px;display:none;"></div>
         </div>
         <div class="settings-section">
-          <div class="settings-section-title">Revert to Stock</div>
-          <div class="settings-note" style="margin-bottom:8px;">Restores the original Onefinity 1.6.6 UI. Use this if you need to get back to stock. The controller will reboot.</div>
+          <div class="settings-section-title">Revert back to Onefinity 1.6.6</div>
+          <div class="settings-note" style="margin-bottom:8px;">Restores the original Onefinity 1.6.6 UI. Use this if you need to roll the UI back. The controller will reboot.</div>
           <div class="admin-action-row">
-            <button class="admin-btn danger" onclick="revertToStock()" style="color:var(--muted);">⚠ Revert to Stock 1.6.6</button>
+            <button class="admin-btn danger" onclick="revertToStock()" style="color:var(--muted);">⚠ Revert back to Onefinity 1.6.6</button>
           </div>
           <div id="revert-status" style="font-size:11px;color:var(--muted);margin-top:8px;display:none;"></div>
         </div>
@@ -2774,6 +2901,7 @@
           <button class="view-btn" onclick="viewRight()">Right</button>
           <button class="view-btn" onclick="viewIso()">Iso</button>
           <button class="view-btn" onclick="zoomToFit()" title="Zoom to fit toolpath">⊡ Fit</button>
+          <button class="view-btn" id="vt-lightmode" onclick="toggle3dLightMode()" title="Toggle 3D panel dark/light">🌙 Dark</button>
           <button class="view-btn" onclick="toggle3dColorPanel()" title="Customize colors">🎨</button>
         </div>
         <div class="vob-row">
@@ -2933,7 +3061,7 @@ function escHtml(s) {
 const WS_URL  = `ws://${location.host}/websocket`; // same-origin always
 const API_URL = ``; // relative URLs — works for both proxy and direct bbctrl
 const SAFE_Z  = 50; // mm to retract before repositioning on resume
-const UI_VERSION             = '1.3.1-nightly.20260419.7'; // Rift by AlienWoodshop LLC
+const UI_VERSION             = '1.3.1-nightly.20260422.23'; // Rift by AlienWoodshop LLC
 const ENABLE_RESUME          = false; // set true to re-enable resume-from-stop feature
 const ENABLE_MACROS          = false; // set true to re-enable macro buttons
 const ENABLE_ROTARY          = false; // set true to show rotary axis toggle
@@ -3015,9 +3143,45 @@ let _colorRefreshAt = 0;  // throttle timestamp for progress color updates
 let camTheta = 0.8, camPhi = 0.6, camRadius = 600, camTarget = new THREE.Vector3(400, 400, 0);
 
 // ── 3D custom colors (persisted to localStorage) ──
-const _3dColorDefaults = { cut:'#4efd71', rapid:'#ff4444', depthHi:'#4efd71', depthLo:'#0055ff', done:'#383838', bg:'#0d0f14', grid:'#1c1f27', spindle:'#c8d5e2' };
-let _3dColors = (() => { try { return Object.assign({}, _3dColorDefaults, JSON.parse(localStorage.getItem('rift_3dColors')||'{}')); } catch(_) { return Object.assign({}, _3dColorDefaults); } })();
-function _save3dColors() { try { localStorage.setItem('rift_3dColors', JSON.stringify(_3dColors)); } catch(_) {} }
+// Each mode (dark/light) has its own saved color set so user tweaks in one mode don't get
+// clobbered by toggling the other mode.
+const _3dColorDefaultsDark  = { cut:'#4efd71', rapid:'#ff4444', depthHi:'#4efd71', depthLo:'#0055ff', done:'#383838', bg:'#0d0f14', grid:'#1c1f27', spindle:'#c8d5e2' };
+const _3dColorDefaultsLight = { cut:'#0a7e28', rapid:'#c81414', depthHi:'#0a7e28', depthLo:'#1a3e9c', done:'#b8b8b8', bg:'#f5f5f5', grid:'#c8c8c8', spindle:'#404040' };
+let _3dMode = (() => { try { return localStorage.getItem('rift_3dMode') === 'light' ? 'light' : 'dark'; } catch(_) { return 'dark'; } })();
+const _3dDefaults   = () => _3dMode === 'light' ? _3dColorDefaultsLight : _3dColorDefaultsDark;
+const _3dStorageKey = () => _3dMode === 'light' ? 'rift_3dColorsLight' : 'rift_3dColorsDark';
+// Back-compat alias — older code references _3dColorDefaults; keep it pointing to the current mode.
+const _3dColorDefaults = _3dColorDefaultsDark;
+// Migrate legacy 'rift_3dColors' into the dark-mode slot once.
+try {
+  const legacy = localStorage.getItem('rift_3dColors');
+  if (legacy && !localStorage.getItem('rift_3dColorsDark')) {
+    localStorage.setItem('rift_3dColorsDark', legacy);
+    localStorage.removeItem('rift_3dColors');
+  }
+} catch(_) {}
+let _3dColors = (() => { try { return Object.assign({}, _3dDefaults(), JSON.parse(localStorage.getItem(_3dStorageKey())||'{}')); } catch(_) { return Object.assign({}, _3dDefaults()); } })();
+function _save3dColors() { try { localStorage.setItem(_3dStorageKey(), JSON.stringify(_3dColors)); } catch(_) {} }
+
+function toggle3dLightMode() {
+  _3dMode = _3dMode === 'light' ? 'dark' : 'light';
+  try { localStorage.setItem('rift_3dMode', _3dMode); } catch(_) {}
+  try { _3dColors = Object.assign({}, _3dDefaults(), JSON.parse(localStorage.getItem(_3dStorageKey())||'{}')); }
+  catch(_) { _3dColors = Object.assign({}, _3dDefaults()); }
+  // Re-apply every color so the scene reflects the mode change immediately.
+  if (renderer) renderer.setClearColor(_3dColors.bg, 1);
+  if (window._viewGrid) { window._viewGrid.material.color.set(_3dColors.grid); window._viewGrid.material.needsUpdate = true; }
+  if (window._rapidsGroup) window._rapidsGroup.traverse(o => { if (o.material) o.material.color.set(_3dColors.rapid); });
+  if (window._spindleMat) { window._spindleMat.color.set(_3dColors.spindle); window._spindleMat.needsUpdate = true; }
+  if (typeof refreshCutColors === 'function') refreshCutColors();
+  // Sync open color-panel inputs.
+  Object.keys(_3dColors).forEach(k => { const el = document.getElementById('cp-'+k); if (el) el.value = _3dColors[k]; });
+  _syncLightModeBtn();
+}
+function _syncLightModeBtn() {
+  const btn = document.getElementById('vt-lightmode');
+  if (btn) btn.textContent = _3dMode === 'light' ? '☀ Light' : '🌙 Dark';
+}
 function setSpindleOpacity(v) {
   if (window._spindleMat) { window._spindleMat.opacity = v; window._spindleMat.needsUpdate = true; }
   try { localStorage.setItem('rift_spindleOpacity', String(v)); } catch(_) {}
@@ -3140,6 +3304,11 @@ function updateUI(data) {
     document.getElementById('dro-abs-z').textContent = fmt(absZ);
     document.getElementById('dro-off-z').textContent = fmt(+(state.offset_z || 0));
   }
+  // Auto-snapshot XY zero on any offset change (MDI, G10, probe macro, gcode, Zero button).
+  // Covers the case where user zeroed XY via something other than the Zero button and then E-stopped.
+  if ('offset_x' in data || 'offset_y' in data) {
+    autoSnapshotXyOffset();
+  }
   // Homed state — motor map: X=0, Y=1, Z=3
   if ('0homed' in data || '1homed' in data || '3homed' in data) {
     const hX = !!state['0homed'], hY = !!state['1homed'], hZ = !!state['3homed'];
@@ -3239,10 +3408,12 @@ function updateUI(data) {
       //   homing   → limit switch trip is expected
       //   pausing  → "user stop" pr is expected
       //   stopping → "user stop" pr is expected
+      //   probing  → bbctrl emits pr="Switch found" on every successful G38.2 hit; not a fault
       const isSwitchDuringHoming = _wasHoming && /switch/i.test(data.pr);
+      const isProbeSuccess       = /^switch\s+found/i.test(data.pr);
       const recentUserAction = (Date.now() - _userActionAt) < 4000;
       const isUserAction = (recentUserAction || _wasPausing || _wasUserStop) && /user|stop/i.test(data.pr);
-      if (!isSwitchDuringHoming && !isUserAction) {
+      if (!isSwitchDuringHoming && !isUserAction && !isProbeSuccess) {
         showErrorBanner(buildPrMessage(data.pr));
       }
     }
@@ -3384,6 +3555,8 @@ let _wasHoming = false;       // machine was in a home cycle (resets _prDismisse
 let _homingAxes = null;       // 'all' | 'x' | 'y' | 'z' — cleared after post-home offset reset
 let _wasPausing = false;          // user clicked Pause — suppress expected "user stop" pr banner
 let _wasUserStop = false;         // user clicked Stop  — suppress expected "user stop" pr banner
+let _wasFileJob = false;          // a file-based gcode run was active (not just MDI/homing) — triggers planner-flush nudge on clean completion
+let _lastJobEndAt = 0;            // timestamp of last file-job end — used to warn when jog is attempted before controller drains
 let _userActionAt = 0;            // timestamp of last pause/stop click — suppress pr for 4s after
 let _movementStartTime = 0;   // when current movement began (to detect pr set during movement)
 let _lastErrLog = 0;          // debounce double-logging when WS delta + setMachineState both fire
@@ -3481,6 +3654,11 @@ function buildPrMessage(pr) {
   const zMax = state['3tm'] !== undefined ? (+state['3tm']).toFixed(0) : '?';
 
   const p = (pr || '').toLowerCase();
+  // bbctrl emits pr="Switch found" on every successful G38.2 probe contact — this is NOT a fault.
+  // The outer caller suppresses the banner, but if we're called directly, return a neutral message.
+  if (/^switch\s+found/.test(p)) {
+    return `Probe contact at Z:${zAbs}mm`;
+  }
   if (/switch/.test(p)) {
     // Could be soft limit or physical switch — include position for context
     return `Limit/switch fault — Z:${zWcs}mm WCS (ABS ${zAbs})  ·  soft limits Z:${zMin}…${zMax}mm`;
@@ -3584,10 +3762,28 @@ function setMachineState(s) {
     _jobPct = 0;
     startProgressTimer();
   }
+  // Flag that a file-based job is active (vs MDI/homing/probe also appearing as running).
+  // cycle === 'run' during the running period means bbctrl is executing a loaded gcode file.
+  if (s === 'running' && state.cycle === 'run') _wasFileJob = true;
   // Clear persisted start when job ends so the next job gets a fresh timer.
   if (s === 'idle' || s === 'estopped' || s === 'error') {
     if (lastMachineState === 'running' || lastMachineState === 'paused') clearJobStart();
   }
+  // Bug 2: on clean file-job completion, nudge bbctrl to flush the planner so jog works immediately.
+  // Without this, bbctrl sometimes reports idle while lingering queue state blocks jog commands.
+  // /api/stop flushes the motion queue — it does NOT wipe G92 offsets or touch homing state.
+  if (s === 'idle' && (lastMachineState === 'running' || lastMachineState === 'paused') &&
+      _wasFileJob && !_wasUserStop) {
+    _lastJobEndAt = Date.now();
+    setTimeout(() => {
+      if (lastMachineState === 'idle') {
+        fetch(`${API_URL}/api/stop`, { method: 'PUT' })
+          .then(() => uiLog('Post-job planner flush sent'))
+          .catch(() => {});
+      }
+    }, 800);
+  }
+  if (s === 'idle' || s === 'estopped' || s === 'error') _wasFileJob = false;
   if (s !== 'running') {
     stopProgressTimer();
     if (s === 'idle') {
@@ -3620,7 +3816,9 @@ function setMachineState(s) {
       const isSwitchFromHoming = /switch/i.test(state.pr) &&
         (_lastHomingAt && (Date.now() - _lastHomingAt) < 5000);
       const isUserAction = _wasUserStop && /user|stop/i.test(state.pr);
-      if (!isSwitchFromHoming && !isUserAction) {
+      // "Switch found" is bbctrl's normal signal for a successful G38.2 probe — not a fault
+      const isProbeSuccess = /^switch\s+found/i.test(state.pr);
+      if (!isSwitchFromHoming && !isUserAction && !isProbeSuccess) {
         _prDismissed = '';
         sessionStorage.removeItem('cnc_prDismissed');
         if (Date.now() - _lastErrLog > 50) {
@@ -3683,12 +3881,31 @@ function setMachineState(s) {
   }
 
   // Offer XY zero recovery after a fault clear returns to idle.
-  // Skip if a homing cycle is what brought us to idle (user was already recovering) or a job is running.
-  if (s === 'idle' && (lastMachineState === 'estopped' || lastMachineState === 'error') && !_wasHoming) {
+  // _faultSinceIdle is sticky across intermediate states (estopped → ready → idle) so the prompt
+  // fires even if the direct estopped→idle transition is missed.
+  // Skip if a homing cycle is what brought us to idle (user was already recovering).
+  if (s === 'idle' && _faultSinceIdle && !_wasHoming) {
+    _faultSinceIdle = false;
     offerXyRecovery();
   }
+  // First-load boot offer: if a snapshot exists and XY are unhomed on first idle after page load,
+  // prompt once so the user can restore across reboots. Gated by settings.offerRecoveryOnBoot.
+  if (s === 'idle' && !_bootRecoveryChecked && settings.offerRecoveryOnBoot !== false) {
+    _bootRecoveryChecked = true;
+    const xyUnhomed = !state['0homed'] || !state['1homed'];
+    // sessionStorage survives F5 refresh but not tab close / real machine reboot —
+    // exactly the line we want: only offer once per browser session.
+    const alreadyOffered = sessionStorage.getItem('rift_boot_recovery_offered') === '1';
+    if (xyUnhomed && !alreadyOffered && readXyZeroSnapshot()) {
+      sessionStorage.setItem('rift_boot_recovery_offered', '1');
+      offerXyRecovery();
+    }
+  }
   // Fresh fault arms a new recovery offer for the next idle transition
-  if (s === 'estopped' || s === 'error') _recoveryOffered = false;
+  if (s === 'estopped' || s === 'error') {
+    _recoveryOffered = false;
+    _faultSinceIdle = true;
+  }
 
   lastMachineState = s;
 }
@@ -3986,10 +4203,20 @@ async function goToZOrigin() {
 }
 
 async function goToXYOrigin() {
-  const wcsX = (+(state.xp || 0)) - (+(state.offset_x || 0));
-  const wcsY = (+(state.yp || 0)) - (+(state.offset_y || 0));
-  const wcsZ = (+(state.zp || 0)) - (+(state.offset_z || 0));
-  if (!await darkConfirm(`Move to XY work zero?\n\nCurrent WCS: X${wcsX.toFixed(3)}  Y${wcsY.toFixed(3)}  Z${wcsZ.toFixed(3)}\n\nZ will retract to 50mm above work zero if needed, then move XY to origin.`)) return;
+  const fromX = +(state.xp || 0);
+  const fromY = +(state.yp || 0);
+  const offX  = +(state.offset_x || 0);
+  const offY  = +(state.offset_y || 0);
+  const wcsX  = fromX - offX;
+  const wcsY  = fromY - offY;
+  const wcsZ  = (+(state.zp || 0)) - (+(state.offset_z || 0));
+  const toX   = offX; // ABS target for WCS (0,0) is (offset_x, offset_y)
+  const toY   = offY;
+  if (!await darkConfirm(
+    `Move to XY work zero?\n\nCurrent WCS: X${wcsX.toFixed(3)}  Y${wcsY.toFixed(3)}  Z${wcsZ.toFixed(3)}\n\nZ will retract to 50mm above work zero if needed, then move XY to origin.`,
+    'OK', 'Cancel',
+    renderTravelArrow(fromX, fromY, toX, toY)
+  )) return;
   const retract = wcsZ < 50 ? 'G0 Z50\n' : '';
   const code = `M70\nG90\n${retract}G0 X0 Y0\nM72`;
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(code);
@@ -4066,7 +4293,20 @@ function closeFeedScaleModal() { closeScaleModal(); }
 
 function makeDraggable(panel) {
   const handle = panel.querySelector('.float-panel-header');
-  let dragging = false, startX = 0, startY = 0, tx = 0, ty = 0;
+  let dragging = false, startX = 0, startY = 0;
+  panel._dragTx = 0; panel._dragTy = 0;
+  // Panels marked data-css-centered use CSS translate(-50%,-50%) for centering —
+  // drag offsets compose via calc(). Others get a plain translate() for drag.
+  const cssCentered = panel.hasAttribute('data-css-centered');
+  const applyTransform = cssCentered
+    ? () => {
+        panel.style.transform =
+          'translate(calc(-50% + ' + panel._dragTx + 'px), calc(-50% + ' + panel._dragTy + 'px))';
+      }
+    : () => {
+        panel.style.transform =
+          'translate(' + panel._dragTx + 'px, ' + panel._dragTy + 'px)';
+      };
 
   handle.addEventListener('mousedown', function(e) {
     if (e.target.closest('button')) return;
@@ -4078,22 +4318,35 @@ function makeDraggable(panel) {
 
   document.addEventListener('mousemove', function(e) {
     if (!dragging) return;
-    tx += e.clientX - startX;
-    ty += e.clientY - startY;
+    panel._dragTx += e.clientX - startX;
+    panel._dragTy += e.clientY - startY;
     startX = e.clientX;
     startY = e.clientY;
-    panel.style.transform = 'translate(' + tx + 'px,' + ty + 'px)';
+    applyTransform();
   });
 
   document.addEventListener('mouseup', function() { dragging = false; });
 }
 
 function _centerPanel(el) {
-  if (!el._posInited) {
-    el._posInited = true;
-    el.style.left = Math.max(0, Math.round((window.innerWidth  - el.offsetWidth)  / 2)) + 'px';
-    el.style.top  = Math.max(0, Math.round((window.innerHeight - el.offsetHeight) / 2)) + 'px';
-  }
+  if (el._posInited) return;
+  el._posInited = true;
+  // Wait one frame so CSS max-width/max-height constraints have been applied
+  // before we measure offsetWidth/offsetHeight.
+  requestAnimationFrame(() => {
+    const r = document.body.getBoundingClientRect();
+    const w = r.width  || window.innerWidth;
+    const h = r.height || window.innerHeight;
+    el.style.left = Math.max(0, Math.round(r.left + (w - el.offsetWidth)  / 2)) + 'px';
+    el.style.top  = Math.max(0, Math.round(r.top  + (h - el.offsetHeight) / 2)) + 'px';
+  });
+}
+function _uncenterPanel(el) {
+  if (!el) return;
+  el._posInited = false;
+  el._dragTx = 0;
+  el._dragTy = 0;
+  el.style.transform = '';
 }
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -4305,8 +4558,20 @@ function jog(axis, dir) {
   const units = settings.units === 'in' ? 'G20' : 'G21';
   const code = `M70\n${units}\nG91\nG0 ${axis.toUpperCase()}${dist}\nM72`;
   if (ws && ws.readyState === WebSocket.OPEN) {
+    const prev = { x: state.xp, y: state.yp, z: state.zp };
     ws.send(code);
     scheduleErrorCheck();
+    // Passive stuck-jog detection: if position didn't change 900ms after send and we're "idle",
+    // bbctrl's planner likely still has residual queue state. Hint the user to tap Stop.
+    const recentJobEnd = _lastJobEndAt && (Date.now() - _lastJobEndAt) < 60000;
+    if (recentJobEnd) {
+      setTimeout(() => {
+        const same = (state.xp === prev.x && state.yp === prev.y && state.zp === prev.z);
+        if (same && lastMachineState === 'idle') {
+          showToast('Jog had no effect — tap Stop once to flush the controller, then try again.', 'warn', 6000);
+        }
+      }, 900);
+    }
   }
 }
 
@@ -4454,6 +4719,23 @@ function readXyZeroSnapshot() {
   catch(e) { return null; }
 }
 
+// Auto-snapshot the CURRENT offset_x/offset_y whenever they change while the machine is stable.
+// Any zeroing method (Zero button, MDI G92, G10 L20 P1, probe macro, gcode) ends up setting these,
+// so watching them directly is a superset of the Zero-button hook.
+let _lastSnapOx = null, _lastSnapOy = null;
+function autoSnapshotXyOffset() {
+  try {
+    const ox = +(state.offset_x || 0);
+    const oy = +(state.offset_y || 0);
+    // Skip transient zeros from fault-clear / G92.1 — only snapshot meaningful non-zero offsets
+    if (ox === 0 && oy === 0) return;
+    // Don't flood writes: only save if changed by ≥0.001mm from last snapshot
+    if (_lastSnapOx !== null && Math.abs(ox - _lastSnapOx) < 0.001 && Math.abs(oy - _lastSnapOy) < 0.001) return;
+    _lastSnapOx = ox; _lastSnapOy = oy;
+    localStorage.setItem(XY_SNAP_KEY, JSON.stringify({ ox, oy, t: Date.now() }));
+  } catch(e) { /* non-fatal */ }
+}
+
 function formatSnapAge(t) {
   const mins = Math.floor((Date.now() - t) / 60000);
   if (mins < 1) return 'just now';
@@ -4465,6 +4747,8 @@ function formatSnapAge(t) {
 
 let _recoveryRunning = false;
 let _recoveryOffered = false; // avoid re-offering after user declines until next fault
+let _faultSinceIdle  = false; // sticky: set on any estop/error, cleared on recovery offer
+let _bootRecoveryChecked = false; // first-idle-after-page-load boot prompt guard
 
 // Wait for a home cycle to complete: state must enter homing/running then return to idle.
 function waitForHomeComplete(timeoutMs = 90000) {
@@ -4482,6 +4766,33 @@ function waitForHomeComplete(timeoutMs = 90000) {
   });
 }
 
+// Wait until bbctrl's cycle state returns to stable idle.
+// After a home completes, bbctrl fires a post-home MDI macro (G92.1 + G92 Z50). If we
+// poll cycle too early we can see a false-positive idle in the brief gap before MDI starts,
+// then fire the next command INTO the active MDI — the AVR rejects the position update
+// ("Cannot set position during mdi") which triggers an alarm beep. Guards against this by:
+//   1. Waiting a minimum pre-delay so the post-home MDI has time to actually begin.
+//   2. Requiring N consecutive idle polls before accepting idle as stable.
+function waitForCycleIdle(timeoutMs = 8000) {
+  return new Promise(resolve => {
+    const t0 = Date.now();
+    const REQUIRED_CONSECUTIVE = 3;  // ~600ms of sustained idle
+    const POLL_MS = 200;
+    let idleStreak = 0;
+    const tick = () => {
+      const cycle = String(state.cycle || '').toLowerCase();
+      const xx = String(state.xx || '').toUpperCase();
+      const isIdle = (cycle === '' || cycle === 'idle') && (xx === '' || xx === 'READY' || xx === 'IDLE');
+      idleStreak = isIdle ? idleStreak + 1 : 0;
+      if (idleStreak >= REQUIRED_CONSECUTIVE) return resolve(true);
+      if (Date.now() - t0 > timeoutMs) return resolve(false);
+      setTimeout(tick, POLL_MS);
+    };
+    // Pre-delay: give the post-home MDI macro time to register as a non-idle cycle
+    setTimeout(tick, 500);
+  });
+}
+
 async function runXyRecovery() {
   if (_recoveryRunning) return;
   const snap = readXyZeroSnapshot();
@@ -4489,12 +4800,7 @@ async function runXyRecovery() {
   _recoveryRunning = true;
   try {
     uiLog(`RECOVER XY zero (saved ${formatSnapAge(snap.t)}): offset X=${snap.ox.toFixed(3)} Y=${snap.oy.toFixed(3)}`);
-    // Step 1 — bit removal + home Z
-    if (!await darkConfirm(
-      'REMOVE THE BIT from the spindle before continuing.\n\n' +
-      'Z will home first (traveling upward). Press OK when the bit is removed and the path is clear.',
-      'Home Z'
-    )) { _recoveryRunning = false; return; }
+    // Step 1 — home Z immediately (only moves upward, safe regardless of bit presence)
     _homingAxes = 'z';
     const zRes = await fetch(`${API_URL}/api/home/z`, { method: 'PUT' }).catch(() => null);
     if (!zRes || !zRes.ok) {
@@ -4505,27 +4811,39 @@ async function runXyRecovery() {
       showErrorBanner('Z home did not complete — recovery aborted', true);
       _recoveryRunning = false; return;
     }
-    // Step 2 — home X and Y
-    if (!await darkConfirm('Z homed. Homing X and Y next. Press OK to continue.', 'Home X/Y')) {
-      _recoveryRunning = false; return;
-    }
+    // Post-home Z macro (G92.1 + G92 Z50) runs as MDI — wait for cycle to return to idle
+    // before prompting, or the user could OK and we'd fire X home into a still-busy controller.
+    await waitForCycleIdle();
+    // Step 2 — bit removal prompt, THEN home X and Y
+    if (!await darkConfirm(
+      'Z is homed. REMOVE THE BIT from the spindle now, then press OK to home X and Y.',
+      'Home X/Y'
+    )) { _recoveryRunning = false; return; }
     _homingAxes = 'x';
     const xRes = await fetch(`${API_URL}/api/home/x`, { method: 'PUT' }).catch(() => null);
     if (!xRes || !xRes.ok) { if (ws && ws.readyState === WebSocket.OPEN) ws.send('G28.2 X0'); }
     if (!await waitForHomeComplete()) { showErrorBanner('X home did not complete — recovery aborted', true); _recoveryRunning = false; return; }
+    // Wait for post-home X MDI macro to finish before firing Y home, or bbctrl rejects with
+    // "Cannot enter homing cycle while in mdi cycle" (500) and Y never actually starts.
+    if (!await waitForCycleIdle()) {
+      showErrorBanner('Controller busy after X home — recovery aborted', true); _recoveryRunning = false; return;
+    }
     _homingAxes = 'y';
     const yRes = await fetch(`${API_URL}/api/home/y`, { method: 'PUT' }).catch(() => null);
     if (!yRes || !yRes.ok) { if (ws && ws.readyState === WebSocket.OPEN) ws.send('G28.2 Y0'); }
     if (!await waitForHomeComplete()) { showErrorBanner('Y home did not complete — recovery aborted', true); _recoveryRunning = false; return; }
+    await waitForCycleIdle();
     // Step 3 — restore G54 XY and travel to saved zero
     // G10 L2 P1 writes the persistent G54 offset — unaffected by the post-home G92.1 that fires above.
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(`G10 L2 P1 X${snap.ox.toFixed(4)} Y${snap.oy.toFixed(4)}`);
     }
+    const fromX = +(state.xp || 0), fromY = +(state.yp || 0);
     if (!await darkConfirm(
       `XY zero restored. Fast-travel to your saved work zero (X0 Y0 WCS)?\n\n` +
       `Z stays at the homed position (~50mm WCS). Install bit and re-probe Z after traveling.`,
-      'Travel'
+      'Travel', 'Cancel',
+      renderTravelArrow(fromX, fromY, snap.ox, snap.oy)
     )) { _recoveryRunning = false; return; }
     if (ws && ws.readyState === WebSocket.OPEN) ws.send('G90\nG0 X0 Y0');
     showToast('XY zero recovered — install bit and re-probe Z', 'info', 6000);
@@ -4543,7 +4861,7 @@ function offerXyRecovery() {
     const ok = await darkConfirm(
       `Recover XY work zero?\n\n` +
       `Saved ${formatSnapAge(snap.t)} at X=${snap.ox.toFixed(2)}  Y=${snap.oy.toFixed(2)} (ABS).\n\n` +
-      `This will home Z (bit removed), then X/Y, then travel to your saved XY zero.`,
+      `Flow: home Z → remove-bit prompt → home X/Y → travel to saved zero.`,
       'Recover', 'Skip'
     );
     if (ok) runXyRecovery();
@@ -4568,6 +4886,7 @@ const SETTINGS_DEFAULTS = {
   probeSafety:    true,    // require circuit check before probing
   warnSoftLimits:     true,   // pre-flight check: warn if file extents exceed soft limits
   warnZeroZ:          true,   // confirm dialog when zeroing Z or all axes
+  offerRecoveryOnBoot: true,  // on first load, if a saved XY zero exists, offer to recover it
   advancedMode:       false,  // unlocks feed/spindle scale override buttons
   autoCheckUpdates:   true,   // check GitHub for new Rift releases on startup
   updateChannel:      'stable', // 'stable' = latest release only; 'nightly' = includes pre-releases
@@ -4621,7 +4940,7 @@ async function loadSettings() {
 function switchSettingsTab(tab) {
   document.querySelectorAll('#settings-tabs .stab').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.stab-panel').forEach(el => el.classList.remove('active'));
-  const tabs = ['general','probe','motors','motors-yy','tool','io','gcode-scripts','indicators','db25','network','system','firmware','about','logs'];
+  const tabs = ['general','probe','motors','motors-yy','tool','io','gcode-scripts','indicators','db25','network','system','controller','firmware','about','logs'];
   const idx = tabs.indexOf(tab);
   const _stabTab = document.querySelectorAll('#settings-tabs .stab')[idx];
   if (_stabTab) _stabTab.classList.add('active');
@@ -4692,6 +5011,7 @@ async function openSettings() {
   document.getElementById('cfg-probe-safety').value   = settings.probeSafety ? '1' : '0';
   document.getElementById('cfg-warn-soft-limits').value    = settings.warnSoftLimits !== false ? '1' : '0';
   document.getElementById('cfg-warn-zero-z').value         = settings.warnZeroZ !== false ? '1' : '0';
+  document.getElementById('cfg-offer-recovery-on-boot').value = settings.offerRecoveryOnBoot !== false ? '1' : '0';
   document.getElementById('cfg-advanced-mode').value       = settings.advancedMode ? '1' : '0';
   document.getElementById('cfg-auto-check-updates').value  = settings.autoCheckUpdates !== false ? '1' : '0';
   document.getElementById('cfg-update-channel').value      = settings.updateChannel || 'stable';
@@ -4700,8 +5020,7 @@ async function openSettings() {
   document.getElementById('cfg-cnc-host').value = localStorage.getItem('cnc_host') || DEFAULT_HOST;
   document.getElementById('cfg-host-note').style.display = _isLocalhost ? 'none' : '';
   document.getElementById('settings-overlay').classList.add('open');
-  const _sm = document.getElementById('settings-modal');
-  _centerPanel(_sm);
+  // Centering is handled by pure CSS (left:50% top:50% translate(-50%,-50%)).
   // Load controller config for Motors/Tool/IO/GCode tabs
   loadControllerConfig();
 }
@@ -4864,6 +5183,8 @@ function renderIOSettings(cfg) {
 
 function closeSettings() {
   document.getElementById('settings-overlay').classList.remove('open');
+  // Reset so reopening recenters (handles viewport changes + past drags cleanly).
+  _uncenterPanel(document.getElementById('settings-modal'));
 }
 
 async function saveSettings() {
@@ -4892,6 +5213,7 @@ async function saveSettings() {
   settings.probeSafety     = document.getElementById('cfg-probe-safety').value === '1';
   settings.warnSoftLimits      = document.getElementById('cfg-warn-soft-limits').value === '1';
   settings.warnZeroZ           = document.getElementById('cfg-warn-zero-z').value === '1';
+  settings.offerRecoveryOnBoot = document.getElementById('cfg-offer-recovery-on-boot').value === '1';
   settings.advancedMode        = document.getElementById('cfg-advanced-mode').value === '1';
   _applyAdvancedMode();
   settings.autoCheckUpdates    = document.getElementById('cfg-auto-check-updates').value === '1';
@@ -5047,16 +5369,59 @@ loadSettings().then(() => {
 // Replaces browser confirm() with a styled modal matching the UI theme.
 // Returns a Promise<boolean>.
 let _darkConfirmResolve = null;
-function darkConfirm(msg, okLabel = 'OK', cancelLabel = 'Cancel') {
+function darkConfirm(msg, okLabel = 'OK', cancelLabel = 'Cancel', extraHtml = '') {
   return new Promise(resolve => {
     _darkConfirmResolve = resolve;
     document.getElementById('dark-confirm-msg').textContent = msg;
+    const extra = document.getElementById('dark-confirm-extra');
+    if (extraHtml) {
+      extra.innerHTML = extraHtml;
+      extra.classList.add('visible');
+    } else {
+      extra.innerHTML = '';
+      extra.classList.remove('visible');
+    }
     document.getElementById('dark-confirm-ok').textContent = okLabel;
     document.getElementById('dark-confirm-cancel').textContent = cancelLabel;
     document.getElementById('dark-confirm-cancel').style.display = cancelLabel ? '' : 'none';
     document.getElementById('dark-confirm-overlay').classList.add('open');
     document.getElementById('dark-confirm-ok').focus();
   });
+}
+
+// Build a top-down mini-map SVG showing current ABS position, target ABS position,
+// and an arrow for the travel direction. Used in fast-travel confirm dialogs.
+function renderTravelArrow(fromX, fromY, toX, toY) {
+  const envX = +(state['0tm'] || 816);  // max soft limit X (falls back to typical envelope)
+  const envY = +(state['1tm'] || 816);
+  const envXmin = +(state['0tn'] || 0);
+  const envYmin = +(state['1tn'] || 0);
+  const W = 260, H = 180, PAD = 18;
+  const plotW = W - 2*PAD, plotH = H - 2*PAD;
+  // SVG Y is inverted (top = 0); machine Y+ should point up visually.
+  const sx = x => PAD + ((x - envXmin) / (envX - envXmin)) * plotW;
+  const sy = y => PAD + plotH - ((y - envYmin) / (envY - envYmin)) * plotH;
+  const x1 = sx(fromX), y1 = sy(fromY);
+  const x2 = sx(toX),   y2 = sy(toY);
+  const dx = toX - fromX, dy = toY - fromY;
+  const dist = Math.hypot(dx, dy);
+  return `
+    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;margin:0 auto;background:var(--bg);border:1px solid var(--border);border-radius:6px">
+      <defs>
+        <marker id="trav-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+        </marker>
+      </defs>
+      <rect x="${PAD}" y="${PAD}" width="${plotW}" height="${plotH}" fill="none" stroke="var(--border)" stroke-width="1" stroke-dasharray="3,3"/>
+      <text x="${PAD + plotW/2}" y="${PAD - 4}" text-anchor="middle" fill="var(--muted)" font-size="9">Y+</text>
+      <text x="${W - PAD + 4}" y="${PAD + plotH/2}" text-anchor="start" fill="var(--muted)" font-size="9" dy="3">X+</text>
+      <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--accent)" stroke-width="2" marker-end="url(#trav-arrow)"/>
+      <circle cx="${x1}" cy="${y1}" r="4" fill="var(--muted)" stroke="var(--bg)" stroke-width="1.5"/>
+      <circle cx="${x2}" cy="${y2}" r="5" fill="var(--accent)" stroke="var(--bg)" stroke-width="1.5"/>
+      <text x="${W/2}" y="${H - 4}" text-anchor="middle" fill="var(--text)" font-size="11" font-weight="600">
+        ${dx >= 0 ? '+' : ''}${dx.toFixed(1)} X, ${dy >= 0 ? '+' : ''}${dy.toFixed(1)} Y · ${dist.toFixed(0)}mm
+      </text>
+    </svg>`;
 }
 document.getElementById('dark-confirm-ok').addEventListener('click', () => {
   document.getElementById('dark-confirm-overlay').classList.remove('open');
@@ -5285,7 +5650,7 @@ function showProbeProgress(refLabel) {
         <div id="ppov-sub" style="font-size:12px;color:var(--text);opacity:0.85;"></div>
         <div style="display:flex;gap:10px;justify-content:center;">
           <button id="ppov-close" style="display:none" onclick="document.getElementById('probe-progress-overlay').remove()" class="settings-btn primary">Finish</button>
-          <button id="ppov-dismiss" style="display:none" onclick="document.getElementById('probe-progress-overlay').remove()" class="settings-btn">Dismiss</button>
+          <button id="ppov-dismiss" onclick="document.getElementById('probe-progress-overlay').remove()" class="settings-btn">Cancel</button>
         </div>
       </div>`;
     document.body.appendChild(ov);
@@ -5295,6 +5660,8 @@ function showProbeProgress(refLabel) {
   document.getElementById('ppov-title').textContent = 'Probing Z…';
   document.getElementById('ppov-sub').textContent = `Zeroing to ${refLabel} · Block: ${settings.probeHeight}mm`;
   document.getElementById('ppov-close').style.display = 'none';
+  document.getElementById('ppov-dismiss').style.display = '';
+  document.getElementById('ppov-dismiss').textContent = 'Cancel';
 
   const ppovFault = (msg) => {
     clearInterval(iv);
@@ -5303,20 +5670,50 @@ function showProbeProgress(refLabel) {
     document.getElementById('ppov-title').textContent = 'Probe faulted';
     document.getElementById('ppov-sub').textContent = msg;
     document.getElementById('ppov-dismiss').style.display = '';
+    document.getElementById('ppov-dismiss').textContent = 'Dismiss';
+  };
+
+  // Detect "busy" directly from raw bbctrl fields rather than the UI-derived state.
+  // deriveMachineState collapses some cycle/xx combos to 'idle' even while the machine is
+  // actively moving (MDI probes reported that way made the overlay sit on "Probing Z…" forever).
+  const rawBusy = () => {
+    const xx = String(state.xx || '').toUpperCase();
+    const cycle = String(state.cycle || '').toLowerCase();
+    if (!xx && !cycle) return false;
+    const idleXx = xx === '' || xx === 'READY' || xx === 'IDLE';
+    const idleCycle = cycle === '' || cycle === 'idle';
+    return !(idleXx && idleCycle);
+  };
+  // Movement fallback: if position is changing, the machine is working even if state says otherwise.
+  let lastPos = { x: state.xp, y: state.yp, z: state.zp };
+  const posMoved = () => {
+    const moved = (state.xp !== lastPos.x) || (state.yp !== lastPos.y) || (state.zp !== lastPos.z);
+    if (moved) lastPos = { x: state.xp, y: state.yp, z: state.zp };
+    return moved;
   };
 
   let started = false;
   let ticks = 0;
   let idleTicks = 0;
+  let loggedOnce = false;
   const iv = setInterval(() => {
     // Fault detection — estop or error state at any point
     if (lastMachineState === 'estopped' || lastMachineState === 'error') {
       ppovFault('E-Stop triggered. Release E-Stop, then use Clear to reset.');
       return;
     }
-    if (!started && lastMachineState === 'running') { started = true; idleTicks = 0; return; }
+    const busy = rawBusy() || posMoved();
+    if (!started && busy) {
+      started = true;
+      idleTicks = 0;
+      if (!loggedOnce) {
+        console.log('[probe] started: xx=' + state.xx + ' cycle=' + state.cycle);
+        loggedOnce = true;
+      }
+      return;
+    }
     if (started) {
-      if (lastMachineState === 'idle') {
+      if (!busy) {
         idleTicks++;
         if (idleTicks >= 4) { // 800ms sustained idle = actually done
           clearInterval(iv);
@@ -5324,6 +5721,7 @@ function showProbeProgress(refLabel) {
           document.getElementById('ppov-icon').style.color = '#4caf50';
           document.getElementById('ppov-title').textContent = 'Done — Z zeroed';
           document.getElementById('ppov-close').style.display = '';
+          document.getElementById('ppov-dismiss').style.display = 'none';
           document.getElementById('ppov-sub').textContent = 'Click Finish when ready.';
         }
       } else {
@@ -5334,6 +5732,7 @@ function showProbeProgress(refLabel) {
     ticks++;
     // If machine never started within 6s, something went wrong
     if (!started && ticks > 30) {
+      console.warn('[probe] no motion detected: xx=' + state.xx + ' cycle=' + state.cycle);
       ppovFault('No response from controller. Check log or use Force Clear.');
     }
   }, 200);
@@ -6477,6 +6876,10 @@ async function fmDelete(filepath) {
 }
 
 function _verifyDelete(filepath) {
+  // If the user re-uploaded the same filename between the delete and this verify tick,
+  // fmUploadFiles already removed it from _pendingDeletes — bail out so we don't flag
+  // the new (legitimate) file as a failed delete.
+  if (!_pendingDeletes.has(filepath)) return;
   _pendingDeletes.delete(filepath);
   // Check if server still has the file (bbctrl watchdog re-added it after disk rescan)
   const stillPresent = (state.gcode_list || []).some(folder =>
@@ -6581,6 +6984,9 @@ async function fmUploadFiles(files) {
       await fetch(`${API_URL}/api/file/${encodeURIComponent(file.name)}`, {
         method: 'PUT', headers: {'Content-Type':'text/plain'}, body: text
       });
+      // Cancel any pending delete-verification for this filename — user just re-uploaded the
+      // same name, so the "file reappeared → delete failed" check would be a false alarm.
+      _pendingDeletes.delete(file.name);
       uiLog(`FILE UPLOAD: ${file.name} (${(file.size/1024).toFixed(1)}KB)`, 'INFO');
       if (!fmFiles.includes(file.name)) fmFiles.push(file.name);
       // Assign to current display folder in gcode_list config
@@ -6762,12 +7168,16 @@ function updateProgressLabel() {
   const stripEl     = null; // removed gcode-progress-strip
 
   if (_jobPct > 1) {
-    // Line-based projection can drastically underestimate end-of-job heavy cuts
-    // (e.g. slow trochoidal passes). Blend with the planner total countdown so the
-    // ETA can't drop below what the planner expected — whichever is longer wins.
+    // Live line-rate projection (truth once we have enough samples).
     const lineRemaining    = (elapsed / _jobPct) * (100 - _jobPct);
     const plannerRemaining = _estimatedJobSeconds > 0 ? Math.max(0, _estimatedJobSeconds - elapsed) : 0;
-    const remaining = Math.max(lineRemaining, plannerRemaining);
+    // Early in the job, line-rate is noisy — floor with the planner estimate so the ETA
+    // doesn't flash "2 min" right after starting a 30-minute job. Past ~10% the measured
+    // rate is reliable and the planner's ±15% heuristic becomes a liability: it can pin
+    // the remaining time ~6x too high when the actual pace is faster (trochoidal etc).
+    const remaining = _jobPct < 10
+      ? Math.max(lineRemaining, plannerRemaining)
+      : lineRemaining;
     const pctStr    = _jobPct.toFixed(0);
     if (labelEl) labelEl.textContent = `Running  ${pctStr}%`;
     setProgressTime('', fmtTime(remaining), 'remaining');
@@ -7135,7 +7545,7 @@ async function uploadFirmware(input) {
 }
 
 async function revertToStock() {
-  if (!await darkConfirm('Revert the controller?\n\nSelect a firmware .tar.bz2 to upload. The controller will install it and reboot.', 'Choose File')) return;
+  if (!await darkConfirm('Revert back to Onefinity 1.6.6?\n\nSelect a firmware .tar.bz2 to upload. The controller will install it and reboot.', 'Choose File')) return;
   document.getElementById('firmware-file-input').click();
 }
 
@@ -7370,6 +7780,7 @@ function applyDevMode(save = true) {
   }
 }
 
+const LOG_MAX_RENDER = 2000; // cap DOM nodes; bbctrl log can be 50k+ lines and will crash the browser otherwise
 async function refreshLogs() {
   const _srcEl = document.getElementById('log-source-sel');
   const source = (_srcEl && _srcEl.value) || 'ui';
@@ -7379,32 +7790,60 @@ async function refreshLogs() {
   if (!viewer) return;
 
   let lines = [];
+  let totalFiltered = 0;
+  let totalRaw = 0;
 
   if (source === 'ui') {
     const levelOrder = { debug: 0, info: 1, warn: 2, error: 3 };
     const minLevel = filter === 'all' ? 0 : filter === 'info' ? 1 : filter === 'error' ? 3 : 0;
-    lines = _uiLogBuf
-      .filter(e => (levelOrder[e.level] !== undefined ? levelOrder[e.level] : 1) >= minLevel)
+    const filtered = _uiLogBuf
+      .filter(e => (levelOrder[e.level] !== undefined ? levelOrder[e.level] : 1) >= minLevel);
+    totalFiltered = filtered.length;
+    totalRaw = _uiLogBuf.length;
+    lines = filtered
+      .slice(-LOG_MAX_RENDER)
       .map(e => ({ cls: `log-${e.level}`, text: `${e.ts} [${e.level.toUpperCase().padEnd(5)}] ${e.msg}` }));
-    document.getElementById('log-entry-count').textContent = `${lines.length} entries`;
   } else {
     try {
       const resp = await fetch('/api/log');
       const text = await resp.text();
       const raw = text.split('\n').filter(Boolean);
-      lines = raw
-        .filter(l => filter === 'all' || (filter === 'error' && /^E:/i.test(l)) || (filter === 'info' && !/^D:/i.test(l)))
+      totalRaw = raw.length;
+      const filtered = raw
+        .filter(l => filter === 'all' || (filter === 'error' && /^E:/i.test(l)) || (filter === 'info' && !/^D:/i.test(l)));
+      totalFiltered = filtered.length;
+      lines = filtered
+        .slice(-LOG_MAX_RENDER)
         .map(l => {
           const cls = /^E:/i.test(l) ? 'log-error' : /^W:/i.test(l) ? 'log-warn' : /^D:/i.test(l) ? 'log-debug' : 'log-info';
           return { cls, text: l };
         });
-      document.getElementById('log-entry-count').textContent = `${lines.length} / ${raw.length} lines`;
     } catch(e) {
       lines = [{ cls: 'log-error', text: `Failed to fetch controller log: ${e.message}` }];
+      totalFiltered = totalRaw = 1;
     }
   }
 
-  viewer.innerHTML = lines.map(l => `<div class="${l.cls}">${escHtml(l.text)}</div>`).join('');
+  const countEl = document.getElementById('log-entry-count');
+  if (countEl) {
+    const truncated = totalFiltered > LOG_MAX_RENDER;
+    const label = source === 'ui' ? 'entries' : 'lines';
+    countEl.textContent = truncated
+      ? `showing last ${LOG_MAX_RENDER.toLocaleString()} of ${totalFiltered.toLocaleString()} ${label} (total ${totalRaw.toLocaleString()})`
+      : `${totalFiltered.toLocaleString()}${source === 'ui' ? '' : ' / ' + totalRaw.toLocaleString()} ${label}`;
+  }
+
+  // Build DOM via fragment instead of innerHTML concat — faster and avoids a giant string.
+  const frag = document.createDocumentFragment();
+  for (const l of lines) {
+    const div = document.createElement('div');
+    div.className = l.cls;
+    div.textContent = l.text;
+    frag.appendChild(div);
+  }
+  viewer.textContent = '';
+  viewer.appendChild(frag);
+
   const _autoScroll = document.getElementById('log-autoscroll');
   if (_autoScroll && _autoScroll.checked) {
     viewer.scrollTop = viewer.scrollHeight;
@@ -7519,6 +7958,7 @@ initKioskMode();
 if (ENABLE_TOUR) document.getElementById('btn-tour').style.display = '';
 try { init3D(); } catch(e) { console.warn('3D view unavailable:', e.message); }
 initViewToggles();
+_syncLightModeBtn();
 connect();
 mdiRenderHistory(); // show "No history" placeholder on load
 
