@@ -3061,7 +3061,7 @@ function escHtml(s) {
 const WS_URL  = `ws://${location.host}/websocket`; // same-origin always
 const API_URL = ``; // relative URLs — works for both proxy and direct bbctrl
 const SAFE_Z  = 50; // mm to retract before repositioning on resume
-const UI_VERSION             = '1.3.1-nightly.20260427.25'; // Rift by AlienWoodshop LLC
+const UI_VERSION             = '1.3.1-nightly.20260427.26'; // Rift by AlienWoodshop LLC
 const ENABLE_RESUME          = false; // set true to re-enable resume-from-stop feature
 const ENABLE_MACROS          = false; // set true to re-enable macro buttons
 const ENABLE_ROTARY          = false; // set true to show rotary axis toggle
@@ -7613,12 +7613,13 @@ async function checkForUpdates() {
     const raw = await res.json();
     if (raw.error) throw new Error(raw.error);
 
-    // Nightly: raw is an array — pick newest by semver (includes pre-releases)
+    // Nightly: raw is an array of releases sorted by created_at DESC — pick the most
+    // recent regardless of semver. UI_VERSION is held one minor behind the stable line
+    // (e.g. 1.3.1-nightly.* while stable is 1.3.2), so a semver max would always pick
+    // the stable and defeat the nightly channel.
     if (nightly) {
       if (!raw.length) throw new Error('No releases found');
-      const semver = tag => (tag || '').replace(/^v/, '').split(/[-.]/).slice(0,3).map(Number);
-      const newer = (a, b) => { for (let i=0;i<3;i++) { if(a[i]>b[i]) return true; if(a[i]<b[i]) return false; } return false; };
-      _latestRelease = raw.reduce((best, r) => newer(semver(r.tag_name), semver(best.tag_name)) ? r : best, raw[0]);
+      _latestRelease = raw[0];
     } else {
       _latestRelease = raw;
     }
@@ -7627,8 +7628,10 @@ async function checkForUpdates() {
     const channelLabel = nightly ? ' (nightly)' : '';
     if (latestEl) latestEl.textContent = 'v' + latestTag + channelLabel;
 
+    // Nightly channel: any tag-mismatch is an update (strict chronological from GitHub).
+    // Stable channel: classic 3-part semver compare.
     const semCmp = (a, b) => { const parse = v => v.replace(/^v/,'').split(/[-.]/).slice(0,3).map(Number); const av=parse(a), bv=parse(b); for(let i=0;i<3;i++){if(av[i]>bv[i])return 1;if(av[i]<bv[i])return -1;} return 0; };
-    const isNewer = semCmp(latestTag, UI_VERSION) > 0;
+    const isNewer = nightly ? (latestTag !== UI_VERSION) : (semCmp(latestTag, UI_VERSION) > 0);
 
     const noticeEl = document.getElementById('fw-update-notice');
     if (isNewer) {
