@@ -75,7 +75,7 @@ Once Rift is installed, you can restore your config any time via **Settings → 
 No SSH, no tools. Done in under a minute.
 
 1. **Download** the latest Rift firmware package:
-   👉 **[rift-cnc-ui-v1.3.1.tar.bz2](https://github.com/DRSwanger/rift-cnc-ui/releases/download/v1.3.1/rift-cnc-ui-v1.3.1.tar.bz2)**
+   👉 **[rift-cnc-ui-v1.3.2.tar.bz2](https://github.com/DRSwanger/rift-cnc-ui/releases/download/v1.3.2/rift-cnc-ui-v1.3.2.tar.bz2)**
 
 2. Open your Onefinity controller in a browser (usually `http://onefinity.local` or your machine's IP)
 
