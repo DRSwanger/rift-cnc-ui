@@ -123,6 +123,26 @@ Everything is restored: the stock UI, splash screens, and all defaults.
 
 ---
 
+## Troubleshooting — Install or Update via `curl`
+
+If the in-UI updater fails (CORS issue on older builds, browser quirks, frozen UI, etc.), you can push any `.tar.bz2` package directly to the controller's bbctrl API. This works regardless of which UI version is installed (Rift or stock) — it's a built-in bbctrl endpoint.
+
+**Install or update Rift:**
+
+```bash
+curl -X PUT -F "firmware=@rift-cnc-ui-v1.3.2.tar.bz2" http://<pi-ip>/api/firmware/update
+```
+
+**Revert to stock Onefinity 1.6.6:**
+
+```bash
+curl -X PUT -F "firmware=@onefinity-1.6.6.tar.bz2" http://<pi-ip>/api/firmware/update
+```
+
+Replace `<pi-ip>` with the controller's IP (e.g. `192.168.1.130`). Run from the directory containing the `.tar.bz2`. The `firmware=@<file>` field name is required. The controller installs the package and reboots in ~30 seconds.
+
+---
+
 ## Running the Local Proxy (Optional)
 
 The included `proxy.py` server unlocks features that aren't available when accessing the controller directly — push notifications, shared settings across browsers, combined backup/restore, and more.
