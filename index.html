@@ -2565,7 +2565,7 @@
           </div>
           <div class="settings-row">
             <div><div class="settings-label">Update channel</div><div class="settings-sub">Nightly includes pre-releases and betas</div></div>
-            <select class="settings-select" id="cfg-update-channel">
+            <select class="settings-select" id="cfg-update-channel" onchange="onUpdateChannelChange(this.value)">
               <option value="stable">Stable</option>
               <option value="nightly">Nightly</option>
             </select>
@@ -3061,7 +3061,7 @@ function escHtml(s) {
 const WS_URL  = `ws://${location.host}/websocket`; // same-origin always
 const API_URL = ``; // relative URLs — works for both proxy and direct bbctrl
 const SAFE_Z  = 50; // mm to retract before repositioning on resume
-const UI_VERSION             = '1.3.1-nightly.20260427.26'; // Rift by AlienWoodshop LLC
+const UI_VERSION             = '1.3.1-nightly.20260427.27'; // Rift by AlienWoodshop LLC
 const ENABLE_RESUME          = false; // set true to re-enable resume-from-stop feature
 const ENABLE_MACROS          = false; // set true to re-enable macro buttons
 const ENABLE_ROTARY          = false; // set true to show rotary axis toggle
@@ -7578,6 +7578,12 @@ let _latestRelease = null;
 async function loadFirmwareVersion() {
   const el = document.getElementById('fw-version-val');
   if (el) el.textContent = UI_VERSION;
+  checkForUpdates();
+}
+
+function onUpdateChannelChange(value) {
+  settings.updateChannel = value || 'stable';
+  localStorage.setItem('cnc_settings', JSON.stringify(settings));
   checkForUpdates();
 }
 
