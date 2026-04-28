@@ -75,7 +75,7 @@ Once Rift is installed, you can restore your config any time via **Settings → 
 No SSH, no tools. Done in under a minute.
 
 1. **Download** the latest Rift firmware package:
-   👉 **[rift-cnc-ui-v1.3.2.tar.bz2](https://github.com/DRSwanger/rift-cnc-ui/releases/download/v1.3.2/rift-cnc-ui-v1.3.2.tar.bz2)**
+   👉 **[rift-cnc-ui-v1.3.3.tar.bz2](https://github.com/DRSwanger/rift-cnc-ui/releases/download/v1.3.3/rift-cnc-ui-v1.3.3.tar.bz2)**
 
 2. Open your Onefinity controller in a browser (usually `http://onefinity.local` or your machine's IP)
 
@@ -130,7 +130,7 @@ If the in-UI updater fails (CORS issue on older builds, browser quirks, frozen U
 **Install or update Rift:**
 
 ```bash
-curl -X PUT -F "firmware=@rift-cnc-ui-v1.3.2.tar.bz2" http://<pi-ip>/api/firmware/update
+curl -X PUT -F "firmware=@rift-cnc-ui-v1.3.3.tar.bz2" http://<pi-ip>/api/firmware/update
 ```
 
 **Revert to stock Onefinity 1.6.6:**
