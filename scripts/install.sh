@@ -1,13 +1,47 @@
 #!/bin/bash
 # Custom CNC UI firmware update
 # Replaces only index.html — leaves Python, AVR firmware, and all other files untouched.
+#
+# Note: bbctrl's update-bbctrl invokes us as `install.sh "$*" 2>&1 > $LOG` which
+# (because of redirect ordering) sends ONLY stdout to the install log; stderr
+# goes to journald, which on Stretch isn't persistent. So everything we want
+# captured needs to print to stdout and we need to *not* rely on `set -e`'s
+# silent exit — when a step fails, write a loud error to stdout first.
 
+set -u
+trap 'echo "ERROR: install.sh aborted at line $LINENO (last command exited $?)"; exit 1' ERR
 set -e
+
+SRC_INDEX="src/py/bbctrl/http/index.html"
+
+# Pre-flight: verify the package extracted cleanly. If the bbctrl PUT upload
+# was truncated (flaky wifi mid-upload is the common cause), `tar xf` on the
+# bbctrl side may have produced scripts/ but missed src/, leaving us with a
+# bogus install. Catch it here before clobbering anything.
+if [ ! -f "$SRC_INDEX" ]; then
+    echo "ERROR: $SRC_INDEX missing from extracted package."
+    echo "       This usually means the firmware tarball was truncated during"
+    echo "       upload (partial PUT to /api/firmware/update). Re-upload over"
+    echo "       a stable connection, or pull the tarball server-side via curl"
+    echo "       on the Pi. See README → Troubleshooting."
+    ls -la . 2>&1 || true
+    ls -la src 2>&1 || true
+    exit 2
+fi
+
+SRC_BYTES=$(stat -c %s "$SRC_INDEX" 2>/dev/null || wc -c < "$SRC_INDEX")
+SRC_VERSION=$(grep -m1 -oE "UI_VERSION[^,]*=[^,]*'[^']+'" "$SRC_INDEX" || echo "(unparseable)")
+echo "Source index.html: $SRC_BYTES bytes — $SRC_VERSION"
 
 HTTP_DIR=$(find /usr/local/lib/ -type d -name "http" 2>/dev/null | head -1)
 
 if [ -z "$HTTP_DIR" ]; then
-    echo "ERROR: Could not find bbctrl http directory"
+    echo "ERROR: Could not find bbctrl http directory under /usr/local/lib/"
+    exit 1
+fi
+
+if [ ! -w "$HTTP_DIR" ]; then
+    echo "ERROR: $HTTP_DIR is not writable (running as $(whoami), uid=$(id -u))"
     exit 1
 fi
 
@@ -20,8 +54,18 @@ if [ ! -e "$HTTP_DIR/index.html.orig" ]; then
 fi
 
 # Install custom UI
-cp src/py/bbctrl/http/index.html "$HTTP_DIR/index.html"
+cp "$SRC_INDEX" "$HTTP_DIR/index.html"
 chmod 644 "$HTTP_DIR/index.html"
+
+# Post-flight: confirm the new file size and version match what we shipped.
+DST_BYTES=$(stat -c %s "$HTTP_DIR/index.html" 2>/dev/null || wc -c < "$HTTP_DIR/index.html")
+DST_VERSION=$(grep -m1 -oE "UI_VERSION[^,]*=[^,]*'[^']+'" "$HTTP_DIR/index.html" || echo "(unparseable)")
+echo "Installed index.html: $DST_BYTES bytes — $DST_VERSION"
+
+if [ "$SRC_BYTES" != "$DST_BYTES" ] || [ "$SRC_VERSION" != "$DST_VERSION" ]; then
+    echo "ERROR: post-install verification failed (src vs dst mismatch)"
+    exit 3
+fi
 
 echo "Custom CNC UI installed successfully"
 

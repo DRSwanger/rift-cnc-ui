@@ -141,6 +141,38 @@ curl -X PUT -F "firmware=@onefinity-1.6.6.tar.bz2" http://<pi-ip>/api/firmware/u
 
 Replace `<pi-ip>` with the controller's IP (e.g. `192.168.1.130`). Run from the directory containing the `.tar.bz2`. The `firmware=@<file>` field name is required. The controller installs the package and reboots in ~30 seconds.
 
+### "The PUT returned `ok` but the controller still shows the old version"
+
+**Symptom:** `curl -X PUT ... /api/firmware/update` (or the in-UI Choose Package upload) returns `"ok"`, the controller reboots, but the version in **About** is unchanged. Hard-refreshing the browser doesn't help.
+
+**Root cause:** The PUT was truncated mid-upload. `update-bbctrl` extracted *some* of the tarball (enough to find `scripts/install.sh`) but `src/py/bbctrl/http/index.html` was missing from the partial extract, so the `cp` step in `install.sh` failed and bbctrl restarted on the *old* `index.html`. The most common cause is a flaky wifi connection during the multipart upload. Older versions of `install.sh` exited silently here; v1.3.1-nightly.20260427.29+ now fails loudly with the message "ERROR: src/py/bbctrl/http/index.html missing from extracted package".
+
+**Diagnose** — from any computer on the same network, check the version the controller is *actually serving*:
+
+```bash
+curl -s http://<pi-ip>/ | grep -m1 -oE "UI_VERSION[^,]*"
+```
+
+If that matches what you tried to install, it's just a browser cache — hard-refresh (Ctrl+F5 / Cmd+Shift+R) or open in incognito. If it shows the old version, the install really didn't take.
+
+**Recover** — from a root shell on the Pi (plug in monitor + keyboard, or SSH if you know the password), pull the tarball server-side and install manually. This avoids the upload entirely:
+
+```bash
+sudo bash -c '
+TAG=v1.3.2  # or any release tag
+URL="https://github.com/DRSwanger/rift-cnc-ui/releases/download/${TAG}/rift-cnc-ui-${TAG}.tar.bz2"
+WORK=/tmp/rift-debug
+rm -rf "$WORK" && mkdir -p "$WORK" && cd "$WORK"
+curl -fLso pkg.tar.bz2 "$URL" && \
+tar xjf pkg.tar.bz2 && \
+cd cnc-ui-custom && \
+bash ./scripts/install.sh && \
+systemctl restart bbctrl
+'
+```
+
+**Prevent** — when `curl`-PUT is the only option, use a wired connection if possible, or test the PUT once with a small known-good tarball before relying on it for a real install.
+
 ---
 
 ## Running the Local Proxy (Optional)
