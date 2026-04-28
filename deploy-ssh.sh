@@ -9,7 +9,13 @@
 
 set -e
 
-PI_HOST="${CNC_HOST:-192.168.1.130}"
+# Default to the mDNS hostname stock Onefinity controllers ship with
+# (`onefinity.local`). This works out-of-box on any un-modified Onefinity
+# controller on a network with mDNS/avahi resolution — no need to know the IP.
+# Override with `CNC_HOST=192.168.x.x ./deploy-ssh.sh` if mDNS isn't available
+# on your network or you've renamed the Pi.
+PI_HOST="${CNC_HOST:-onefinity.local}"
+# Default SSH user matches stock Onefinity (`bbmc`). Override via CNC_USER.
 PI_USER="${CNC_USER:-bbmc}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

@@ -8,7 +8,7 @@
 #
 #   2. Firmware update API (triggers bbctrl update, ~30s, no reboot):
 #      ./build_firmware.sh
-#      curl -X PUT http://192.168.1.130/api/firmware/update \
+#      curl -X PUT http://onefinity.local/api/firmware/update \
 #           -F "firmware=@$HOME/Documents/rift-cnc-ui-v<version>.tar.bz2"
 
 set -e

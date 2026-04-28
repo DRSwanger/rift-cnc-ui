@@ -1,9 +1,14 @@
 """
 CNC UI Proxy Server
 - Serves static files on port 8888
-- Proxies /websocket  → ws://192.168.1.130/websocket
-- Proxies /api/*      → http://192.168.1.130/api/*
+- Proxies /websocket  → ws://onefinity.local/websocket
+- Proxies /api/*      → http://onefinity.local/api/*
 Tornado blocks cross-origin WebSockets, so we proxy from same origin.
+
+Default target is `onefinity.local` (the mDNS hostname stock Onefinity
+controllers ship with) so this works out-of-box on un-modified setups.
+Override with `CNC_HOST=192.168.x.x python3 proxy.py` if mDNS isn't
+available on your network or you've renamed the Pi.
 """
 
 import asyncio
@@ -14,7 +19,7 @@ import mimetypes
 import zipfile
 from aiohttp import web, ClientSession, WSMsgType
 
-CNC_HOST    = os.environ.get('CNC_HOST', '192.168.1.130')
+CNC_HOST    = os.environ.get('CNC_HOST', 'onefinity.local')
 STATIC_DIR  = os.path.dirname(os.path.abspath(__file__))
 PORT        = int(os.environ.get('PORT', 8888))
 SETTINGS_FILE = os.path.join(STATIC_DIR, 'ui-settings.json')

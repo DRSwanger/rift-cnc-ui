@@ -2401,7 +2401,7 @@
           <div class="settings-section-title">Controller Connection</div>
           <div class="settings-row">
             <div><div class="settings-label">Controller IP Address</div><div class="settings-sub">IP of the Onefinity (bbctrl) Raspberry Pi. Requires proxy restart to take effect.</div></div>
-            <input id="cfg-cnc-host" type="text" class="settings-input" style="text-align:left;" placeholder="192.168.1.130"/>
+            <input id="cfg-cnc-host" type="text" class="settings-input" style="text-align:left;" placeholder="onefinity.local"/>
           </div>
           <div class="settings-note" id="cfg-host-note" style="margin-top:4px;">Proxy is started with: <code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:11px;">CNC_HOST=192.168.x.x python3 proxy.py</code></div>
         </div>
@@ -3061,7 +3061,7 @@ function escHtml(s) {
 const WS_URL  = `ws://${location.host}/websocket`; // same-origin always
 const API_URL = ``; // relative URLs — works for both proxy and direct bbctrl
 const SAFE_Z  = 50; // mm to retract before repositioning on resume
-const UI_VERSION             = '1.3.2-nightly.20260427.1'; // Rift by AlienWoodshop LLC
+const UI_VERSION             = '1.3.2-nightly.20260427.2'; // Rift by AlienWoodshop LLC
 const ENABLE_RESUME          = false; // set true to re-enable resume-from-stop feature
 const ENABLE_MACROS          = false; // set true to re-enable macro buttons
 const ENABLE_ROTARY          = false; // set true to show rotary axis toggle
@@ -3220,7 +3220,10 @@ function reset3dColors() {
 }
 
 // ── HOST CONFIG ──
-const DEFAULT_HOST = '192.168.1.130';
+// mDNS hostname stock Onefinity controllers ship with — works out-of-box on
+// any un-modified setup with mDNS/avahi. Existing users keep their stored
+// `cnc_host` from localStorage; this is only the fallback for fresh installs.
+const DEFAULT_HOST = 'onefinity.local';
 
 // ── WEBSOCKET ──
 function connect() {
@@ -7666,7 +7669,7 @@ function loadAboutTab() {
   const v = document.getElementById('about-version');
   if (v) v.textContent = UI_VERSION;
   const h = document.getElementById('about-host-line');
-  if (h) h.textContent = `Controller IP: ${localStorage.getItem('cnc_host') || '192.168.1.130'}`;
+  if (h) h.textContent = `Controller IP: ${localStorage.getItem('cnc_host') || DEFAULT_HOST}`;
 }
 
 async function factoryResetController() {

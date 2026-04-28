@@ -139,7 +139,7 @@ curl -X PUT -F "firmware=@rift-cnc-ui-v1.3.3.tar.bz2" http://<pi-ip>/api/firmwar
 curl -X PUT -F "firmware=@onefinity-1.6.6.tar.bz2" http://<pi-ip>/api/firmware/update
 ```
 
-Replace `<pi-ip>` with the controller's IP (e.g. `192.168.1.130`). Run from the directory containing the `.tar.bz2`. The `firmware=@<file>` field name is required. The controller installs the package and reboots in ~30 seconds.
+Replace `<pi-ip>` with the controller's address — `onefinity.local` works on most networks (it's the mDNS hostname stock Onefinity controllers ship with), or use the IP directly (e.g. `192.168.1.130`) if mDNS isn't available. Run from the directory containing the `.tar.bz2`. The `firmware=@<file>` field name is required. The controller installs the package and reboots in ~30 seconds.
 
 ### "The PUT returned `ok` but the controller still shows the old version"
 

@@ -1,8 +1,8 @@
 #!/bin/bash
 # bbctrl watchdog — auto-restarts bbctrl if it stops responding.
 # Deploy once to the Pi:
-#   scp scripts/watchdog.sh pi@192.168.1.130:/home/pi/watchdog.sh
-#   ssh pi@192.168.1.130 "chmod +x /home/pi/watchdog.sh && sudo /home/pi/watchdog.sh &"
+#   scp scripts/watchdog.sh pi@onefinity.local:/home/pi/watchdog.sh
+#   ssh pi@onefinity.local "chmod +x /home/pi/watchdog.sh && sudo /home/pi/watchdog.sh &"
 #
 # Or add to /etc/rc.local before "exit 0":
 #   /home/pi/watchdog.sh >> /var/log/bbctrl-watchdog.log 2>&1 &

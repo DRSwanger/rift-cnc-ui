@@ -154,10 +154,11 @@ When you access the controller directly at `http://onefinity.local`, the browser
 git clone https://github.com/DRSwanger/rift-cnc-ui.git
 cd rift-cnc-ui
 
-# Default — expects controller at 192.168.1.130
+# Default — uses mDNS hostname `onefinity.local` (works on any
+# un-modified Onefinity controller with mDNS/avahi on the network)
 python3 proxy.py
 
-# Custom controller IP
+# Custom controller host or IP (override if mDNS isn't available)
 CNC_HOST=192.168.1.xxx python3 proxy.py
 
 # Custom port (default is 8888)
