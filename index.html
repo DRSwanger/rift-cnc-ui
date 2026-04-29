@@ -31,6 +31,7 @@
     --accent2:  #ff6b35;
     --green:    #4efd71;
     --yellow:   #fbff00;
+    --probe:    #b08fcc;
     --red:      #ff4444;
     --text:     #e8eaf0;
     --muted:    #9da2b2;
@@ -674,8 +675,10 @@
     border: 1px solid var(--border);
     color: var(--text);
     border-radius: 6px;
-    padding: 4px 4px;
-    font-size: 11px;
+    /* Bumped from 4px/11px → 12px/14px per wife's UX feedback — Home/Zero
+       rows were too short, freed up space comes from the shrunk jog panel. */
+    padding: 12px 4px;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     text-align: center;
@@ -685,12 +688,16 @@
   .hz-btn:active { transform: scale(0.94); }
   .hz-btn.all      { grid-column: span 1; background: var(--surface); color: var(--muted); border-color: var(--border); }
   .hz-btn.zero-all { background: var(--surface); color: var(--muted); border-color: var(--border); }
-  /* Homed: text turns teal (home) or yellow (zero), border unchanged */
-  .hz-btn.btn-homed  { color: var(--accent); }
-  .hz-btn.btn-zeroed { color: var(--yellow); }
-  /* All buttons get the full outline treatment when all axes homed */
-  .hz-btn.all.btn-homed      { border-color: var(--accent); }
-  .hz-btn.zero-all.btn-zeroed { border-color: var(--yellow); }
+  /* Section titles "HOME" / "ZERO" / "PROBE Z" stay color-coded at all times. */
+  #home-title { color: var(--accent); }
+  #zero-title { color: var(--yellow); }
+  #probe-title-desktop, #probe-title-kiosk { color: var(--probe); }
+  /* X/Y/Z/All buttons read muted-grey by default; on homed/zeroed they fill with
+     color and pick up a matching border outline. */
+  #home-grid .hz-btn               { color: var(--muted); }
+  #home-grid .hz-btn.btn-homed     { color: var(--accent); border-color: var(--accent); }
+  #zero-grid .hz-btn               { color: var(--muted); }
+  #zero-grid .hz-btn.btn-zeroed    { color: var(--yellow); border-color: var(--yellow); }
   .load-btn:hover { filter: none; border-color: var(--green); }
   .state-idle       { background: #1a2a1a; color: var(--green);  border-color: var(--green); }
   .state-running    { background: #1a2a00; color: var(--yellow); border-color: var(--yellow); animation: pulse 1s infinite; }
@@ -702,9 +709,12 @@
   @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.6; } }
 
   /* ── MAIN LAYOUT ── */
+  /* Three resizable tracks: sidebar | 3D | gcode-panel. Two 5px splitter tracks
+     between them are draggable (see initColumnSplitters). Widths persist in
+     localStorage as CSS custom properties on #main. */
   #main {
     display: grid;
-    grid-template-columns: 280px 1fr 300px;
+    grid-template-columns: var(--col-sidebar, 320px) 5px 1fr 5px var(--col-right, 450px);
     overflow: hidden;
   }
 
@@ -714,7 +724,19 @@
     body:not(.kiosk-mode) #gcode-panel { display: none; }
     body:not(.kiosk-mode) #sidebar.mobile-active { display: flex; flex-direction: column; width: 100%; height: 100%; overflow-y: auto; }
     body:not(.kiosk-mode) #gcode-panel.mobile-active { display: flex; flex-direction: column; width: 100%; height: 100%; }
+    body:not(.kiosk-mode) .col-splitter { display: none; }
   }
+
+  /* Column splitters between sidebar/3D and 3D/gcode panel. */
+  .col-splitter {
+    background: var(--border);
+    cursor: col-resize;
+    position: relative;
+    z-index: 5;
+    transition: background 0.15s;
+  }
+  .col-splitter:hover, .col-splitter.dragging { background: var(--accent); }
+  body.kiosk-mode .col-splitter { display: none; }
 
   /* ── SIDEBAR ── */
   #sidebar {
@@ -773,7 +795,9 @@
     grid-template-columns: 1fr 1fr 1fr;
     grid-auto-rows: 1fr;
     gap: 4px;
-    flex: 3;
+    /* Shrunk from flex:3 → flex:2 per wife's UX feedback — jog pad was
+       eating too much sidebar real estate for routine use. */
+    flex: 2;
     min-height: 0;
   }
   .jog-btn {
@@ -781,8 +805,8 @@
     border: 1px solid var(--border);
     color: var(--text);
     border-radius: 8px;
-    padding: 10px 4px;
-    font-size: 18px;
+    padding: 6px 4px;
+    font-size: 16px;
     cursor: pointer;
     transition: all 0.1s;
     text-align: center;
@@ -802,7 +826,9 @@
     flex-direction: column;
     gap: 3px;
     margin-top: 2px;
-    flex: 2;
+    /* Shrunk from flex:2 → flex:1.4 alongside .jog-grid bump (XY:Z ratio
+       preserved at ~1.4:1 so the column proportions feel the same). */
+    flex: 1.4;
     min-height: 0;
   }
   .jog-z .jog-btn { flex: 1; }
@@ -886,6 +912,7 @@
     min-width: 180px;
   }
   #color-panel.open { display: flex; }
+  [data-theme="light"] #color-panel { background: rgba(255,255,255,0.97); }
   #color-panel-title { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 2px; }
   .cp-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .cp-row label { font-size: 11px; color: var(--text); flex: 1; }
@@ -954,15 +981,15 @@
   #gcode-top-bar {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 4px 8px;
+    gap: 10px;
+    padding: 8px 12px;
     border-bottom: 1px solid var(--border);
     background: var(--surface2);
     flex-shrink: 0;
   }
   #btn-files {
-    padding: 6px 14px;
-    font-size: 12px;
+    padding: 14px 22px;
+    font-size: 16px;
     font-weight: 700;
     white-space: nowrap;
     background: var(--surface2);
@@ -987,22 +1014,23 @@
     overflow: hidden;
   }
   #gcode-file-folder {
-    font-size: 9px;
+    font-size: 12px;
     color: var(--muted);
     text-transform: uppercase;
     letter-spacing: 0.8px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    line-height: 1.2;
+    line-height: 1.3;
   }
   #gcode-file-name {
-    font-size: 12px;
+    font-size: 18px;
     font-weight: 600;
     color: var(--text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    line-height: 1.3;
   }
 
   #gcode-content {
@@ -1551,18 +1579,18 @@
   .fm-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
+    gap: 12px;
+    padding: 16px 14px;
     border-radius: 8px;
     transition: background 0.1s;
     cursor: pointer;
   }
   .fm-item:hover { background: var(--surface2); }
-  .fm-icon { font-size: 16px; flex-shrink: 0; width: 22px; text-align: center; }
-  .fm-name { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fm-icon { font-size: 22px; flex-shrink: 0; width: 28px; text-align: center; }
+  .fm-name { flex: 1; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fm-name.folder { color: var(--accent); cursor: pointer; font-weight: 600; }
   .fm-name.folder:hover { text-decoration: underline; }
-  .fm-size { font-size: 11px; color: var(--muted); min-width: 60px; text-align: right; flex-shrink: 0; }
+  .fm-size { font-size: 14px; color: var(--muted); min-width: 70px; text-align: right; flex-shrink: 0; }
   .fm-actions { display: flex; gap: 4px; flex-shrink: 0; }
   .fm-btn {
     background: none;
@@ -1665,6 +1693,14 @@
     grid-template-rows: repeat(4, 1fr);
     flex: 1;
     min-height: 0;
+  }
+  /* In kiosk, Home block lives inside scol-setup (above Zero) — flex column so #home-grid fills */
+  body.kiosk-mode #home-block {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    gap: 8px;
   }
   body.kiosk-mode #home-grid .hz-btn,
   body.kiosk-mode #zero-grid .hz-btn { height: 100%; min-height: 0; font-size: 10px; padding: 2px; }
@@ -1833,14 +1869,17 @@
     --accent:   #0099cc;
     --accent2:  #e85d20;
     --green:    #1a8a3a;
-    --yellow:   #a08000;
+    --yellow:   #7a5d2e;
+    --probe:    #6a4f9a;
     --red:      #cc2222;
     --text:     #1a1c22;
     --muted:    #5c6275;
   }
   [data-theme="light"] body,
   [data-theme="light"] html { background: var(--bg); }
-  [data-theme="light"] #three-canvas { filter: invert(0.92) hue-rotate(180deg); }
+  /* No CSS filter on the 3D canvas — light mode now drives Three.js scene
+     colors directly via _3dColorDefaultsLight (see toggle3dLightMode + the
+     applyTheme sync). */
   /* 3D viewer buttons sit on top of the canvas — need their own background in light mode */
   [data-theme="light"] .view-btn {
     background: rgba(240,242,245,0.92); color: var(--text); border-color: var(--border);
@@ -1860,6 +1899,13 @@
   [data-theme="light"] #error-banner   { background: #ffe8e8; }
   [data-theme="light"] .gcode-line.current { background: rgba(0,153,204,0.08); }
   [data-theme="light"] .load-btn.on    { background: rgba(26,138,58,0.1); }
+  /* Hardcoded neon-yellow tints (rgba(251,255,0,...)) read as washed-out lemon
+     on white. Replace with darker amber tints in light mode. */
+  [data-theme="light"] .btn-pause            { background: rgba(122,93,46,0.10); }
+  [data-theme="light"] .btn-pause:hover      { background: var(--yellow); color: #fff; }
+  [data-theme="light"] .ovr-opt-pause.armed  { background: rgba(122,93,46,0.10); }
+  [data-theme="light"] .indicator-item.ind-warn { background: rgba(122,93,46,0.08); }
+  [data-theme="light"] .db25-badge.motor     { background: rgba(122,93,46,0.12); }
 
   /* Connection dot */
   #conn-dot, .conn-dot {
@@ -1992,9 +2038,42 @@
     pointer-events: none;
   }
 
+  /* Dev-mode visual indicator. Activated when the UI is loaded via the dev
+     proxy hostname (`dev.cnc.rift`) or with `?dev=1` in the URL — see the
+     small inline script directly under <body>. Hot-pink ring around the
+     viewport so dev sessions can't be confused with prod. */
+  body.dev-mode::before {
+    content: "";
+    position: fixed; inset: 0;
+    box-shadow: inset 0 0 0 1px #ff2d95;
+    pointer-events: none;
+    z-index: 99999;
+  }
+  body.dev-mode::after {
+    content: "DEV";
+    position: fixed; top: 8px; right: 12px;
+    background: #ff2d95; color: #fff;
+    font-family: system-ui, sans-serif;
+    font-weight: 800; font-size: 11px; letter-spacing: 1.2px;
+    padding: 3px 8px; border-radius: 4px;
+    pointer-events: none;
+    z-index: 99999;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  }
+
 </style>
 </head>
 <body>
+<script>
+  // Dev-mode flag: `dev.cnc.rift` hostname OR `?dev=1` query param.
+  // Adds `body.dev-mode` so the hot-pink ring + DEV badge render. Runs inline
+  // (no DOMContentLoaded wait) so the badge is visible from first paint.
+  (function() {
+    var isDevHost = location.hostname === 'dev.cnc.rift';
+    var isDevParam = /[?&]dev=1\b/.test(location.search);
+    if (isDevHost || isDevParam) document.body.classList.add('dev-mode');
+  })();
+</script>
 
 <!-- STATUS BAR -->
 <div id="status-bar">
@@ -2095,14 +2174,14 @@
           </svg>
         </div>
         <div class="probe-ref-label">Zero to Top of Stock</div>
-        <div class="probe-ref-desc">Probe on wasteboard. Enter stock thickness — Z=0 = top of material. Use for V-carving, engraving.</div>
+        <div class="probe-ref-desc">Probe on top of stock. Z=0 = top of material. Use for V-carving, engraving.</div>
       </div>
     </div>
     <!-- Stock thickness — always visible -->
     <div id="probe-thickness-row" style="display:flex; flex-direction:column; gap:6px;">
       <label style="font-size:12px;color:var(--muted);">Stock thickness (mm)</label>
       <input id="probe-thickness-input" type="number" step="0.1" min="0.1" value="18" class="probe-stock-field" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:10px 12px;font-size:22px;font-weight:700;text-align:center;width:100%;"/>
-      <div id="probe-thickness-note" style="font-size:11px;color:var(--muted);text-align:center;"></div>
+      <div id="probe-thickness-note" style="font-size:11px;color:var(--muted);text-align:center;min-height:48px;line-height:1.4;"></div>
     </div>
     <div class="probe-safety-btns" style="justify-content:space-between">
       <button class="settings-btn" onclick="probeStockCancel()">Cancel</button>
@@ -2809,8 +2888,18 @@
   <!-- SIDEBAR -->
   <div id="sidebar">
 
-    <!-- Motion column: Step Size + Jog XY + Jog Z (desktop) -->
+    <!-- Motion column: Home (desktop only — JS moves #home-block to scol-setup in kiosk) + Step Size + Jog XY + Jog Z (desktop) -->
     <div class="sidebar-col" id="scol-motion">
+      <div id="home-block">
+        <div class="section-title" id="home-title">Home</div>
+        <div class="axis-grid" id="home-grid">
+          <button class="hz-btn" id="btn-home-x" onclick="homeAxis('x')">X</button>
+          <button class="hz-btn" id="btn-home-y" onclick="homeAxis('y')">Y</button>
+          <button class="hz-btn" id="btn-home-z" onclick="homeAxis('z')">Z</button>
+          <button class="hz-btn all" id="btn-home-all" onclick="homeAxis('all')">All</button>
+        </div>
+      </div>
+
       <div class="section-title">Step Size (mm)</div>
       <div class="step-btns">
         <div class="step-btn" onclick="setStep(0.1)">0.1</div>
@@ -2840,28 +2929,21 @@
       </div>
     </div>
 
-    <!-- Setup column: Home + Zero (desktop), Home + Zero only (kiosk — narrower 2×2) -->
+    <!-- Setup column: Zero (desktop) + Home/Zero only (kiosk — narrower 2×2). Home was
+         moved up into scol-motion per UX feedback (Home above Step Size). -->
     <div class="sidebar-col" id="scol-setup">
-      <div class="section-title">Home</div>
-      <div class="axis-grid" id="home-grid">
-        <button class="hz-btn all" id="btn-home-all" onclick="homeAxis('all')">All</button>
-        <button class="hz-btn" id="btn-home-x" onclick="homeAxis('x')">X</button>
-        <button class="hz-btn" id="btn-home-y" onclick="homeAxis('y')">Y</button>
-        <button class="hz-btn" id="btn-home-z" onclick="homeAxis('z')">Z</button>
-      </div>
-
-      <div class="section-title">Zero</div>
+      <div class="section-title" id="zero-title">Zero</div>
       <div class="axis-grid" id="zero-grid">
-        <button class="hz-btn zero-all" id="btn-zero-all" onclick="zeroAxis('all')">All</button>
         <button class="hz-btn" id="btn-zero-x" onclick="zeroAxis('x')">X</button>
         <button class="hz-btn" id="btn-zero-y" onclick="zeroAxis('y')">Y</button>
         <button class="hz-btn" id="btn-zero-z" onclick="zeroAxis('z')">Z</button>
+        <button class="hz-btn zero-all" id="btn-zero-all" onclick="zeroAxis('all')">All</button>
       </div>
 
       <!-- Desktop only: Probe Z lives here; kiosk moves it to scol-zprobe -->
-      <div class="section-title desktop-only">Probe Z</div>
+      <div class="section-title desktop-only" id="probe-title-desktop">Probe Z</div>
       <div class="jog-z desktop-only" style="flex:none">
-        <button id="btn-probe-z" class="jog-btn" onclick="probeZ()" style="width:100%;font-size:14px;font-weight:600;">Probe Z</button>
+        <button id="btn-probe-z" class="jog-btn" onclick="probeZ()" style="width:100%;padding:12px 4px;font-size:14px;font-weight:600;color:var(--probe);">Probe Z</button>
       </div>
 
       <div id="macros-section" style="display:none">
@@ -2878,13 +2960,15 @@
         <button class="jog-btn center" onclick="goToZOrigin()" title="Move to Z work zero" style="color:var(--accent);align-self:center;padding:10px 24px;">Z Origin</button>
         <button class="jog-btn" onclick="jog('Z', -1)" style="width:100%">▼ Z−</button>
       </div>
-      <div class="section-title">Probe Z</div>
+      <div class="section-title" id="probe-title-kiosk">Probe Z</div>
       <div class="jog-z" style="flex:none">
-        <button id="btn-probe-z-kiosk" class="jog-btn" onclick="probeZ()" style="width:100%;font-size:14px;font-weight:600;">Probe Z</button>
+        <button id="btn-probe-z-kiosk" class="jog-btn" onclick="probeZ()" style="width:100%;padding:12px 4px;font-size:14px;font-weight:600;color:var(--probe);">Probe Z</button>
       </div>
     </div>
 
   </div>
+
+  <div class="col-splitter" id="split-left" title="Drag to resize sidebar"></div>
 
   <!-- 3D VIEW -->
   <div id="view-panel">
@@ -2929,6 +3013,14 @@
             <label style="font-size:11px;color:var(--text);">Spindle opacity <span id="cp-opacity-val">—</span></label>
             <input type="range" id="cp-opacity" min="0.05" max="1" step="0.05" style="width:100%;accent-color:var(--accent);" oninput="setSpindleOpacity(+this.value)">
           </div>
+          <div class="cp-row" style="flex-direction:column;align-items:stretch;gap:3px;">
+            <label style="font-size:11px;color:var(--text);">Spindle size <span id="cp-scale-val">—</span></label>
+            <input type="range" id="cp-scale" min="0.2" max="2" step="0.05" style="width:100%;accent-color:var(--accent);" oninput="setSpindleScale(+this.value)">
+          </div>
+          <div class="cp-row" style="flex-direction:column;align-items:stretch;gap:3px;">
+            <label style="font-size:11px;color:var(--text);">Marker size <span id="cp-marker-val">—</span></label>
+            <input type="range" id="cp-marker" min="0.2" max="3" step="0.05" style="width:100%;accent-color:var(--accent);" oninput="setMarkerScale(+this.value)">
+          </div>
           <button class="cp-reset" onclick="reset3dColors()">Reset defaults</button>
         </div>
       </div>
@@ -2937,6 +3029,8 @@
     </div>
 
   </div>
+
+  <div class="col-splitter" id="split-right" title="Drag to resize file panel"></div>
 
   <!-- GCODE PANEL -->
   <div id="gcode-panel">
@@ -3061,7 +3155,7 @@ function escHtml(s) {
 const WS_URL  = `ws://${location.host}/websocket`; // same-origin always
 const API_URL = ``; // relative URLs — works for both proxy and direct bbctrl
 const SAFE_Z  = 50; // mm to retract before repositioning on resume
-const UI_VERSION             = '1.3.2-nightly.20260427.2'; // Rift by AlienWoodshop LLC
+const UI_VERSION             = '1.3.2-nightly.20260428.1'; // Rift by AlienWoodshop LLC
 const ENABLE_RESUME          = false; // set true to re-enable resume-from-stop feature
 const ENABLE_MACROS          = false; // set true to re-enable macro buttons
 const ENABLE_ROTARY          = false; // set true to show rotary axis toggle
@@ -3188,6 +3282,25 @@ function setSpindleOpacity(v) {
   const lbl = document.getElementById('cp-opacity-val');
   if (lbl) lbl.textContent = Math.round(v * 100) + '%';
 }
+
+function setSpindleScale(v) {
+  if (!isFinite(v) || v <= 0) v = 1;
+  if (window._machineRoot) { window._machineRoot.scale.setScalar(v); requestRender(); }
+  try { localStorage.setItem('rift_spindleScale', String(v)); } catch(_) {}
+  const lbl = document.getElementById('cp-scale-val');
+  if (lbl) lbl.textContent = Math.round(v * 100) + '%';
+}
+
+function setMarkerScale(v) {
+  if (!isFinite(v) || v <= 0) v = 1;
+  if (typeof posMarker !== 'undefined' && posMarker) {
+    posMarker.scale.setScalar(v);
+    if (typeof requestRender === 'function') requestRender();
+  }
+  try { localStorage.setItem('rift_markerScale', String(v)); } catch(_) {}
+  const lbl = document.getElementById('cp-marker-val');
+  if (lbl) lbl.textContent = Math.round(v * 100) + '%';
+}
 function toggle3dColorPanel() {
   const p = document.getElementById('color-panel');
   if (!p) return;
@@ -3196,6 +3309,12 @@ function toggle3dColorPanel() {
     const sl = document.getElementById('cp-opacity');
     const cur = window._spindleMat ? window._spindleMat.opacity : parseFloat(localStorage.getItem('rift_spindleOpacity')||'0.55');
     if (sl) { sl.value = cur; setSpindleOpacity(cur); }
+    const ss = document.getElementById('cp-scale');
+    const sCur = parseFloat(localStorage.getItem('rift_spindleScale') || '1') || 1;
+    if (ss) { ss.value = sCur; setSpindleScale(sCur); }
+    const ms = document.getElementById('cp-marker');
+    const mCur = parseFloat(localStorage.getItem('rift_markerScale') || '1') || 1;
+    if (ms) { ms.value = mCur; setMarkerScale(mCur); }
   }
   p.classList.toggle('open');
 }
@@ -3311,6 +3430,10 @@ function updateUI(data) {
   // Covers the case where user zeroed XY via something other than the Zero button and then E-stopped.
   if ('offset_x' in data || 'offset_y' in data) {
     autoSnapshotXyOffset();
+  }
+  // Resize 3D bed grid when soft-limit config arrives or changes
+  if ('0tn' in data || '0tm' in data || '1tn' in data || '1tm' in data) {
+    if (typeof updateBedGrid === 'function') updateBedGrid();
   }
   // Homed state — motor map: X=0, Y=1, Z=3
   if ('0homed' in data || '1homed' in data || '3homed' in data) {
@@ -3579,6 +3702,10 @@ function updateBannerMore() {
 
 function showErrorBanner(msg, force) {
   if (!msg) return;
+  // "Stopped by user" / "user stop" is an intentional action, not a fault — never
+  // banner or log it. Catches paths that bypass the pr-based isUserAction filter
+  // (e.g. log-poll lines that arrive before _wasUserStop is set).
+  if (/stopped by user|user\s*stop/i.test(msg)) return;
   // pr-based suppression: if user dismissed this exact pr value, don't re-show.
   // Log errors (force=true) are cursor-tracked independently — don't touch _prDismissed.
   if (!force && _prDismissed && state.pr === _prDismissed) return;
@@ -3719,7 +3846,9 @@ async function pollLog() {
     const errLine = text.split('\n')
       .filter(l => /^E:Planner:/.test(l))
       .map(l => l.replace(/^E:Planner:/, '').trim())
-      .find(l => l && !/^While executing|^\s+At:|^Caused by/.test(l));
+      // Skip "user stop" / "stopped by user" — that's an intentional user action,
+      // not a fault. Same suppression idea as the pr-based isUserAction check.
+      .find(l => l && !/^While executing|^\s+At:|^Caused by|user\s*stop|stopped by user/i.test(l));
     if (errLine) showErrorBanner(errLine, true);
   } catch(e) { /* ignore */ }
   _logPolling = false;
@@ -3733,6 +3862,17 @@ function setMachineState(s) {
   // Sync E-Stop button label with state
   const estopBtn = document.getElementById('btn-estop');
   if (estopBtn) estopBtn.textContent = s === 'estopped' ? '✅ Clear E-Stop' : '⛔ E-Stop';
+  // E-Stop cleared: drop any leftover "Stopped by user" banner. The controller's
+  // pr value can persist across the estopped → idle/ready transition, so the
+  // generic pr-handler would just re-display it. Mark it dismissed.
+  if (lastMachineState === 'estopped' && s !== 'estopped') {
+    const pr = state.pr || '';
+    if (/user|stop/i.test(pr)) {
+      _prDismissed = pr;
+      try { sessionStorage.setItem('cnc_prDismissed', pr); } catch(_) {}
+      clearErrorBanner(true);
+    }
+  }
   // Successful home cycle: homing → idle clears all switch faults in bbctrl.
   // _wasHoming is checked HERE (before clearing) because updateUI no longer clears it early.
   if (s === 'idle' && _wasHoming) {
@@ -3893,16 +4033,19 @@ function setMachineState(s) {
     offerXyRecovery();
   }
   // First-load boot offer: if a snapshot exists and XY are unhomed on first idle after page load,
-  // prompt once so the user can restore across reboots. Gated by settings.offerRecoveryOnBoot.
+  // prompt once per snapshot so the user can restore across reboots. Gated by settings.offerRecoveryOnBoot.
+  // Key the "already offered" flag on the snapshot's timestamp (in localStorage) so closing and
+  // reopening the tab doesn't re-prompt for the same snapshot. A new snapshot (new `t`) re-arms it.
   if (s === 'idle' && !_bootRecoveryChecked && settings.offerRecoveryOnBoot !== false) {
     _bootRecoveryChecked = true;
     const xyUnhomed = !state['0homed'] || !state['1homed'];
-    // sessionStorage survives F5 refresh but not tab close / real machine reboot —
-    // exactly the line we want: only offer once per browser session.
-    const alreadyOffered = sessionStorage.getItem('rift_boot_recovery_offered') === '1';
-    if (xyUnhomed && !alreadyOffered && readXyZeroSnapshot()) {
-      sessionStorage.setItem('rift_boot_recovery_offered', '1');
-      offerXyRecovery();
+    const snap = readXyZeroSnapshot();
+    if (xyUnhomed && snap) {
+      const offeredFor = localStorage.getItem('rift_boot_recovery_offered_for');
+      if (offeredFor !== String(snap.t)) {
+        localStorage.setItem('rift_boot_recovery_offered_for', String(snap.t));
+        offerXyRecovery();
+      }
     }
   }
   // Fresh fault arms a new recovery offer for the next idle transition
@@ -4736,6 +4879,12 @@ function autoSnapshotXyOffset() {
     // Don't flood writes: only save if changed by ≥0.001mm from last snapshot
     if (_lastSnapOx !== null && Math.abs(ox - _lastSnapOx) < 0.001 && Math.abs(oy - _lastSnapOy) < 0.001) return;
     _lastSnapOx = ox; _lastSnapOy = oy;
+    // On page load _lastSnapOx is null, so the first WS update with offsets would
+    // bump the snapshot's `t` even when the underlying offsets haven't changed —
+    // that defeats the "once per snapshot" boot-recovery guard. If the persisted
+    // snapshot already matches these offsets, keep its existing timestamp.
+    const existing = readXyZeroSnapshot();
+    if (existing && Math.abs(+existing.ox - ox) < 0.001 && Math.abs(+existing.oy - oy) < 0.001) return;
     localStorage.setItem(XY_SNAP_KEY, JSON.stringify({ ox, oy, t: Date.now() }));
   } catch(e) { /* non-fatal */ }
 }
@@ -5520,16 +5669,27 @@ function probeRefSelectCard(ref) {
 function probeThicknessUpdate() {
   const selected = document.querySelector('.probe-ref-card.selected');
   const ref = selected ? (selected.id === 'probe-ref-top' ? 'top' : 'surface') : null;
-  const t = parseFloat(document.getElementById('probe-thickness-input').value) || 0;
+  const input = document.getElementById('probe-thickness-input');
+  const row   = document.getElementById('probe-thickness-row');
+  const note  = document.getElementById('probe-thickness-note');
+  const t = parseFloat(input.value) || 0;
+  // Stock thickness is only used by 'surface' (wasteboard). On 'top' hide the whole
+  // row with visibility:hidden so the modal height stays constant — the field reads
+  // as cleanly absent rather than a confusingly-disabled field.
   if (ref === 'top') {
-    document.getElementById('probe-thickness-note').textContent =
-      `Z=0 at top of stock · probe height ${settings.probeHeight}mm`;
+    row.style.visibility = 'hidden';
+    input.disabled = true;
+    note.textContent = '';
   } else if (ref === 'surface') {
+    row.style.visibility = '';
+    input.disabled = false;
     const offset = (settings.probeHeight - t).toFixed(3);
-    document.getElementById('probe-thickness-note').textContent =
+    note.textContent =
       `Z offset = ${settings.probeHeight}mm − ${t}mm stock = ${offset}mm  ·  Z=0 at wasteboard, stock top at Z=+${t}mm`;
   } else {
-    document.getElementById('probe-thickness-note').textContent = '';
+    row.style.visibility = '';
+    input.disabled = false;
+    note.textContent = '';
   }
 }
 
@@ -6195,11 +6355,8 @@ function init3D() {
   camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10000);
   updateCamera();
 
-  // Grid (stored for toggle)
-  window._viewGrid = new THREE.GridHelper(1000, 20, _3dColors.grid, _3dColors.grid);
-  window._viewGrid.rotation.x = Math.PI / 2;
-  window._viewGrid.position.set(400, 400, 0);
-  scene.add(window._viewGrid);
+  // Grid (stored for toggle) — sized to machine soft limits, rebuilt on bound changes
+  updateBedGrid();
 
   // Axes
   const axMat = (color) => new THREE.LineBasicMaterial({ color });
@@ -6242,6 +6399,10 @@ function init3D() {
   posMarker.add(shank);
 
   scene.add(posMarker);
+  try {
+    const mk = parseFloat(localStorage.getItem('rift_markerScale') || '1');
+    if (isFinite(mk) && mk > 0) posMarker.scale.setScalar(mk);
+  } catch(_) {}
 
   // Toolpath group (rapids sub-group for toggle)
   window._rapidsGroup = new THREE.Group();
@@ -6344,6 +6505,52 @@ function updateCamera() {
 // hours of idle UI was the dominant CPU/GPU drag during long jobs.
 let _renderDirty = true;
 function requestRender() { _renderDirty = true; }
+
+// Build a rectangular grid sized to the machine's X/Y soft limits.
+// Reads bounds from state ('0tn'/'0tm' for X, '1tn'/'1tm' for Y) and rebuilds
+// only when bounds change (signature cached on window._bedGridSig).
+function updateBedGrid() {
+  if (typeof scene === 'undefined' || !scene) return;
+  const xMin = +(state['0tn'] != null ? state['0tn'] : 0);
+  const xMax = +(state['0tm'] != null ? state['0tm'] : 816);
+  const yMin = +(state['1tn'] != null ? state['1tn'] : 0);
+  const yMax = +(state['1tm'] != null ? state['1tm'] : 816);
+  if (!(xMax > xMin) || !(yMax > yMin)) return;
+  const sig = xMin+','+xMax+','+yMin+','+yMax;
+  if (window._bedGridSig === sig && window._viewGrid) return;
+  window._bedGridSig = sig;
+  if (window._viewGrid) {
+    scene.remove(window._viewGrid);
+    if (window._viewGrid.geometry) window._viewGrid.geometry.dispose();
+    if (window._viewGrid.material) window._viewGrid.material.dispose();
+  }
+  // Pick cell size that gives ~16-24 cells across the larger dim
+  const span = Math.max(xMax - xMin, yMax - yMin);
+  const target = span / 20;
+  const steps = [10, 25, 50, 100, 200];
+  let cell = steps[steps.length - 1];
+  for (const s of steps) { if (s >= target) { cell = s; break; } }
+  const verts = [];
+  for (let x = Math.ceil(xMin / cell) * cell; x <= xMax + 0.001; x += cell) {
+    verts.push(x, yMin, 0, x, yMax, 0);
+  }
+  for (let y = Math.ceil(yMin / cell) * cell; y <= yMax + 0.001; y += cell) {
+    verts.push(xMin, y, 0, xMax, y, 0);
+  }
+  // Outer border (always drawn so the bed edge is visible even when gridlines miss it)
+  verts.push(xMin, yMin, 0, xMax, yMin, 0,
+             xMax, yMin, 0, xMax, yMax, 0,
+             xMax, yMax, 0, xMin, yMax, 0,
+             xMin, yMax, 0, xMin, yMin, 0);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  const mat = new THREE.LineBasicMaterial({ color: _3dColors.grid });
+  const grid = new THREE.LineSegments(geo, mat);
+  grid.visible = !(typeof viewToggles !== 'undefined' && viewToggles && viewToggles.grid === false);
+  window._viewGrid = grid;
+  scene.add(grid);
+  requestRender();
+}
 
 function animate() {
   requestAnimationFrame(animate);
@@ -6558,6 +6765,11 @@ function buildMachineModel() {
   }
   _machineRoot.visible = viewToggles.machine;
   scene.add(_machineRoot);
+  // Apply user's saved spindle marker size, if any.
+  try {
+    const s = parseFloat(localStorage.getItem('rift_spindleScale') || '1');
+    if (isFinite(s) && s > 0) _machineRoot.scale.setScalar(s);
+  } catch(_) {}
   updateMachinePos();
   requestRender();
 }
@@ -7231,7 +7443,14 @@ function updateProgressLabel() {
 
 // ── THEME ──
 function applyTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : '');
+  const isLight = theme === 'light';
+  document.documentElement.setAttribute('data-theme', isLight ? 'light' : '');
+  // Auto-sync the 3D viewer mode to match the UI theme. The 3D toolbar's
+  // separate dark/light button still works as a manual override after the fact.
+  const want3d = isLight ? 'light' : 'dark';
+  if (typeof toggle3dLightMode === 'function' && _3dMode !== want3d) {
+    toggle3dLightMode();
+  }
 }
 
 // ── LOAD BUTTON LABELS ──
@@ -7943,8 +8162,21 @@ function updateKioskScale() {
 }
 window.addEventListener('resize', updateKioskScale);
 
+function relocateHomeBlock(kiosk) {
+  const block = document.getElementById('home-block');
+  if (!block) return;
+  if (kiosk) {
+    const setup = document.getElementById('scol-setup');
+    if (setup && block.parentElement !== setup) setup.insertBefore(block, setup.firstChild);
+  } else {
+    const motion = document.getElementById('scol-motion');
+    if (motion && block.parentElement !== motion) motion.insertBefore(block, motion.firstChild);
+  }
+}
+
 function setKioskMode(enable) {
   document.body.classList.toggle('kiosk-mode', enable);
+  relocateHomeBlock(enable);
   const btn = document.getElementById('btn-kiosk');
   if (btn) {
     btn.classList.toggle('kiosk-active', enable);
@@ -7958,15 +8190,37 @@ function setKioskMode(enable) {
 }
 
 function toggleKioskMode() {
+  // Locked environments (local Pi / old Chromium) can't leave kiosk
+  if (document.body.classList.contains('kiosk-locked')) return;
   setKioskMode(!document.body.classList.contains('kiosk-mode'));
+}
+
+// Old/embedded Chromium on the local Pi touchscreen has no scroll wheel and lags
+// in desktop mode — once a user toggles to desktop they can't get back. Lock the
+// UI to kiosk and hide the toggle for those environments.
+function _kioskIsLocked() {
+  const isLocal = _isLocalhost || window.location.hostname === '192.168.1.130';
+  const m = navigator.userAgent.match(/Chrom(?:e|ium)\/(\d+)/);
+  const chromeMajor = m ? parseInt(m[1], 10) : 0;
+  // Pi stock Chromium ships at v60-ish; modern desktops are 100+. Threshold of 90
+  // catches embedded browsers without false-positive on modern remote viewers.
+  const isOldChromium = chromeMajor > 0 && chromeMajor < 90;
+  return isLocal || isOldChromium;
 }
 
 function initKioskMode() {
   // Auto-detect: local Pi browser or mobile viewport
   const isLocal  = _isLocalhost || window.location.hostname === '192.168.1.130';
   const isMobile = window.innerWidth <= 900;
+  const locked   = _kioskIsLocked();
   const stored   = localStorage.getItem('kioskMode');
-  const enable   = stored !== null ? stored === '1' : (isLocal || isMobile);
+  // Locked environments always boot to kiosk and hide the toggle
+  const enable   = locked ? true : (stored !== null ? stored === '1' : (isLocal || isMobile));
+  if (locked) {
+    document.body.classList.add('kiosk-locked');
+    const btn = document.getElementById('btn-kiosk');
+    if (btn) btn.style.display = 'none';
+  }
   if (enable) {
     if (isLocal) document.body.classList.add('local-kiosk');
     setKioskMode(true);
@@ -7984,6 +8238,91 @@ function initKioskMode() {
   }
 }
 
+// Resizable column splitters between sidebar/3D and 3D/gcode panels.
+// Persists widths to localStorage; clamps so the 3D viewport never collapses.
+function initColumnSplitters() {
+  const main = document.getElementById('main');
+  if (!main) return;
+  const SIDEBAR_KEY = 'rift_sidebar_w';
+  const RIGHT_KEY   = 'rift_right_w';
+  const SIDEBAR_MIN = 240, SIDEBAR_MAX = 500;
+  const RIGHT_MIN   = 320, RIGHT_MAX   = 700;
+  const VIEW_MIN    = 280;
+  const SPLITTERS_W = 10;
+  const sw = parseInt(localStorage.getItem(SIDEBAR_KEY), 10);
+  const rw = parseInt(localStorage.getItem(RIGHT_KEY),   10);
+  if (sw && sw > 0) main.style.setProperty('--col-sidebar', sw + 'px');
+  if (rw && rw > 0) main.style.setProperty('--col-right',   rw + 'px');
+
+  function attach(el, isLeft) {
+    let dragging = false, startX = 0, startW = 0;
+    function down(e) {
+      // Skip in kiosk/mobile (splitters are display:none anyway, but belt-and-braces)
+      if (document.body.classList.contains('kiosk-mode')) return;
+      dragging = true;
+      el.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      const ev = e.touches ? e.touches[0] : e;
+      startX = ev.clientX;
+      const cols = getComputedStyle(main).gridTemplateColumns.split(' ');
+      // 5-track grid: [sidebar, splitter, view, splitter, right]
+      startW = parseFloat(isLeft ? cols[0] : cols[4]);
+      window.addEventListener('mousemove', move);
+      window.addEventListener('mouseup',   up);
+      window.addEventListener('touchmove', move, { passive: false });
+      window.addEventListener('touchend',  up);
+      e.preventDefault();
+    }
+    function move(e) {
+      if (!dragging) return;
+      const ev = e.touches ? e.touches[0] : e;
+      if (e.preventDefault) e.preventDefault();
+      const dx    = ev.clientX - startX;
+      const winW  = main.clientWidth;
+      const cols  = getComputedStyle(main).gridTemplateColumns.split(' ');
+      const otherW = parseFloat(isLeft ? cols[4] : cols[0]);
+      const maxBySpace = winW - otherW - VIEW_MIN - SPLITTERS_W;
+      let newW;
+      if (isLeft) {
+        newW = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, startW + dx));
+        newW = Math.min(newW, maxBySpace);
+        main.style.setProperty('--col-sidebar', newW + 'px');
+        localStorage.setItem(SIDEBAR_KEY, String(Math.round(newW)));
+      } else {
+        newW = Math.max(RIGHT_MIN, Math.min(RIGHT_MAX, startW - dx));
+        newW = Math.min(newW, maxBySpace);
+        main.style.setProperty('--col-right', newW + 'px');
+        localStorage.setItem(RIGHT_KEY, String(Math.round(newW)));
+      }
+      // Three.js viewport listens to window resize for canvas sizing
+      window.dispatchEvent(new Event('resize'));
+    }
+    function up() {
+      dragging = false;
+      el.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup',   up);
+      window.removeEventListener('touchmove', move);
+      window.removeEventListener('touchend',  up);
+    }
+    el.addEventListener('mousedown',  down);
+    el.addEventListener('touchstart', down, { passive: false });
+    // Double-click resets to default
+    el.addEventListener('dblclick', () => {
+      if (isLeft) { main.style.removeProperty('--col-sidebar'); localStorage.removeItem(SIDEBAR_KEY); }
+      else        { main.style.removeProperty('--col-right');   localStorage.removeItem(RIGHT_KEY); }
+      window.dispatchEvent(new Event('resize'));
+    });
+  }
+  const left  = document.getElementById('split-left');
+  const right = document.getElementById('split-right');
+  if (left)  attach(left,  true);
+  if (right) attach(right, false);
+}
+
 // ── INIT ──
 // Apply dev mode on load (restores Logs tab visibility from saved settings)
 (function() {
@@ -7991,6 +8330,7 @@ function initKioskMode() {
   if (logsTab && settings.devMode) logsTab.classList.add('dev-visible');
 })();
 initKioskMode();
+initColumnSplitters();
 if (ENABLE_TOUR) document.getElementById('btn-tour').style.display = '';
 try { init3D(); } catch(e) { console.warn('3D view unavailable:', e.message); }
 initViewToggles();

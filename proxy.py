@@ -317,7 +317,15 @@ async def handle(request):
 
     mime, _ = mimetypes.guess_type(filepath)
     with open(filepath, 'rb') as f:
-        return web.Response(body=f.read(), content_type=mime or 'text/html')
+        # Always serve fresh during dev — the proxy is the dev/test loop, so we
+        # never want the browser to cache index.html or any static asset here.
+        return web.Response(
+            body=f.read(),
+            content_type=mime or 'text/html',
+            headers={'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+                     'Pragma': 'no-cache',
+                     'Expires': '0'}
+        )
 
 
 def main():
