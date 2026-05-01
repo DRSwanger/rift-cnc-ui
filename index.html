@@ -1897,29 +1897,6 @@
   .movable.drop-before::after { top: 0; }
   .movable.drop-after::after  { bottom: 0; }
 
-  /* Bottom tray under 3D view (desktop) */
-  #bottom-tray {
-    flex: 0 1 auto;
-    min-height: 0;
-    overflow: hidden;
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    padding: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  #bottom-tray.has-items { min-height: 80px; }
-  #bottom-tray:not(.has-items) { display: none; }
-  body.layout-rearranging #bottom-tray:not(.has-items) {
-    display: flex; padding: 8px; border-top: 1px dashed var(--border);
-    min-height: 60px; max-height: 60px;
-  }
-  body.layout-rearranging #bottom-tray:not(.has-items) .bottom-tray-empty {
-    display: block; text-align: center; color: var(--muted); font-size: 11px; padding: 18px 8px;
-  }
-  #bottom-tray .bottom-tray-empty { display: none; }
-  body.kiosk-mode #bottom-tray { display: none; }
   body.kiosk-mode #sec-jogz { display: none; }
   body.kiosk-mode #sec-probe { display: none; }
 
@@ -1937,18 +1914,17 @@
   #gcode-panel > .movable { display: flex; flex-direction: column; min-height: 0; }
   #gcode-panel > #sec-gcode { flex: 1; min-height: 0; }
   #gcode-panel > #sec-gcode > #gcode-content { flex: 1; min-height: 0; }
-  /* 3D view: fill its host. In view-panel it grows above bottom-tray; in
-     sidebar/gcode it takes available column space; in tray it gets a
-     reasonable default height. */
+  /* 3D view: fill its host as a movable that competes equally with siblings */
   #sec-3d { display: flex; flex-direction: column; min-height: 0; }
   #sec-3d > #canvas-wrap { flex: 1; min-height: 0; }
   #view-panel > #sec-3d,
-  #sidebar > #sec-3d { flex: 1 1 auto; min-height: 200px; }
-  #gcode-panel > #sec-3d { flex: 1 1 0; min-height: 150px; }
-  #bottom-tray > #sec-3d { flex: 0 0 240px; min-height: 200px; }
+  #gcode-panel > #sec-3d,
+  #sidebar > #sec-3d { flex: 1 1 0; min-height: 150px; }
+  /* All three column zones share the same flex behavior so dropped sections
+     compete equally regardless of column. */
+  #view-panel > .movable { display: flex; flex-direction: column; min-height: 0; }
   /* History allows shrinking so the resize grip is never pushed out of view */
   #sec-mdi > #mdi-history-wrap { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-  #bottom-tray > .movable { width: 100%; }
 
   #btn-kiosk.kiosk-active { color: var(--accent) !important; opacity: 1 !important; }
 
@@ -3224,10 +3200,6 @@
       <div id="selected-file-label">No file selected</div>
     </div>
     </div>
-    <!-- Bottom tray: drop zone for relocated sections (desktop only) -->
-    <div id="bottom-tray" class="layout-zone" data-zone="tray">
-      <div class="bottom-tray-empty">Drag sections here to rearrange</div>
-    </div>
 
   </div>
 
@@ -3360,7 +3332,7 @@ function escHtml(s) {
 const WS_URL  = `ws://${location.host}/websocket`; // same-origin always
 const API_URL = ``; // relative URLs — works for both proxy and direct bbctrl
 const SAFE_Z  = 50; // mm to retract before repositioning on resume
-const UI_VERSION             = '1.3.2-nightly.20260430.1'; // Rift by AlienWoodshop LLC
+const UI_VERSION             = '1.3.2-nightly.20260430.2'; // Rift by AlienWoodshop LLC
 const ENABLE_RESUME          = false; // set true to re-enable resume-from-stop feature
 const ENABLE_MACROS          = false; // set true to re-enable macro buttons
 const ENABLE_ROTARY          = false; // set true to show rotary axis toggle
@@ -8421,39 +8393,32 @@ function restoreSectionsToHome() {
     const homeId = el.dataset.movableHome;
     const home = homeId ? document.getElementById(homeId) : null;
     if (!home) return;
-    // In view-panel, keep sec-3d above the bottom-tray.
-    if (homeId === 'view-panel') {
-      const tray = document.getElementById('bottom-tray');
-      if (tray && tray.parentElement === home) home.insertBefore(el, tray);
-      else if (el.parentElement !== home) home.appendChild(el);
-    } else if (el.parentElement !== home) {
-      home.appendChild(el);
-    }
+    if (el.parentElement !== home) home.appendChild(el);
   });
-  _updateTrayState();
 }
 
 function applyDesktopLayout() {
-  // Read saved layout; flatten sidebar sections into #sidebar (out of scol-X) and
-  // populate tray + gcode zones. Sections with no saved zone go to their home.
+  // Read saved layout; sections fill their assigned zone column directly.
+  // Sections with no saved zone (or a legacy 'tray' zone) go to their home.
   const layout = _layoutGet();
   const sidebar = document.getElementById('sidebar');
-  const tray    = document.getElementById('bottom-tray');
   const gcode   = document.getElementById('gcode-panel');
-  if (!sidebar || !tray || !gcode) return;
+  const view    = document.getElementById('view-panel');
+  if (!sidebar || !gcode || !view) return;
 
-  const view = document.getElementById('view-panel');
-  const buckets = { sidebar: [], tray: [], gcode: [], view: [] };
+  const buckets = { sidebar: [], gcode: [], view: [] };
   _MOVABLE_IDS.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     const homeId = el.dataset.movableHome;
     let zone, idx;
-    if (layout && layout[id] && buckets[layout[id].zone]) {
-      zone = layout[id].zone;
+    const savedZone = layout && layout[id] ? layout[id].zone : null;
+    // Migrate legacy 'tray' zone → 'view' (bottom-tray was removed)
+    const mapped = savedZone === 'tray' ? 'view' : savedZone;
+    if (mapped && buckets[mapped]) {
+      zone = mapped;
       idx  = layout[id].idx | 0;
     } else {
-      // Default routing by data-movable-home
       if (homeId === 'gcode-panel')      zone = 'gcode';
       else if (homeId === 'view-panel')  zone = 'view';
       else                                zone = 'sidebar';
@@ -8461,21 +8426,16 @@ function applyDesktopLayout() {
     }
     buckets[zone].push({ id, idx });
   });
-  const containers = { sidebar, tray, gcode, view };
+  const containers = { sidebar, gcode, view };
   Object.keys(buckets).forEach(zone => {
     const list = buckets[zone].sort((a,b) => a.idx - b.idx);
     const container = containers[zone];
     if (!container) return;
     list.forEach(({id}) => {
       const el = document.getElementById(id);
-      if (el) {
-        // Keep bottom-tray as the LAST child of view-panel so it stays below sec-3d.
-        if (zone === 'view') container.insertBefore(el, document.getElementById('bottom-tray'));
-        else container.appendChild(el);
-      }
+      if (el) container.appendChild(el);
     });
   });
-  _updateTrayState();
 }
 
 function saveCurrentLayout() {
@@ -8490,7 +8450,7 @@ function saveCurrentLayout() {
     });
   };
   collect('sidebar',     'sidebar');
-  collect('bottom-tray', 'tray');
+  collect('view-panel',  'view');
   collect('gcode-panel', 'gcode');
   _layoutSet(layout);
 }
@@ -8709,11 +8669,7 @@ function resetUiLayout() {
   window.dispatchEvent(new Event('resize'));
 }
 
-function _updateTrayState() {
-  const tray = document.getElementById('bottom-tray');
-  if (!tray) return;
-  tray.classList.toggle('has-items', tray.querySelector('.movable') != null);
-}
+function _updateTrayState() { /* legacy no-op — bottom-tray was removed */ }
 
 function _findInsertTarget(zone, clientY) {
   const movables = Array.from(zone.children).filter(c =>
