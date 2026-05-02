@@ -3332,7 +3332,7 @@ function escHtml(s) {
 const WS_URL  = `ws://${location.host}/websocket`; // same-origin always
 const API_URL = ``; // relative URLs — works for both proxy and direct bbctrl
 const SAFE_Z  = 50; // mm to retract before repositioning on resume
-const UI_VERSION             = '1.3.2-nightly.20260430.3'; // Rift by AlienWoodshop LLC
+const UI_VERSION             = '1.3.2-nightly.20260430.4'; // Rift by AlienWoodshop LLC
 const ENABLE_RESUME          = false; // set true to re-enable resume-from-stop feature
 const ENABLE_MACROS          = false; // set true to re-enable macro buttons
 const ENABLE_ROTARY          = false; // set true to show rotary axis toggle
@@ -3396,7 +3396,9 @@ let resumeState     = null;  // { line, x, y, z, speed, feed, filename, wasPause
 let peakResumeState = null;  // highest-line snapshot seen during run (used on Stop)
 let resumeStateLocked = false;
 let jobStartTime = null;  // Date.now() when job started
-let _jobPct = 0;          // last known progress % (for ETA calculation)
+let _jobPct = 0;          // last known progress % (line-based, for display)
+let _jobLine = 0;         // last known running line number (for time-based ETA)
+let _cumulativeTimeByLine = null; // Float32Array: cumByLine[i] = est. seconds to reach line i
 let _progressTimer = null;
 let _estimatedJobSeconds = 0; // pre-computed time estimate from loaded GCode
 
@@ -3741,6 +3743,7 @@ function updateUI(data) {
   if ('line' in data && totalLines > 0) {
     const pct = Math.min(100, (data.line / totalLines) * 100);
     _jobPct = pct;
+    _jobLine = data.line | 0;
     document.getElementById('progress-bar').style.width = pct + '%';
     // Homing/jogging cycles emit line deltas that would yank the cursor around awkwardly.
     const _cyc = state.cycle || '';
@@ -4094,6 +4097,7 @@ function setMachineState(s) {
       saveJobStart(jobStartTime, fname);
     }
     _jobPct = 0;
+    _jobLine = 0;
     startProgressTimer();
   }
   // Flag that a file-based job is active (vs MDI/homing/probe also appearing as running).
@@ -4342,6 +4346,15 @@ function loadGCode(filename, resetScale = true) {
         if (lastMachineState !== 'running') showFileReadyLabel();
         _fetchBbctrlPlannerTime(filename).then(t => {
           if (t && t > 0) {
+            // Rescale cumByLine so its total matches the planner's authoritative
+            // estimate while preserving the per-line distribution shape (which
+            // is what makes multi-tool ETA work).
+            if (_cumulativeTimeByLine && _estimatedJobSeconds > 0) {
+              const scale = t / _estimatedJobSeconds;
+              for (let i = 0; i < _cumulativeTimeByLine.length; i++) {
+                _cumulativeTimeByLine[i] *= scale;
+              }
+            }
             _estimatedJobSeconds = Math.ceil(t);
             if (lastMachineState !== 'running') showFileReadyLabel();
           }
@@ -7456,12 +7469,17 @@ async function fmUploadFiles(files) {
 // Handles G20/G21 (unit), G90/G91 (mode), G0 (rapid), G1/G2/G3 (feed).
 // Adds 15% overhead for acceleration/dwells. Returns seconds.
 function estimateJobTime(lines) {
+  // Walk the file and build a cumulative seconds-per-line table. This lets the
+  // ETA reflect actual cutting density — critical for multi-tool files (e.g.
+  // MillMage concatenates a fast roughing section and a slow finishing section
+  // back-to-back; line-pct alone would mis-project remaining time).
   let x = 0, y = 0, z = 0;
   let feedRate = 1000;     // mm/min default if no F seen yet
   const rapidRate = 5000;  // mm/min (typical Onefinity rapid)
   let totalSec = 0;
   let isAbsolute = true;
   let isMetric = true;
+  const cumByLine = new Float32Array(lines.length + 1);
 
   const pn = (str, axis) => {
     const m = str.match(new RegExp(axis + '([+-]?[\\d.]+)', 'i'));
@@ -7470,42 +7488,49 @@ function estimateJobTime(lines) {
 
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i].split(';')[0].replace(/\(.*?\)/g, '').trim().toUpperCase();
-    if (!line) continue;
-    line = line.replace(/^N\d+\s*/, ''); // strip line numbers
+    if (line) {
+      line = line.replace(/^N\d+\s*/, ''); // strip line numbers
 
-    if (/^G20\b/.test(line)) { isMetric = false; continue; }
-    if (/^G21\b/.test(line)) { isMetric = true;  continue; }
-    if (/^G90\b/.test(line)) { isAbsolute = true;  continue; }
-    if (/^G91\b/.test(line)) { isAbsolute = false; continue; }
+      if (/^G20\b/.test(line)) { isMetric = false; }
+      else if (/^G21\b/.test(line)) { isMetric = true; }
+      else if (/^G90\b/.test(line)) { isAbsolute = true; }
+      else if (/^G91\b/.test(line)) { isAbsolute = false; }
+      else {
+        const fm = line.match(/F([+-]?[\d.]+)/);
+        if (fm) feedRate = parseFloat(fm[1]);
 
-    const fm = line.match(/F([+-]?[\d.]+)/);
-    if (fm) feedRate = parseFloat(fm[1]);
-
-    const isRapid = /^G0?0[\s;]|^G0?0$/.test(line);
-    const isFeed  = /^G0?1[\s;]|^G0?1$/.test(line) || /^G0?[23][\s;]/.test(line);
-    if (!isRapid && !isFeed) continue;
-
-    const nx = pn(line, 'X'), ny = pn(line, 'Y'), nz = pn(line, 'Z');
-    let dx = 0, dy = 0, dz = 0;
-    if (isAbsolute) {
-      if (nx !== null) { dx = nx - x; x = nx; }
-      if (ny !== null) { dy = ny - y; y = ny; }
-      if (nz !== null) { dz = nz - z; z = nz; }
-    } else {
-      if (nx !== null) { dx = nx; x += nx; }
-      if (ny !== null) { dy = ny; y += ny; }
-      if (nz !== null) { dz = nz; z += nz; }
+        const isRapid = /^G0?0[\s;]|^G0?0$/.test(line);
+        const isFeed  = /^G0?1[\s;]|^G0?1$/.test(line) || /^G0?[23][\s;]/.test(line);
+        if (isRapid || isFeed) {
+          const nx = pn(line, 'X'), ny = pn(line, 'Y'), nz = pn(line, 'Z');
+          let dx = 0, dy = 0, dz = 0;
+          if (isAbsolute) {
+            if (nx !== null) { dx = nx - x; x = nx; }
+            if (ny !== null) { dy = ny - y; y = ny; }
+            if (nz !== null) { dz = nz - z; z = nz; }
+          } else {
+            if (nx !== null) { dx = nx; x += nx; }
+            if (ny !== null) { dy = ny; y += ny; }
+            if (nz !== null) { dz = nz; z += nz; }
+          }
+          const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+          if (dist > 0) {
+            const scaledDist = isMetric ? dist : dist * 25.4;
+            const rate = isRapid ? rapidRate : (feedRate > 0 ? feedRate : 1000);
+            totalSec += (scaledDist / rate) * 60;
+          }
+        }
+      }
     }
-
-    const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-    if (dist === 0) continue;
-
-    const scaledDist = isMetric ? dist : dist * 25.4;
-    const rate = isRapid ? rapidRate : (feedRate > 0 ? feedRate : 1000);
-    totalSec += (scaledDist / rate) * 60;
+    cumByLine[i + 1] = totalSec;
   }
 
-  return Math.ceil(totalSec * 1.15); // +15% for acceleration and overhead
+  // Scale the cumulative table by the same +15% factor we apply to the total
+  // so ETA math stays consistent.
+  const FACTOR = 1.15;
+  for (let i = 0; i < cumByLine.length; i++) cumByLine[i] *= FACTOR;
+  _cumulativeTimeByLine = cumByLine;
+  return Math.ceil(totalSec * FACTOR);
 }
 
 // Ask bbctrl's planner for the authoritative run time. It accounts for arc
@@ -7608,16 +7633,29 @@ function updateProgressLabel() {
   const stripEl     = null; // removed gcode-progress-strip
 
   if (_jobPct > 1) {
-    // Live line-rate projection (truth once we have enough samples).
-    const lineRemaining    = (elapsed / _jobPct) * (100 - _jobPct);
+    // Time-based projection using the cumulative seconds-per-line table built
+    // by estimateJobTime. Multi-tool files (e.g. MillMage concat) have wildly
+    // different cutting density across sections — using line-pct alone would
+    // under-project the ETA while in a fast roughing section and over-project
+    // in a slow finishing section. The pace ratio (actual elapsed / predicted
+    // elapsed at this line) projected onto the total estimate handles this.
+    const cumAtLine = (_cumulativeTimeByLine && _jobLine > 0)
+      ? (_cumulativeTimeByLine[Math.min(_jobLine, _cumulativeTimeByLine.length - 1)] || 0)
+      : 0;
+    let timeRemaining;
+    if (cumAtLine > 0 && _estimatedJobSeconds > 0) {
+      const pace = elapsed / cumAtLine; // >1 = slower than planned, <1 = faster
+      const projectedTotal = _estimatedJobSeconds * pace;
+      timeRemaining = Math.max(0, projectedTotal - elapsed);
+    } else {
+      timeRemaining = (elapsed / _jobPct) * (100 - _jobPct);
+    }
     const plannerRemaining = _estimatedJobSeconds > 0 ? Math.max(0, _estimatedJobSeconds - elapsed) : 0;
-    // Early in the job, line-rate is noisy — floor with the planner estimate so the ETA
-    // doesn't flash "2 min" right after starting a 30-minute job. Past ~10% the measured
-    // rate is reliable and the planner's ±15% heuristic becomes a liability: it can pin
-    // the remaining time ~6x too high when the actual pace is faster (trochoidal etc).
+    // Early in the job (line-pct noisy), floor with the planner estimate so the
+    // ETA doesn't flash a too-low number right after starting a long job.
     const remaining = _jobPct < 10
-      ? Math.max(lineRemaining, plannerRemaining)
-      : lineRemaining;
+      ? Math.max(timeRemaining, plannerRemaining)
+      : timeRemaining;
     const pctStr    = _jobPct.toFixed(0);
     if (labelEl) labelEl.textContent = `Running  ${pctStr}%`;
     setProgressTime('', fmtTime(remaining), 'remaining');
