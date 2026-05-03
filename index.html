@@ -748,7 +748,8 @@
     flex-direction: column;
     gap: 4px;
     padding: 8px;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     min-height: 0;
   }
   /* Desktop: sidebar-col is invisible to layout — children participate directly */
@@ -795,7 +796,7 @@
   .jog-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    grid-auto-rows: 1fr;
+    grid-auto-rows: minmax(min-content, 1fr);
     gap: 4px;
     /* Shrunk from flex:3 → flex:2 per wife's UX feedback — jog pad was
        eating too much sidebar real estate for routine use. */
@@ -851,12 +852,16 @@
     cursor: pointer;
     text-align: center;
     transition: all 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .step-btn.active, .step-btn:hover { background: var(--accent); color: var(--bg); border-color: var(--accent); }
 
   /* ── CENTER - 3D VIEW ── */
   #view-panel {
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     background: var(--surface);
     display: flex;
     flex-direction: column;
@@ -987,7 +992,8 @@
     border-left: 1px solid var(--border);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   #gcode-top-bar {
@@ -1822,7 +1828,7 @@
   #sec-step  { min-height: 50px; }
   #sec-zero  { min-height: 54px; }
   #sec-probe { min-height: 54px; }
-  #sec-jogxy { min-height: 130px; }
+  #sec-jogxy { min-height: 170px; }
   #sec-jogz  { min-height: 168px; }
   #sec-mdi   { min-height: 70px; }
   #sec-gcode { min-height: 120px; }
@@ -3332,7 +3338,7 @@ function escHtml(s) {
 const WS_URL  = `ws://${location.host}/websocket`; // same-origin always
 const API_URL = ``; // relative URLs — works for both proxy and direct bbctrl
 const SAFE_Z  = 50; // mm to retract before repositioning on resume
-const UI_VERSION             = '1.3.2-nightly.20260430.4'; // Rift by AlienWoodshop LLC
+const UI_VERSION             = '1.3.2-nightly.20260502.1'; // Rift by AlienWoodshop LLC
 const ENABLE_RESUME          = false; // set true to re-enable resume-from-stop feature
 const ENABLE_MACROS          = false; // set true to re-enable macro buttons
 const ENABLE_ROTARY          = false; // set true to show rotary axis toggle
@@ -8498,7 +8504,7 @@ const _SECTION_H_KEY = 'rift_section_h';
 // Floor heights below which inner buttons stop being usable. Used by the resize grip.
 const _SECTION_MIN = {
   'sec-home': 54, 'sec-step': 50, 'sec-zero': 54, 'sec-probe': 54,
-  'sec-jogxy': 130, 'sec-jogz': 168,
+  'sec-jogxy': 170, 'sec-jogz': 168,
   'sec-gcode': 120, 'sec-mdi': 70,
   'sec-3d': 200
 };
