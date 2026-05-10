@@ -748,8 +748,7 @@
     flex-direction: column;
     gap: 4px;
     padding: 8px;
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: hidden;
     min-height: 0;
   }
   /* Desktop: sidebar-col is invisible to layout — children participate directly */
@@ -796,7 +795,9 @@
   .jog-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    grid-auto-rows: minmax(min-content, 1fr);
+    /* `1fr` (not `minmax(min-content, 1fr)`) — Chromium 60 on the local Pi
+       collapses minmax-with-min-content rows to content height. */
+    grid-auto-rows: 1fr;
     gap: 4px;
     /* Shrunk from flex:3 → flex:2 per wife's UX feedback — jog pad was
        eating too much sidebar real estate for routine use. */
@@ -860,8 +861,7 @@
 
   /* ── CENTER - 3D VIEW ── */
   #view-panel {
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: hidden;
     background: var(--surface);
     display: flex;
     flex-direction: column;
@@ -992,8 +992,7 @@
     border-left: 1px solid var(--border);
     display: flex;
     flex-direction: column;
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: hidden;
   }
 
   #gcode-top-bar {
@@ -1308,16 +1307,32 @@
 
   /* ── BOTTOM BAR ── */
   #bottom-bar {
+    position: relative;
     background: var(--surface);
     border-top: 1px solid var(--border);
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 10px 14px;
-    height: 64px;
+    height: var(--bottom-bar-h, 64px);
+    /* 32px button floor + 20px vertical padding + 4px breathing room. */
+    min-height: 56px;
     flex-shrink: 0;
     overflow: hidden;
   }
+  #bottom-bar-grip {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    cursor: ns-resize;
+    background: transparent;
+    z-index: 6;
+  }
+  #bottom-bar-grip:hover, #bottom-bar-grip.dragging { background: var(--accent); }
+  body.kiosk-mode #bottom-bar-grip,
+  body.ui-locked #bottom-bar-grip { display: none; }
   #bottom-clock {
     margin-left: auto;
     flex-shrink: 0;
@@ -1338,7 +1353,11 @@
   }
 
   .ctrl-btn {
-    padding: 12px 0;
+    /* Default 40px height (bar=64px). Modern browsers get proportional growth
+       via the rule below using max()+calc(); Chromium 60 ignores that and
+       keeps this fixed 40px floor. */
+    height: 40px;
+    padding: 0;
     width: 110px;
     flex-shrink: 0;
     border-radius: var(--radius);
@@ -1355,6 +1374,14 @@
     gap: 6px;
     white-space: nowrap;
     overflow: hidden;
+  }
+  /* Proportional growth on modern browsers (Chrome 79+ for max()).
+     Chromium 60 ignores this rule and uses the fixed 40px height above.
+     --bottom-bar-h is set inline on #bottom-bar by the resize grip. */
+  @supports (height: max(1px, 1px)) {
+    .ctrl-btn {
+      height: max(32px, calc(40px + (var(--bottom-bar-h, 64px) - 64px) * 0.5));
+    }
   }
   .ctrl-btn:active { transform: scale(0.96); }
   .btn-start { background: rgba(78,253,113,0.15); color: var(--green); border-color: var(--green); }
@@ -1766,6 +1793,7 @@
   body.kiosk-mode.local-kiosk .sidebar-col > *:not(:last-child)         { margin-bottom: 8px; }
   body.kiosk-mode.local-kiosk .jog-z .jog-btn:not(:last-child)          { margin-bottom: 8px; }
   body.kiosk-mode.local-kiosk .step-btns > *:not(:last-child)            { margin-right: 4px; }
+  body.kiosk-mode.local-kiosk #home-block > *:not(:last-child)           { margin-bottom: 8px; }
   body.kiosk-mode.local-kiosk #bottom-bar > *:not(:last-child)           { margin-right: 16px; }
   body.kiosk-mode.local-kiosk #dro-bar > *:not(:last-child)              { margin-right: 6px; }
   body.kiosk-mode.local-kiosk #status-bar-main > *:not(:last-child)      { margin-right: 20px; }
@@ -1775,30 +1803,46 @@
   body.kiosk-mode.local-kiosk .status-logo-row > *:not(:last-child)      { margin-right: 16px; }
   body.kiosk-mode.local-kiosk .settings-footer > *:not(:last-child)      { margin-right: 8px; }
 
-  /* Chrome 60: CSS Grid uses `grid-gap` not `gap` (renamed in Chrome 66) */
-  body.kiosk-mode.local-kiosk .jog-grid  { grid-gap: 12px; }
+  /* Chrome 60: CSS Grid uses `grid-gap` not `gap` (renamed in Chrome 66).
+     Values must match the modern `gap` declarations above so local Pi matches
+     remote-browser kiosk layout exactly. */
+  body.kiosk-mode.local-kiosk .jog-grid  { grid-gap: 8px; }
   body.kiosk-mode.local-kiosk .axis-grid { grid-gap: 4px; }
-  /* Shrink jog buttons to keep gaps proportional */
-  body.kiosk-mode.local-kiosk .jog-btn   { padding: 18px 4px; font-size: 24px; }
+  body.kiosk-mode.local-kiosk #home-grid,
+  body.kiosk-mode.local-kiosk #zero-grid { grid-gap: 4px; }
 
-  /* Chrome 60: `inset` not supported (added Chrome 87) — fullscreen overlays need explicit TRBL */
+  /* Chrome 60: `inset` not supported (added Chrome 87) — fullscreen overlays need explicit TRBL.
+     Note: do NOT include #probe-safety-overlay or #probe-stock-overlay here —
+     those are 420px centered modals using left:50%/top:50%, not fullscreen. */
   body.kiosk-mode.local-kiosk #errlog-overlay,
-  body.kiosk-mode.local-kiosk #probe-safety-overlay,
   body.kiosk-mode.local-kiosk #dark-confirm-overlay,
-  body.kiosk-mode.local-kiosk #probe-stock-overlay,
-  body.kiosk-mode.local-kiosk #settings-overlay,
-  body.kiosk-mode.local-kiosk #feed-panel,
-  body.kiosk-mode.local-kiosk #spindle-panel,
   body.kiosk-mode.local-kiosk #gref-overlay,
   body.kiosk-mode.local-kiosk #fm-overlay,
   body.kiosk-mode.local-kiosk #wifi-pw-overlay,
   body.kiosk-mode.local-kiosk #tour-modal-bg { top: 0; right: 0; bottom: 0; left: 0; }
 
-  /* Local Pi: body fills actual window (browser is 1278×718 via --start-fullscreen) */
-  body.kiosk-mode.local-kiosk {
-    width: 100vw;
-    height: 100vh;
-  }
+  /* Chrome 60: flex `gap` not supported (added Chrome 84). Grid `gap` works
+     via the older `grid-gap` rename. For the modals/dialogs the local kiosk
+     can surface, simulate gap with adjacent-sibling margins. */
+  body.kiosk-mode.local-kiosk #probe-safety-modal > * + * { margin-top: 18px; }
+  body.kiosk-mode.local-kiosk #probe-stock-modal  > * + * { margin-top: 16px; }
+  body.kiosk-mode.local-kiosk #dark-confirm-modal > * + * { margin-top: 16px; }
+  body.kiosk-mode.local-kiosk .probe-safety-btns  > * + * { margin-left: 10px; }
+  body.kiosk-mode.local-kiosk .dark-confirm-btns  > * + * { margin-left: 10px; }
+  body.kiosk-mode.local-kiosk .probe-stock-field  > * + * { margin-top: 6px; }
+  body.kiosk-mode.local-kiosk .probe-ref-options  > * + * { margin-left: 12px; }
+  body.kiosk-mode.local-kiosk .probe-ref-card     > * + * { margin-top: 8px; }
+  body.kiosk-mode.local-kiosk #probe-progress-overlay > div > * + * { margin-top: 16px; }
+  body.kiosk-mode.local-kiosk #probe-progress-overlay > div > div:last-child > * + * { margin-top: 0; margin-left: 10px; }
+  body.kiosk-mode.local-kiosk .float-panel-body         > * + * { margin-top: 8px; }
+  body.kiosk-mode.local-kiosk .float-panel-header-actions > * + * { margin-left: 10px; }
+  body.kiosk-mode.local-kiosk .override-row             > * + * { margin-left: 4px; }
+  body.kiosk-mode.local-kiosk .ovr-apply-row            > * + * { margin-left: 6px; }
+  body.kiosk-mode.local-kiosk .cp-row                   > * + * { margin-left: 10px; }
+
+  /* Local Pi: body uses the same fixed 1280×720 design as remote (inherits from
+     body.kiosk-mode above). updateKioskScale() applies CSS zoom to fit the
+     actual chromium window, so layouts match across viewports. */
   body.kiosk-mode .jog-btn.center { font-size: 13px; }
   /* Step size: desktop height in kiosk motion col */
   body.kiosk-mode #scol-motion .step-btn { padding: 3px 2px; font-size: 11px; }
@@ -1824,30 +1868,31 @@
   #sidebar > #sec-jogxy { flex: 2 1 140px; }
   #sidebar > #sec-jogz  { flex: 1 1 168px; }
   /* Min heights are per-section regardless of which zone they live in */
-  #sec-home  { min-height: 54px; }
-  #sec-step  { min-height: 50px; }
-  #sec-zero  { min-height: 54px; }
-  #sec-probe { min-height: 54px; }
+  /* Floor each row at title (~18px) + button (~40px) + breathing (~10px). */
+  #sec-home  { min-height: 70px; }
+  #sec-step  { min-height: 60px; }
+  #sec-zero  { min-height: 70px; }
+  #sec-probe { min-height: 70px; }
   #sec-jogxy { min-height: 170px; }
   #sec-jogz  { min-height: 168px; }
   #sec-mdi   { min-height: 70px; }
   #sec-gcode { min-height: 120px; }
   /* Inner buttons stretch with section height regardless of which zone the
      section lives in — scope by section id, not by parent zone. */
-  #sec-jogxy > .jog-grid { flex: 1 1 auto; min-height: 0; }
-  #sec-jogz  > .jog-z    { flex: 1 1 auto; min-height: 0; }
+  #sec-jogxy > .jog-grid { flex: 1 1 0px; min-height: 0; }
+  #sec-jogz  > .jog-z    { flex: 1 1 0px; min-height: 0; }
   #sec-home  > #home-block {
-    display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0;
+    display: flex; flex-direction: column; flex: 1 1 0px; min-height: 0;
   }
   #sec-home  > #home-block > #home-grid,
   #sec-zero  > #zero-grid {
-    flex: 1 1 auto; min-height: 0; grid-auto-rows: 1fr;
+    flex: 1 1 0px; min-height: 0; grid-auto-rows: 1fr;
   }
   #sec-step  > .step-btns { flex: 1 1 auto; min-height: 0; align-items: stretch; }
   #sec-probe > .jog-z {
-    flex: 1 1 auto !important; min-height: 0;
+    flex: 1 1 0px !important; min-height: 0;
   }
-  #sec-probe > .jog-z > #btn-probe-z { flex: 1 1 auto; }
+  #sec-probe > .jog-z > #btn-probe-z { flex: 1 1 0px; }
   /* Bottom resize grip — its own 4px flex slot so it never overlaps a button */
   .movable-resize {
     flex: 0 0 4px;
@@ -1907,10 +1952,12 @@
   body.kiosk-mode #sec-probe { display: none; }
 
   /* Kiosk: stretch the active sections to fill their scol-* columns;
-     ignore desktop's per-section min-heights so buttons grow naturally. */
+     ignore desktop's per-section min-heights so buttons grow naturally.
+     NOTE: explicit `0px` (not bare `0`) — Chromium 60 on the local Pi parses
+     `flex: 1 1 0` as `flex: 1 1 auto` and the section won't grow. */
   body.kiosk-mode #sec-home,
   body.kiosk-mode #sec-zero,
-  body.kiosk-mode #sec-jogxy { flex: 1 1 0 !important; min-height: 0 !important; }
+  body.kiosk-mode #sec-jogxy { flex: 1 1 0px !important; min-height: 0 !important; }
   body.kiosk-mode #sec-step  { flex: 0 0 auto !important; min-height: 0 !important; }
 
   /* Hide handles in kiosk */
@@ -1925,7 +1972,7 @@
   #sec-3d > #canvas-wrap { flex: 1; min-height: 0; }
   #view-panel > #sec-3d,
   #gcode-panel > #sec-3d,
-  #sidebar > #sec-3d { flex: 1 1 0; min-height: 150px; }
+  #sidebar > #sec-3d { flex: 1 1 0px; min-height: 150px; }
   /* All three column zones share the same flex behavior so dropped sections
      compete equally regardless of column. */
   #view-panel > .movable { display: flex; flex-direction: column; min-height: 0; }
@@ -1986,7 +2033,7 @@
       align-items: center;
     }
     .ctrl-btn {
-      flex: 1 1 0;
+      flex: 1 1 0px;
       width: auto !important;
       min-width: 60px;
       max-width: 85px;
@@ -2391,16 +2438,16 @@
               <option value="light">Light</option>
             </select>
           </div>
-          <div class="settings-row">
-            <div><div class="settings-label">Lock UI</div><div class="settings-sub">Disable drag-to-rearrange and section/column resize so layout can't change accidentally</div></div>
+          <div class="settings-row" id="row-ui-locked">
+            <div><div class="settings-label">Lock UI</div><div class="settings-sub" id="sub-ui-locked">Disable drag-to-rearrange and section/column resize so layout can't change accidentally</div></div>
             <select class="settings-select" id="cfg-ui-locked" onchange="setUiLocked(this.value === '1')">
               <option value="0">Unlocked</option>
               <option value="1">Locked</option>
             </select>
           </div>
-          <div class="settings-row">
-            <div><div class="settings-label">Reset UI layout</div><div class="settings-sub">Restore default panel order, sidebar/file widths, and 3D color choices</div></div>
-            <button class="settings-btn" onclick="resetUiLayout()">Reset to defaults</button>
+          <div class="settings-row" id="row-reset-layout">
+            <div><div class="settings-label">Reset UI layout</div><div class="settings-sub" id="sub-reset-layout">Restore default panel order, sidebar/file widths, and 3D color choices</div></div>
+            <button class="settings-btn" id="btn-reset-layout" onclick="resetUiLayout()">Reset to defaults</button>
           </div>
         </div>
         <div class="settings-section">
@@ -2874,7 +2921,7 @@
             </div>
             <label style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0;margin-left:16px;">
               <input type="checkbox" id="cfg-dev-mode" style="opacity:0;width:0;height:0;" onchange="applyDevMode()">
-              <span style="position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:22px;transition:.2s;" id="dev-mode-slider"></span>
+              <span style="position:absolute;cursor:pointer;top:0;right:0;bottom:0;left:0;background:var(--border);border-radius:22px;transition:.2s;" id="dev-mode-slider"></span>
             </label>
           </div>
         </div>
@@ -3294,6 +3341,7 @@
 
 <!-- BOTTOM BAR -->
 <div id="bottom-bar">
+  <div id="bottom-bar-grip" title="Drag to resize · double-click to reset"></div>
   <button class="ctrl-btn btn-start"  id="btn-start"  onclick="machineStart()">▶ Start</button>
   <button class="ctrl-btn btn-pause"  id="btn-pause"  onclick="machinePause()">⏸ Pause</button>
   <button class="ctrl-btn btn-stop"   id="btn-stop"   onclick="machineStop()">■ Stop</button>
@@ -3320,6 +3368,8 @@
 
 <script>
 fetch('/api/log').catch(function(){}); // DEBUG: JS start probe
+// Surface any uncaught JS error visibly on screen — for debugging the local Pi
+// kiosk where devtools is unavailable. Removable once stable.
 // ── CONFIG ──
 // On localhost (Pi's own browser): use same-origin ws://localhost/websocket so Tornado
 // accepts the connection (it checks Origin == Host; cross-origin to 192.168.x.x gets 403).
@@ -3338,7 +3388,7 @@ function escHtml(s) {
 const WS_URL  = `ws://${location.host}/websocket`; // same-origin always
 const API_URL = ``; // relative URLs — works for both proxy and direct bbctrl
 const SAFE_Z  = 50; // mm to retract before repositioning on resume
-const UI_VERSION             = '1.3.2-nightly.20260502.1'; // Rift by AlienWoodshop LLC
+const UI_VERSION             = '1.3.4'; // Rift by AlienWoodshop LLC
 const ENABLE_RESUME          = false; // set true to re-enable resume-from-stop feature
 const ENABLE_MACROS          = false; // set true to re-enable macro buttons
 const ENABLE_ROTARY          = false; // set true to show rotary axis toggle
@@ -4456,7 +4506,7 @@ function _renderLineHtml(line, i) {
 }
 
 // ── GCODE WRAP TOGGLE ──
-let _gcodeNoWrap = (localStorage.getItem('rift_gcode_nowrap') ?? '1') === '1';
+let _gcodeNoWrap = (function(){ var v = localStorage.getItem('rift_gcode_nowrap'); return (v == null ? '1' : v) === '1'; })();
 function _applyGcodeWrap() {
   const c = document.getElementById('gcode-content');
   if (!c) return;
@@ -5063,8 +5113,8 @@ function saveXyZeroSnapshot(axis) {
   try {
     const prev = JSON.parse(localStorage.getItem(XY_SNAP_KEY) || 'null') || {};
     // G92 X0 makes offset_x equal to the current ABS X. Predict new offsets without waiting for state.
-    const ox = (axis === 'x' || axis === 'all') ? (+(state.xp || 0)) : (prev.ox ?? +(state.offset_x || 0));
-    const oy = (axis === 'y' || axis === 'all') ? (+(state.yp || 0)) : (prev.oy ?? +(state.offset_y || 0));
+    const ox = (axis === 'x' || axis === 'all') ? (+(state.xp || 0)) : (prev.ox != null ? prev.ox : +(state.offset_x || 0));
+    const oy = (axis === 'y' || axis === 'all') ? (+(state.yp || 0)) : (prev.oy != null ? prev.oy : +(state.offset_y || 0));
     localStorage.setItem(XY_SNAP_KEY, JSON.stringify({ ox, oy, t: Date.now() }));
   } catch(e) { /* localStorage full / disabled — non-fatal */ }
 }
@@ -5359,6 +5409,20 @@ async function openSettings() {
   document.getElementById('cfg-units').value          = settings.units;
   document.getElementById('cfg-theme').value          = settings.theme || 'dark';
   document.getElementById('cfg-ui-locked').value      = isUiLocked() ? '1' : '0';
+  // Kiosk mode: layout is fixed — disable Lock UI + Reset Layout controls.
+  const _kiosk = document.body.classList.contains('kiosk-mode');
+  const _lockSel = document.getElementById('cfg-ui-locked');
+  const _resetBtn = document.getElementById('btn-reset-layout');
+  if (_lockSel)  _lockSel.disabled  = _kiosk;
+  if (_resetBtn) _resetBtn.disabled = _kiosk;
+  const _lockSub = document.getElementById('sub-ui-locked');
+  const _resSub  = document.getElementById('sub-reset-layout');
+  if (_lockSub) _lockSub.textContent = _kiosk
+    ? 'Layout is fixed in kiosk mode.'
+    : "Disable drag-to-rearrange and section/column resize so layout can't change accidentally";
+  if (_resSub) _resSub.textContent = _kiosk
+    ? 'Layout is fixed in kiosk mode.'
+    : 'Restore default panel order, sidebar/file widths, and 3D color choices';
   document.getElementById('cfg-dev-mode').checked     = !!settings.devMode;
   document.getElementById('cfg-log-level').value      = settings.logLevel || 'info';
   applyDevMode(false); // sync Logs tab visibility without saving
@@ -5642,7 +5706,7 @@ async function saveSettings() {
           const hasActive = regs.some(r => r && r['reg-type'] && r['reg-type'] !== 'disabled');
           if (!hasActive) {
             while (regs.length < 32) regs.push({ 'reg-addr': 0, 'reg-value': 0, 'reg-type': 'disabled' });
-            HUANYANG_REGS.forEach((r, i) => regs[i] = { ...r });
+            HUANYANG_REGS.forEach((r, i) => regs[i] = Object.assign({}, r));
             cfg['modbus-spindle'].regs = regs;
           }
         }
@@ -5908,6 +5972,7 @@ function probeRefNext() {
   const ref = selected.id === 'probe-ref-top' ? 'top' : 'surface';
   const t = parseFloat(document.getElementById('probe-thickness-input').value) || 0;
   if (ref === 'surface' && t <= 0) { document.getElementById('probe-thickness-input').focus(); return; }
+  try { localStorage.setItem('rift_probe_ref', ref); } catch (e) {}
   document.getElementById('probe-stock-overlay').classList.remove('open');
   document.querySelectorAll('.probe-ref-card').forEach(c => c.classList.remove('selected'));
   if (_probeStockResolve) { _probeStockResolve({ ref, stockThickness: t }); _probeStockResolve = null; }
@@ -5918,8 +5983,11 @@ function askProbeReference() {
     _probeStockResolve = resolve;
     document.getElementById('probe-stock-block-dim').textContent = settings.probeHeight.toFixed(1);
     document.querySelectorAll('.probe-ref-card').forEach(c => c.classList.remove('selected'));
-    // Default to "top of stock" selected
-    document.getElementById('probe-ref-top').classList.add('selected');
+    // Default to last-used probe ref (falls back to "top of stock" on first run)
+    let lastRef = 'top';
+    try { lastRef = localStorage.getItem('rift_probe_ref') || 'top'; } catch (e) {}
+    if (lastRef !== 'top' && lastRef !== 'surface') lastRef = 'top';
+    document.getElementById(lastRef === 'surface' ? 'probe-ref-surface' : 'probe-ref-top').classList.add('selected');
     probeThicknessUpdate();
     const input = document.getElementById('probe-thickness-input');
     input.oninput = probeThicknessUpdate;
@@ -6014,7 +6082,7 @@ function showProbeProgress(refLabel) {
   if (!ov) {
     ov = document.createElement('div');
     ov.id = 'probe-progress-overlay';
-    ov.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.45);backdrop-filter:blur(2px);z-index:4500;align-items:center;justify-content:center;';
+    ov.style.cssText = 'display:flex;position:fixed;top:0;right:0;bottom:0;left:0;inset:0;background:rgba(0,0,0,0.45);backdrop-filter:blur(2px);z-index:4500;align-items:center;justify-content:center;';
     ov.innerHTML = `
       <div style="position:relative;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:32px 36px;text-align:center;min-width:340px;display:flex;flex-direction:column;gap:16px;box-shadow:0 10px 40px rgba(0,0,0,0.5);">
         <button class="modal-estop-btn" onclick="machineEStop()" style="position:absolute;top:10px;right:10px;">⛔ E-Stop</button>
@@ -6541,7 +6609,7 @@ function init3D() {
     _3dInitialized = false;
     canvas.style.display = 'none';
     const msg = document.createElement('div');
-    msg.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;color:var(--muted);font-family:var(--font);gap:8px;';
+    msg.style.cssText = 'position:absolute;top:0;right:0;bottom:0;left:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;color:var(--muted);font-family:var(--font);gap:8px;';
     msg.innerHTML = '<div style="font-size:14px;font-weight:600;color:var(--text);">3D view unavailable</div>'
                   + '<div style="font-size:12px;max-width:380px;line-height:1.5;">WebGL could not be initialized in this browser. '
                   + 'Check that hardware acceleration is enabled (Firefox: <code>about:config</code> → <code>webgl.disabled</code> = false, '
@@ -6629,7 +6697,11 @@ function init3D() {
     requestRender();
   }
   resize();
-  new ResizeObserver(resize).observe(panel);
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(resize).observe(panel);
+  } else {
+    window.addEventListener('resize', resize);
+  }
 
   // Mouse orbit (left) + pan (right/middle)
   canvas.addEventListener('contextmenu', e => e.preventDefault());
@@ -8387,20 +8459,39 @@ function updateKioskScale() {
   document.documentElement.style.width = '';
   document.documentElement.style.height = '';
   if (isKiosk) {
-    if (document.body.classList.contains('local-kiosk')) {
-      // Local Pi: body is 100vw×100vh already — no scaling needed
-      document.body.style.zoom = '';
-    } else {
-      // Remote browser: scale 1280×720 body to fit window
-      const zoom = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
-      document.body.style.zoom = zoom;
-    }
+    // Both local Pi and remote browsers: body is fixed 1280×720, zoom to fit
+    // viewport. (Pi monitors vary — old assumption that local was always
+    // 1280×720 native is wrong, e.g. 1920×1080 HDMI shows up as ~1784×957
+    // chrome window.)
+    const zoom = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+    document.body.style.zoom = zoom;
   } else {
     document.body.style.zoom = '';
     scaleUI(); // restore desktop scaling
   }
 }
 window.addEventListener('resize', updateKioskScale);
+
+function sizeProbeZButton() {
+  if (!document.body.classList.contains('kiosk-mode')) return;
+  const probeBtn = document.getElementById('btn-probe-z-kiosk');
+  if (!probeBtn) return;
+  const zeroBtn = document.querySelector('#zero-grid .hz-btn');
+  let h = 0;
+  if (zeroBtn) h = zeroBtn.getBoundingClientRect().height || zeroBtn.offsetHeight;
+  // Fallback if zero buttons aren't laid out yet (slow Pi / Chromium 60)
+  if (!h || h < 10) h = 40;
+  const target = Math.max(50, Math.round(h * 1.5));
+  probeBtn.style.height = target + 'px';
+  probeBtn.style.minHeight = target + 'px';
+  probeBtn.style.flex = 'none';
+}
+// Retry repeatedly on load — Chromium 60 on the Pi can take >1s before
+// the zero-grid buttons report their final height.
+function _sizeProbeZRetry() {
+  [50, 200, 500, 1000, 2000, 3500].forEach(ms => setTimeout(sizeProbeZButton, ms));
+}
+window.addEventListener('resize', () => setTimeout(sizeProbeZButton, 50));
 
 function relocateHomeBlock(kiosk) {
   // Desktop: Home above Step in scol-motion. Kiosk: Home in middle column
@@ -8503,7 +8594,7 @@ function saveCurrentLayout() {
 const _SECTION_H_KEY = 'rift_section_h';
 // Floor heights below which inner buttons stop being usable. Used by the resize grip.
 const _SECTION_MIN = {
-  'sec-home': 54, 'sec-step': 50, 'sec-zero': 54, 'sec-probe': 54,
+  'sec-home': 70, 'sec-step': 60, 'sec-zero': 70, 'sec-probe': 70,
   'sec-jogxy': 170, 'sec-jogz': 168,
   'sec-gcode': 120, 'sec-mdi': 70,
   'sec-3d': 200
@@ -8548,6 +8639,22 @@ function applySectionHeights() {
     }
   });
 }
+// .sidebar-col uses display:contents on desktop, so movable.parentElement
+// (e.g. #scol-motion) has no layout box. Walk up past contents-display
+// wrappers to find the real flex/grid parent that controls layout.
+function _layoutParent(el) {
+  let p = el.parentElement;
+  while (p && getComputedStyle(p).display === 'contents') p = p.parentElement;
+  return p;
+}
+function _layoutSiblings(el) {
+  const lp = _layoutParent(el);
+  if (!lp) return { lp: null, siblings: [] };
+  const siblings = Array.from(lp.querySelectorAll('.movable'))
+    .filter(m => _layoutParent(m) === lp);
+  return { lp, siblings };
+}
+
 function initSectionResize() {
   document.querySelectorAll('.movable').forEach(movable => {
     if (movable.querySelector(':scope > .movable-resize')) return;
@@ -8591,102 +8698,48 @@ function initSectionResize() {
       target = movable;
       startY = e.clientY;
       startH = movable.getBoundingClientRect().height;
-      // Unpin siblings to make room, but KEEP the bottom-most pinned panel
-      // pinned so it doesn't snap to a default size. Saved heights are
-      // preserved — we re-pin everyone at post-drag rendered heights on up.
+      // Make every sibling a shrinkable flex item with its current rendered
+      // height as flex-basis. This lets sibling panels — including the
+      // bottom-most one — shrink proportionally to absorb the dragged
+      // panel's growth, rather than overflowing the column or snapping to a
+      // tiny default. On pointerup we re-pin everyone at rendered heights.
       unpinned = [];
-      const par = movable.parentElement;
-      if (par) {
-        const kids = Array.from(par.children);
-        let bottomPinned = null;
-        for (let i = kids.length - 1; i >= 0; i--) {
-          const el = kids[i];
-          if (el === movable) continue;
-          if (el.classList && el.classList.contains('movable') &&
-              /^\s*0\s+0\s+/.test(el.style.flex || '')) {
-            bottomPinned = el;
-            break;
-          }
-        }
-        kids.forEach(el => {
-          if (el === movable || el === bottomPinned) return;
-          if (!el.classList || !el.classList.contains('movable')) return;
-          if (/^\s*0\s+0\s+/.test(el.style.flex || '')) {
-            el.style.flex = '';
-            el.style.height = '';
-            unpinned.push(el);
-          }
-        });
-      }
+      const { lp, siblings } = _layoutSiblings(movable);
+      siblings.forEach(el => {
+        if (el === movable) return;
+        const curH = Math.round(el.getBoundingClientRect().height);
+        el.style.flex = '0 1 ' + curH + 'px';
+        el.style.height = '';
+        unpinned.push(el);
+      });
       const cssMin = parseFloat(getComputedStyle(movable).minHeight);
       minH = _SECTION_MIN[movable.id]
           || ((isFinite(cssMin) && cssMin > 0) ? cssMin : 40);
-      // Cap to parent's available content height minus what other children
-      // need at minimum. Works whether or not there are sibling movables.
+      // Cap to layout-parent's available content height minus what other
+      // movable siblings need at minimum. Walks past display:contents
+      // wrappers so the real flex container's height is used.
       maxH = Infinity;
-      const parent = movable.parentElement;
-      if (parent) {
-        const ps = getComputedStyle(parent);
-        const childCount = Array.from(parent.children).filter(el =>
-          el.offsetParent !== null || el === movable).length;
+      if (lp) {
+        const ps = getComputedStyle(lp);
         const rowGap = parseFloat(ps.rowGap) || parseFloat(ps.gap) || 0;
-        const totalGap = rowGap * Math.max(0, childCount - 1);
-        const parentInner = parent.clientHeight
+        const totalGap = rowGap * Math.max(0, siblings.length - 1);
+        const parentInner = lp.clientHeight
                           - (parseFloat(ps.paddingTop) || 0)
                           - (parseFloat(ps.paddingBottom) || 0)
                           - totalGap;
         let reserved = 0;
-        Array.from(parent.children).forEach(el => {
+        siblings.forEach(el => {
           if (el === movable) return;
-          if (el.classList && el.classList.contains('movable')) {
-            // Pinned siblings we KEPT pinned (bottom panel) reserve full
-            // rendered height. Unpinned siblings only reserve their min.
-            const isStillPinned = /^\s*0\s+0\s+/.test(el.style.flex || '');
-            if (isStillPinned) {
-              reserved += el.getBoundingClientRect().height;
-            } else {
-              reserved += _SECTION_MIN[el.id]
-                       || parseFloat(getComputedStyle(el).minHeight) || 0;
-            }
-          } else {
-            const r = el.getBoundingClientRect();
-            if (r.height > 0) reserved += r.height;
-          }
+          reserved += _SECTION_MIN[el.id]
+                   || parseFloat(getComputedStyle(el).minHeight) || 0;
         });
         if (parentInner > 0) maxH = Math.max(minH, parentInner - reserved);
       }
-      // Clamp the section's bottom edge by the lowest of: the start/stop bar,
-      // viewport bottom, and any scrollable/clipping ancestor's max-bottom
-      // (resolving CSS max-height including percentage values).
-      const movableTop = movable.getBoundingClientRect().top;
-      let floor = window.innerHeight;
-      const footer = document.getElementById('bottom-bar');
-      if (footer) {
-        const fr = footer.getBoundingClientRect();
-        if (fr.top > 0) floor = Math.min(floor, fr.top);
-      }
-      let anc = movable.parentElement;
-      while (anc && anc !== document.body) {
-        const acs = getComputedStyle(anc);
-        if (acs.overflowY === 'auto' || acs.overflowY === 'scroll' || acs.overflowY === 'hidden') {
-          const ar = anc.getBoundingClientRect();
-          let maxBottom = ar.bottom;
-          const mh = acs.maxHeight;
-          if (mh && mh !== 'none') {
-            let mhpx = NaN;
-            if (mh.endsWith('%') && anc.parentElement) {
-              mhpx = anc.parentElement.clientHeight * parseFloat(mh) / 100;
-            } else if (mh.endsWith('px')) {
-              mhpx = parseFloat(mh);
-            }
-            if (isFinite(mhpx) && mhpx > 0) maxBottom = ar.top + mhpx;
-          }
-          floor = Math.min(floor, maxBottom);
-        }
-        anc = anc.parentElement;
-      }
-      const viewportCap = Math.max(minH, floor - movableTop - 24);
-      maxH = Math.min(maxH, viewportCap);
+      // NOTE: viewport/floor clamp removed. In a flex column with unpinned
+      // siblings, growing the dragged panel doesn't push it past the column
+      // floor — siblings absorb the change. The parentInner − reserved cap
+      // above is the correct ceiling. The previous clamp froze the bottom-
+      // most panel at its current height (could only shrink, never grow).
       grip.classList.add('dragging');
       window.addEventListener('pointermove', onMove);
       window.addEventListener('pointerup', onUp);
@@ -8703,9 +8756,131 @@ function initSectionResize() {
   applySectionHeights();
 }
 
+function initBottomBarResize() {
+  const bar = document.getElementById('bottom-bar');
+  const grip = document.getElementById('bottom-bar-grip');
+  if (!bar || !grip || grip._wired) return;
+  grip._wired = true;
+  const KEY = 'rift_bottom_bar_h';
+  const DEFAULT_H = 64, MIN_H = 56, MAX_H = 600;
+  const apply = h => {
+    const clamped = Math.max(MIN_H, Math.min(MAX_H, h));
+    bar.style.setProperty('--bottom-bar-h', clamped + 'px');
+  };
+  try {
+    const saved = parseFloat(localStorage.getItem(KEY));
+    if (isFinite(saved) && saved > 0) apply(saved);
+  } catch(_) {}
+  function _columns() {
+    return ['sidebar', 'view-panel', 'gcode-panel']
+      .map(id => document.getElementById(id))
+      .filter(z => z && z.offsetParent !== null);
+  }
+  // Compute how many extra pixels the bar can grow by — min across the 3
+  // column zones of (column inner content height − sum of movable mins).
+  // Use the LARGER of _SECTION_MIN and CSS min-height per panel, since
+  // either can be the actual floor. Once any column hits its panel
+  // minimums, the bar must stop growing.
+  function _columnGrowSlack() {
+    const zones = _columns();
+    if (!zones.length) return Infinity;
+    return Math.min(...zones.map(z => {
+      const ps = getComputedStyle(z);
+      const padTop = parseFloat(ps.paddingTop) || 0;
+      const padBot = parseFloat(ps.paddingBottom) || 0;
+      const gap = parseFloat(ps.rowGap) || parseFloat(ps.gap) || 0;
+      const movables = Array.from(z.querySelectorAll('.movable'))
+        .filter(m => _layoutParent(m) === z);
+      const totalGap = gap * Math.max(0, movables.length - 1);
+      let mins = 0;
+      movables.forEach(m => {
+        const sm = _SECTION_MIN[m.id] || 0;
+        const cm = parseFloat(getComputedStyle(m).minHeight) || 0;
+        mins += Math.max(sm, cm);
+      });
+      const inner = z.clientHeight - padTop - padBot - totalGap;
+      return Math.max(0, inner - mins);
+    }));
+  }
+  let startY = 0, startH = 0, maxBarH = MAX_H;
+  let unpinned = [];
+  const onMove = e => {
+    // Grip is at top of bar; dragging up grows the bar.
+    const dy = e.clientY - startY;
+    let desired = Math.min(maxBarH, startH - dy);
+    desired = Math.max(MIN_H, desired);
+    apply(desired);
+    // Defensive: if any column actually overflows after apply (e.g. min
+    // estimates were too optimistic), shrink the bar by the actual
+    // overflow amount + buffer and lower the cap so we can't grow any
+    // further this drag.
+    const cols = _columns();
+    const overflowAmt = Math.max(0, ...cols.map(z =>
+      Math.max(0, z.scrollHeight - z.clientHeight)));
+    if (overflowAmt > 0) {
+      const curH = bar.getBoundingClientRect().height;
+      const safe = Math.max(MIN_H, curH - overflowAmt - 8);
+      apply(safe);
+      maxBarH = Math.min(maxBarH, safe);
+    }
+  };
+  const onUp = () => {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    grip.classList.remove('dragging');
+    const h = Math.round(bar.getBoundingClientRect().height);
+    try { localStorage.setItem(KEY, String(h)); } catch(_) {}
+    // Re-pin movables that we made shrinkable for the drag, at their
+    // post-drag rendered heights, so the layout sticks.
+    unpinned.forEach(m => {
+      const rh = Math.round(m.getBoundingClientRect().height);
+      m.style.flex = '0 0 ' + rh + 'px';
+      m.style.height = rh + 'px';
+      _saveSectionHeight(m.id, rh);
+    });
+    unpinned = [];
+    window.dispatchEvent(new Event('resize'));
+  };
+  grip.addEventListener('pointerdown', e => {
+    if (document.body.classList.contains('kiosk-mode') ||
+        document.body.classList.contains('ui-locked')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    startY = e.clientY;
+    startH = bar.getBoundingClientRect().height;
+    // Convert every pinned movable to a shrinkable flex item so the
+    // columns redistribute as the bar steals their height.
+    unpinned = [];
+    document.querySelectorAll('.movable').forEach(m => {
+      if (/^\s*0\s+0\s+/.test(m.style.flex || '')) {
+        const h = Math.round(m.getBoundingClientRect().height);
+        m.style.flex = '0 1 ' + h + 'px';
+        m.style.height = '';
+        unpinned.push(m);
+      }
+    });
+    // Cap bar growth at startH + min-column-slack. After this point the
+    // most-constrained column is at its minimums and bar stops growing.
+    maxBarH = Math.min(MAX_H, startH + _columnGrowSlack());
+    grip.classList.add('dragging');
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  });
+  grip.addEventListener('dblclick', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    bar.style.removeProperty('--bottom-bar-h');
+    try { localStorage.removeItem(KEY); } catch(_) {}
+    window.dispatchEvent(new Event('resize'));
+  });
+}
+
 // UI lock: when on, disables drag-rearrange, height grips, and column splitters.
 function isUiLocked() {
-  try { return localStorage.getItem('rift_ui_locked') === '1'; } catch(_) { return false; }
+  // Kiosk mode is always considered locked (drag/resize don't apply there).
+  if (document.body.classList.contains('kiosk-mode')) return true;
+  // Desktop default = Locked. Only "0" explicitly unlocks.
+  try { return localStorage.getItem('rift_ui_locked') !== '0'; } catch(_) { return true; }
 }
 function setUiLocked(locked) {
   document.body.classList.toggle('ui-locked', !!locked);
@@ -8719,7 +8894,7 @@ function resetUiLayout() {
   const KEYS = [
     'rift_layout', 'rift_section_h', 'rift_sidebar_w', 'rift_right_w',
     'rift_markerScale', 'rift_spindleScale', 'rift_3dColors', 'rift_3dLight',
-    'rift_gcodeWrap'
+    'rift_gcodeWrap', 'rift_bottom_bar_h'
   ];
   KEYS.forEach(k => { try { localStorage.removeItem(k); } catch(_) {} });
   // Drop any inline width overrides on #main
@@ -8728,6 +8903,9 @@ function resetUiLayout() {
     main.style.removeProperty('--col-sidebar');
     main.style.removeProperty('--col-right');
   }
+  // Drop the inline bottom-bar height override so it falls back to the default.
+  const bar = document.getElementById('bottom-bar');
+  if (bar) bar.style.removeProperty('--bottom-bar-h');
   // Reapply defaults without a page reload
   if (document.body.classList.contains('kiosk-mode')) {
     restoreSectionsToHome();
@@ -8860,6 +9038,7 @@ function setKioskMode(enable) {
   }
   localStorage.setItem('kioskMode', enable ? '1' : '0');
   updateKioskScale();
+  if (enable) _sizeProbeZRetry();
   // Re-init 3D only when switching back to desktop
   if (!enable) setTimeout(init3D, 100);
 }
@@ -9005,10 +9184,12 @@ function initColumnSplitters() {
   if (logsTab && settings.devMode) logsTab.classList.add('dev-visible');
 })();
 initKioskMode();
+_sizeProbeZRetry();
 initColumnSplitters();
 initLayoutDnD();
 if (!document.body.classList.contains('kiosk-mode')) applyDesktopLayout();
 initSectionResize();
+initBottomBarResize();
 setUiLocked(isUiLocked());
 if (ENABLE_TOUR) document.getElementById('btn-tour').style.display = '';
 try { init3D(); } catch(e) { console.warn('3D view unavailable:', e.message); }
