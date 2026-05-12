@@ -303,7 +303,7 @@
     left: 50%; top: 50%; transform: translate(-50%, -50%);
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 8px; width: 880px; max-width: 95vw;
-    height: 75vh; max-height: 600px; display: flex; flex-direction: column;
+    height: 78vh; max-height: 660px; display: flex; flex-direction: column;
     box-shadow: 0 8px 32px rgba(0,0,0,0.5);
   }
   #settings-header {
@@ -404,6 +404,13 @@
   #stab-db25    .settings-select { padding: 4px 6px; font-size: 11px; }
   #stab-general .settings-note,
   #stab-db25    .settings-note { font-size: 10px; padding: 8px 10px; }
+
+  /* Firmware tab: shorter rows for Manual Upload + Revert (spacing only;
+     text size kept at default for readability). */
+  #stab-firmware .settings-section { margin-bottom: 14px; }
+  #stab-firmware .settings-section-title { padding-bottom: 4px; margin-bottom: 8px; }
+  #stab-firmware .settings-note { padding: 6px 10px; }
+  #stab-firmware .settings-row { margin-bottom: 6px; }
 
   /* Controller tab: compact layout */
   #stab-controller .settings-section { margin-bottom: 7px; }
@@ -1839,6 +1846,24 @@
   body.kiosk-mode.local-kiosk .override-row             > * + * { margin-left: 4px; }
   body.kiosk-mode.local-kiosk .ovr-apply-row            > * + * { margin-left: 6px; }
   body.kiosk-mode.local-kiosk .cp-row                   > * + * { margin-left: 10px; }
+  /* Files / gcode column — these all use flex `gap` so on Chromium 60 the
+     line-num collapses against the code, the Files button touches the
+     filename, and file manager rows have icon/name/size jammed together. */
+  body.kiosk-mode.local-kiosk #gcode-top-bar   > * + * { margin-left: 10px; }
+  body.kiosk-mode.local-kiosk .gcode-line      > * + * { margin-left: 10px; }
+  body.kiosk-mode.local-kiosk .fm-item         > * + * { margin-left: 12px; }
+  body.kiosk-mode.local-kiosk .fm-actions      > * + * { margin-left: 4px; }
+  body.kiosk-mode.local-kiosk #fm-bulk-bar     > * + * { margin-left: 10px; }
+  body.kiosk-mode.local-kiosk #gcode-file-info > * + * { margin-top: 2px; }
+  body.kiosk-mode.local-kiosk #mdi-bar         > * + * { margin-left: 6px; }
+
+  /* Trim some files-column text that's oversized on the 1280×720 kiosk */
+  body.kiosk-mode.local-kiosk #gcode-file-name { font-size: 15px; }
+  body.kiosk-mode.local-kiosk #gcode-file-folder { font-size: 11px; }
+  body.kiosk-mode.local-kiosk .fm-name { font-size: 16px; }
+  body.kiosk-mode.local-kiosk .fm-item { padding: 12px 12px; }
+  body.kiosk-mode.local-kiosk .fm-icon { font-size: 20px; width: 26px; }
+  body.kiosk-mode.local-kiosk .fm-size { font-size: 12px; min-width: 60px; }
 
   /* Local Pi: body uses the same fixed 1280×720 design as remote (inherits from
      body.kiosk-mode above). updateKioskScale() applies CSS zoom to fit the
@@ -2266,6 +2291,29 @@
     var isDevHost = location.hostname === 'dev.cnc.rift';
     var isDevParam = /[?&]dev=1\b/.test(location.search);
     if (isDevHost || isDevParam) document.body.classList.add('dev-mode');
+  })();
+  // Pre-paint kiosk detection — mirrors initKioskMode()/_kioskIsLocked() so the
+  // first paint matches the eventual mode and we don't flash desktop layout
+  // before JS settles. The full initKioskMode() still runs later and is the
+  // source of truth; this just paints the body classes ahead of it.
+  (function() {
+    try {
+      var host = location.hostname;
+      var isLocal = host === 'localhost' || host === '127.0.0.1' || host === '192.168.1.130';
+      var isMobile = window.innerWidth <= 900;
+      var m = navigator.userAgent.match(/Chrom(?:e|ium)\/(\d+)/);
+      var chromeMajor = m ? parseInt(m[1], 10) : 0;
+      var isOldChromium = chromeMajor > 0 && chromeMajor < 90;
+      var locked = isLocal || isOldChromium;
+      var stored = null;
+      try { stored = localStorage.getItem('kioskMode'); } catch(_) {}
+      var enable = locked ? true : (stored !== null ? stored === '1' : (isLocal || isMobile));
+      if (locked) document.body.classList.add('kiosk-locked');
+      if (enable) {
+        document.body.classList.add('kiosk-mode');
+        if (isLocal) document.body.classList.add('local-kiosk');
+      }
+    } catch(_) {}
   })();
 </script>
 
@@ -2858,7 +2906,6 @@
           <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">
             <a href="https://github.com/DRSwanger/rift-cnc-ui/releases" target="_blank" style="color:var(--accent);text-decoration:none;">⎋ All releases on GitHub</a>
           </div>
-          <div id="fw-update-notes" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:11px;color:var(--muted);white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;"></div>
         </div>
         <div class="settings-section">
           <div class="settings-section-title">Manual Upload</div>
@@ -3388,7 +3435,7 @@ function escHtml(s) {
 const WS_URL  = `ws://${location.host}/websocket`; // same-origin always
 const API_URL = ``; // relative URLs — works for both proxy and direct bbctrl
 const SAFE_Z  = 50; // mm to retract before repositioning on resume
-const UI_VERSION             = '1.3.3-nightly.20260510.1'; // Rift by AlienWoodshop LLC
+const UI_VERSION             = '1.3.5-nightly.20260511.1'; // Rift by AlienWoodshop LLC
 const ENABLE_RESUME          = false; // set true to re-enable resume-from-stop feature
 const ENABLE_MACROS          = false; // set true to re-enable macro buttons
 const ENABLE_ROTARY          = false; // set true to show rotary axis toggle
@@ -7955,7 +8002,20 @@ async function importSettings(input) {
   }
 }
 
+let _bugReportInFlight = false;
 async function downloadBugReport() {
+  if (_bugReportInFlight) return;
+  _bugReportInFlight = true;
+  const btns = document.querySelectorAll('[onclick^="downloadBugReport"]');
+  const origLabels = [];
+  btns.forEach((b, i) => {
+    origLabels[i] = b.innerHTML;
+    b.disabled = true;
+    b.style.opacity = '0.6';
+    b.style.cursor = 'wait';
+    b.innerHTML = '⏳ Building…';
+  });
+  showToast('Building bug report… this can take ~10–20s', 'info');
   try {
     const res = await fetch(`${API_URL}/api/bugreport`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -7970,6 +8030,14 @@ async function downloadBugReport() {
     showToast('Bug report downloaded', 'info');
   } catch(e) {
     showToast('Bug report failed: ' + e.message, 'error');
+  } finally {
+    btns.forEach((b, i) => {
+      b.disabled = false;
+      b.style.opacity = '';
+      b.style.cursor = '';
+      b.innerHTML = origLabels[i];
+    });
+    _bugReportInFlight = false;
   }
 }
 
@@ -8007,14 +8075,31 @@ async function loadSystemTime() {
     const res = await fetch(`${API_URL}/api/time`);
     if (!res.ok) return;
     const data = await res.json();
+    // bbctrl returns timeinfo as a multiline string. Pull the first
+    // "Local time:" line for the visible status.
     const el = document.getElementById('sys-time-val');
-    if (el && data.timeinfo) el.textContent = data.timeinfo;
-    // Populate timezone dropdown
+    const localLine = data.timeinfo
+      ? (data.timeinfo.match(/Local time:\s*(.+)/) || [])[1]
+      : null;
+    if (el) el.textContent = (localLine || data.timeinfo || '—').trim();
+    // Pre-fill the datetime-local input from the parsed local time
+    // (format: "Mon 2026-05-11 18:56:34 PDT" → "2026-05-11T18:56").
+    const dtIn = document.getElementById('cfg-sys-time');
+    if (dtIn && localLine) {
+      const m = localLine.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
+      if (m) dtIn.value = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}`;
+    }
+    // bbctrl returns timezones as a newline-separated string, not an array.
     const sel = document.getElementById('cfg-sys-tz');
-    if (sel && Array.isArray(data.timezones)) {
-      const cur = (data.timeinfo || '').split(' ').pop() || '';
-      sel.innerHTML = data.timezones.map(tz =>
-        `<option value="${tz}" ${tz === cur ? 'selected' : ''}>${tz}</option>`
+    const tzList = typeof data.timezones === 'string'
+      ? data.timezones.split('\n').map(s => s.trim()).filter(Boolean)
+      : (Array.isArray(data.timezones) ? data.timezones : []);
+    if (sel && tzList.length) {
+      const curTz = data.timeinfo
+        ? ((data.timeinfo.match(/Time zone:\s*(\S+)/) || [])[1] || '')
+        : '';
+      sel.innerHTML = tzList.map(tz =>
+        `<option value="${tz}" ${tz === curTz ? 'selected' : ''}>${tz}</option>`
       ).join('');
     }
   } catch(e) { /* non-fatal */ }
@@ -8124,7 +8209,6 @@ function onUpdateChannelChange(value) {
 async function checkForUpdates() {
   const statusEl = document.getElementById('fw-update-status');
   const latestEl = document.getElementById('fw-latest-val');
-  const notesEl  = document.getElementById('fw-update-notes');
   const actionEl = document.getElementById('fw-update-action');
   const checkBtn = document.getElementById('fw-check-btn');
   if (!statusEl) return;
@@ -8132,7 +8216,6 @@ async function checkForUpdates() {
   statusEl.style.color = 'var(--muted)';
   statusEl.textContent = 'Checking for updates…';
   if (latestEl) latestEl.textContent = '—';
-  if (notesEl)  notesEl.style.display = 'none';
   if (actionEl) actionEl.style.display = 'none';
   if (checkBtn) checkBtn.disabled = true;
 
@@ -8177,10 +8260,6 @@ async function checkForUpdates() {
     if (isNewer) {
       statusEl.style.color = 'var(--green)';
       statusEl.innerHTML = 'Update available! <a href="https://github.com/DRSwanger/rift-cnc-ui/releases/tag/v' + escHtml(latestTag) + '" target="_blank" style="color:var(--accent)">Download v' + escHtml(latestTag) + channelLabel + ' from GitHub</a> and install via Manual Upload below.';
-      if (notesEl && _latestRelease.body) {
-        notesEl.textContent = _latestRelease.body;
-        notesEl.style.display = '';
-      }
       if (noticeEl) { noticeEl.textContent = '⬆ Update available' + channelLabel; noticeEl.style.display = ''; }
     } else {
       statusEl.style.color = 'var(--green)';
