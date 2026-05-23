@@ -59,6 +59,7 @@ MANIFEST="$SCRIPT_DIR/manifest.json"
 BOOT_PNG="$SCRIPT_DIR/rift-boot.png"
 SHUTDOWN_PNG="$SCRIPT_DIR/rift-shutdown.png"
 XINITRC="$SCRIPT_DIR/xinitrc"
+JOURNALD_CONF="$SCRIPT_DIR/journald-rift.conf"
 
 # Discover bbctrl http directory on the Pi
 echo "Locating bbctrl http directory on $PI_USER@$PI_HOST..."
@@ -100,6 +101,7 @@ eval "$SCP_CMD -o StrictHostKeyChecking=no $MANIFEST $PI_USER@$PI_HOST:/tmp/rift
 eval "$SCP_CMD -o StrictHostKeyChecking=no $BOOT_PNG $PI_USER@$PI_HOST:/tmp/rift-boot.png"
 eval "$SCP_CMD -o StrictHostKeyChecking=no $SHUTDOWN_PNG $PI_USER@$PI_HOST:/tmp/rift-shutdown.png"
 eval "$SCP_CMD -o StrictHostKeyChecking=no $XINITRC $PI_USER@$PI_HOST:/tmp/rift-xinitrc"
+eval "$SCP_CMD -o StrictHostKeyChecking=no $JOURNALD_CONF $PI_USER@$PI_HOST:/tmp/rift-journald.conf"
 eval "$SSH_CMD -o StrictHostKeyChecking=no $PI_USER@$PI_HOST \
     'echo ${SSH_PASS} | sudo -S bash -c \"
         cp /tmp/rift-index.html \\\"$HTTP_DIR/index.html\\\" &&
@@ -118,7 +120,12 @@ eval "$SSH_CMD -o StrictHostKeyChecking=no $PI_USER@$PI_HOST \
         cp /tmp/rift-xinitrc /home/pi/.xinitrc &&
         chown pi:pi /home/pi/.xinitrc &&
         chmod 644 /home/pi/.xinitrc &&
-        rm /tmp/rift-index.html /tmp/rift-mobile.html /tmp/rift-manifest.json /tmp/rift-boot.png /tmp/rift-shutdown.png /tmp/rift-xinitrc
+        mkdir -p /etc/systemd/journald.conf.d &&
+        install -m 644 /tmp/rift-journald.conf /etc/systemd/journald.conf.d/rift-persistent.conf &&
+        mkdir -p /var/log/journal &&
+        systemd-tmpfiles --create --prefix /var/log/journal 2>/dev/null || true &&
+        systemctl restart systemd-journald &&
+        rm /tmp/rift-index.html /tmp/rift-mobile.html /tmp/rift-manifest.json /tmp/rift-boot.png /tmp/rift-shutdown.png /tmp/rift-xinitrc /tmp/rift-journald.conf
     \"'"
 
 echo ""

@@ -114,6 +114,20 @@ if [ -f "$BOOT_SRC" ] && [ -d "$PLYMOUTH_DIR" ]; then
     update-initramfs -u 2>/dev/null && echo "Plymouth splash updated" || echo "Plymouth splash copied (initramfs update skipped)"
 fi
 
+# ── Persist systemd journal across reboots ──
+# Stock journald defaults to volatile /run/log/journal (tmpfs), so a Pi crash
+# wipes all forensic evidence on the next boot. Drop in a 200MB-capped
+# persistent journal config so future crashes leave traces queryable via
+# `journalctl -b -1`.
+JOURNALD_SRC="$(dirname "$0")/../journald-rift.conf"
+if [ -f "$JOURNALD_SRC" ]; then
+    mkdir -p /etc/systemd/journald.conf.d
+    install -m 644 "$JOURNALD_SRC" /etc/systemd/journald.conf.d/rift-persistent.conf
+    mkdir -p /var/log/journal
+    systemd-tmpfiles --create --prefix /var/log/journal 2>/dev/null || true
+    systemctl restart systemd-journald && echo "Persistent journald installed (200MB cap)" || echo "WARN: journald restart failed"
+fi
+
 # ── Patch .xinitrc kiosk watchdog ──
 # Stock bbctrl 1.6.6 checks HDMI state 0x40001 every second. On HDMI DMT
 # displays that check fails every iteration, which hammers chromium with

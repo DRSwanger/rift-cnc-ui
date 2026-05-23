@@ -1804,6 +1804,7 @@
   body.kiosk-mode.local-kiosk #bottom-bar > *:not(:last-child)           { margin-right: 16px; }
   body.kiosk-mode.local-kiosk #dro-bar > *:not(:last-child)              { margin-right: 6px; }
   body.kiosk-mode.local-kiosk #status-bar-main > *:not(:last-child)      { margin-right: 20px; }
+  body.kiosk-mode.local-kiosk #progress-info-row > *:not(:last-child)    { margin-right: 12px; }
   body.kiosk-mode.local-kiosk .status-conn-row > *:not(:last-child)      { margin-right: 8px; }
   body.kiosk-mode.local-kiosk .status-logo > *:not(:last-child)          { margin-bottom: 6px; }
   body.kiosk-mode.local-kiosk .status-logo-bottom > *:not(:last-child)   { margin-right: 10px; }
@@ -3435,7 +3436,7 @@ function escHtml(s) {
 const WS_URL  = `ws://${location.host}/websocket`; // same-origin always
 const API_URL = ``; // relative URLs — works for both proxy and direct bbctrl
 const SAFE_Z  = 50; // mm to retract before repositioning on resume
-const UI_VERSION             = '1.3.5'; // Rift by AlienWoodshop LLC
+const UI_VERSION             = '1.3.6-nightly.20260523.1'; // Rift by AlienWoodshop LLC
 const ENABLE_RESUME          = false; // set true to re-enable resume-from-stop feature
 const ENABLE_MACROS          = false; // set true to re-enable macro buttons
 const ENABLE_ROTARY          = false; // set true to show rotary axis toggle
@@ -4178,9 +4179,18 @@ function setMachineState(s) {
     // Reset work offsets for homed axes so repeated homing can't accumulate G92 offsets.
     // Z always gets WCS=50 at home so goToXYOrigin's Z-retract check doesn't try to exceed the axis limit.
     // X/Y: set WCS = ABS (offset → 0).  All axes: G92.1 + G92 Z50.
+    // bbctrl fires its own post-home MDI macro at this same moment — firing ours synchronously
+    // races it and the AVR rejects with "Cannot set position during mdi" → alarm beep.
+    // waitForCycleIdle holds until bbctrl's macro has completed before we fire ours.
     if (_homingAxes && ws && ws.readyState === WebSocket.OPEN) {
-      ws.send('G92.1\nG92 Z50');
-      uiLog('Post-home (' + _homingAxes + '): cleared all work offsets, set Z=50 at home');
+      const axes = _homingAxes;
+      (async () => {
+        await waitForCycleIdle();
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send('G92.1\nG92 Z50');
+          uiLog('Post-home (' + axes + '): cleared all work offsets, set Z=50 at home');
+        }
+      })();
     }
     _homingAxes = null;
   }
