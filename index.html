@@ -2269,17 +2269,66 @@
     pointer-events: none;
     z-index: 99999;
   }
-  body.dev-mode::after {
-    content: "DEV";
+  #dev-badge {
+    display: none;
     position: fixed; top: 8px; right: 12px;
     background: #ff2d95; color: #fff;
     font-family: system-ui, sans-serif;
     font-weight: 800; font-size: 11px; letter-spacing: 1.2px;
     padding: 3px 8px; border-radius: 4px;
-    pointer-events: none;
+    cursor: pointer;
     z-index: 99999;
     box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    border: none;
   }
+  #dev-badge:hover { background: #ff5cad; }
+  body.dev-mode #dev-badge { display: inline-block; }
+  /* Dev Tools popup */
+  #dev-tools-panel {
+    display: none; position: fixed; top: 40px; right: 12px;
+    background: var(--surface); border: 1px solid #ff2d95; border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    min-width: 260px; z-index: 100000;
+    font-family: system-ui, sans-serif;
+  }
+  #dev-tools-panel.open { display: block; }
+  #dev-tools-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px; border-bottom: 1px solid var(--border);
+  }
+  #dev-tools-header .title {
+    font-size: 11px; font-weight: 800; letter-spacing: 1.2px;
+    color: #ff2d95; text-transform: uppercase;
+  }
+  #dev-tools-close {
+    background: none; border: none; color: var(--muted);
+    font-size: 16px; cursor: pointer; padding: 0 2px; line-height: 1;
+  }
+  #dev-tools-close:hover { color: var(--text); }
+  #dev-tools-body { padding: 10px 12px; display: flex; flex-direction: column; }
+  #dev-tools-body > button + button { margin-top: 6px; }
+  .dev-tool-btn {
+    background: #2a2a2a; color: #fff; border: 1px solid #444;
+    padding: 8px 10px; border-radius: 4px; cursor: pointer;
+    font-size: 12px; text-align: left;
+  }
+  .dev-tool-btn:hover { background: #3a3a3a; border-color: #ff2d95; }
+  /* Recover button on error banner (only visible when wedge detected) */
+  #error-banner-recover {
+    display: none;
+    background: #4a1e00;
+    border: 1px solid #ff7733;
+    color: #ffaa66;
+    padding: 2px 10px;
+    border-radius: 3px;
+    font-size: 11px;
+    cursor: pointer;
+    flex-shrink: 0;
+    white-space: nowrap;
+    font-weight: 700;
+  }
+  #error-banner-recover:hover { background: #ff7733; color: #fff; }
+  #error-banner.wedge #error-banner-recover { display: inline-block; }
 
 </style>
 </head>
@@ -2293,6 +2342,18 @@
     var isDevParam = /[?&]dev=1\b/.test(location.search);
     if (isDevHost || isDevParam) document.body.classList.add('dev-mode');
   })();
+</script>
+<button id="dev-badge" onclick="toggleDevTools()" title="Open dev tools">DEV</button>
+<div id="dev-tools-panel">
+  <div id="dev-tools-header">
+    <span class="title">Dev Tools</span>
+    <button id="dev-tools-close" onclick="toggleDevTools(false)">✕</button>
+  </div>
+  <div id="dev-tools-body">
+    <button class="dev-tool-btn" onclick="simulateProbeWedge()">⚠ Simulate Probe Wedge</button>
+  </div>
+</div>
+<script>
   // Pre-paint kiosk detection — mirrors initKioskMode()/_kioskIsLocked() so the
   // first paint matches the eventual mode and we don't flash desktop layout
   // before JS settles. The full initKioskMode() still runs later and is the
@@ -2351,6 +2412,7 @@
     <span id="error-banner-icon">⚠</span>
     <span id="error-banner-more" onclick="openErrorLog()"></span>
     <span id="error-banner-msg" style="cursor:pointer" onclick="openErrorLog()"></span>
+    <button id="error-banner-recover" onclick="recoverFromWedge()" title="Send /api/stop to drain the wedge">↻ Recover</button>
     <button id="error-banner-clear" onclick="clearErrorBanner()">Clear</button>
   </div>
 </div>
@@ -3436,7 +3498,7 @@ function escHtml(s) {
 const WS_URL  = `ws://${location.host}/websocket`; // same-origin always
 const API_URL = ``; // relative URLs — works for both proxy and direct bbctrl
 const SAFE_Z  = 50; // mm to retract before repositioning on resume
-const UI_VERSION             = '1.3.6-nightly.20260523.1'; // Rift by AlienWoodshop LLC
+const UI_VERSION             = '1.3.6-nightly.20260531.1'; // Rift by AlienWoodshop LLC
 const ENABLE_RESUME          = false; // set true to re-enable resume-from-stop feature
 const ENABLE_MACROS          = false; // set true to re-enable macro buttons
 const ENABLE_ROTARY          = false; // set true to show rotary axis toggle
@@ -3794,6 +3856,27 @@ function updateUI(data) {
       _wasActive = true;
     }
     if (cycle === 'homing' || xx === 'HOMING') { _wasHoming = true; _lastHomingAt = Date.now(); }
+    // Wedge detector: STOPPING that arrives WITHOUT a recent user-initiated stop/pause is
+    // suspicious — usually bbctrl reacting to a noise-triggered probe input. Arm a flag;
+    // if HOLDING follows shortly, the machine is wedged and /api/unpause is a no-op (bbctrl
+    // /api/clear is gated on ESTOPPED, so the only recovery is /api/stop).
+    if ('xx' in data && xx === 'STOPPING') {
+      const userInitiated = _wasPausing || _wasUserStop ||
+        (_userActionAt && (Date.now() - _userActionAt) < 4000);
+      if (!userInitiated) _wedgeArmedAt = Date.now();
+    }
+    if ('xx' in data && xx === 'HOLDING' && _wedgeArmedAt &&
+        (Date.now() - _wedgeArmedAt) < 5000) {
+      _wedgeArmedAt = 0;
+      showWedgeBanner('Controller stopped unexpectedly (possible probe-line noise). Unpause is a no-op — click Recover to drain.');
+    }
+    if (['RUNNING','READY','IDLE','ESTOPPED'].includes(xx)) {
+      _wedgeArmedAt = 0;
+      // Auto-dismiss the wedge banner once the controller has actually drained back
+      // to a healthy state. Don't touch non-wedge banners.
+      const _b = document.getElementById('error-banner');
+      if (_b.classList.contains('wedge')) clearErrorBanner(true);
+    }
     // NOTE: _wasHoming is intentionally NOT cleared here.
     // setMachineState clears it AFTER the idle-post-homing check so the check can fire.
     setMachineState(deriveMachineState(cycle, xx));
@@ -3985,6 +4068,8 @@ let _userActionAt = 0;            // timestamp of last pause/stop click — supp
 let _movementStartTime = 0;   // when current movement began (to detect pr set during movement)
 let _lastErrLog = 0;          // debounce double-logging when WS delta + setMachineState both fire
 let _lastHomingAt = 0;        // timestamp when last homing cycle began (suppresses switch-found grace window)
+let _wedgeArmedAt = 0;        // set when STOPPING arrives without user action; HOLDING within 5s confirms wedge
+let _wedgeSimPrevXx = null;   // dev-only: pre-sim xx snapshot so Recover can restore (no real /api/stop)
 
 function updateBannerMore() {
   const el = document.getElementById('error-banner-more');
@@ -4023,7 +4108,9 @@ function showErrorBanner(msg, force) {
 }
 
 function clearErrorBanner(fromController) {
-  document.getElementById('error-banner').classList.remove('visible');
+  const banner = document.getElementById('error-banner');
+  banner.classList.remove('visible');
+  banner.classList.remove('wedge');
   document.getElementById('error-banner-msg').textContent = '';
   if (!fromController) {
     // User clicked Clear — remember the pr that triggered this banner so refresh
@@ -4038,6 +4125,77 @@ function clearErrorBanner(fromController) {
     }
     updateBannerMore();
   }
+}
+
+// Wedge banner: shown when the controller has fallen into HOLDING via STOPPING
+// without any user action. The pr-based suppression path doesn't apply here —
+// we always want this visible and we always want a Recover button.
+function showWedgeBanner(msg) {
+  const banner = document.getElementById('error-banner');
+  document.getElementById('error-banner-msg').textContent = msg;
+  banner.classList.add('visible');
+  banner.classList.add('wedge');
+  uiLog('WEDGE DETECTED: ' + msg, 'ERROR');
+  showToast('Controller wedged — click Recover', 'error');
+}
+
+// Recover from a wedged controller. bbctrl /api/unpause is a no-op in this state
+// (the STOPPING path put the planner in a state where it ignores resume), and
+// /api/clear is gated on ESTOPPED — so /api/stop is the only thing that drains it.
+// In sim mode we don't touch the controller — just restore the pre-sim xx so the
+// UI doesn't stay stuck on a synthetic HOLDING (bbctrl only sends xx deltas on
+// change, so it won't naturally re-broadcast the real state).
+async function recoverFromWedge() {
+  if (_wedgeSimPrevXx !== null) {
+    uiLog('Recover (sim): restoring xx=' + _wedgeSimPrevXx);
+    injectSyntheticState({ xx: _wedgeSimPrevXx });
+    _wedgeSimPrevXx = null;
+    clearErrorBanner(true);
+    return;
+  }
+  try {
+    uiLog('Recover: PUT /api/stop');
+    await fetch(`${API_URL}/api/stop`, { method: 'PUT' });
+    _wasUserStop = true;
+    _userActionAt = Date.now();
+    setTimeout(() => clearErrorBanner(true), 400);
+  } catch(e) {
+    showErrorBanner(`Recover failed: ${e.message}`, true);
+  }
+}
+
+// ── DEV TOOLS popup (gated by body.dev-mode) ──
+function toggleDevTools(force) {
+  const panel = document.getElementById('dev-tools-panel');
+  if (!panel) return;
+  const open = force === undefined ? !panel.classList.contains('open') : !!force;
+  panel.classList.toggle('open', open);
+}
+
+// Simulate a probe wedge by injecting synthetic WS state deltas through the same
+// path the real WS handler uses. STOPPING (no user action recently) → arms the
+// wedge flag; HOLDING 250ms later → fires the banner. No controller contact.
+function simulateProbeWedge() {
+  if (!document.body.classList.contains('dev-mode')) return;
+  // If a prior sim is still active, snapshot was already taken — don't overwrite.
+  if (_wedgeSimPrevXx === null) _wedgeSimPrevXx = state.xx || 'READY';
+  uiLog('SIM: injecting STOPPING → HOLDING wedge (prev xx=' + _wedgeSimPrevXx + ')', 'DEBUG');
+  // Clear user-action flags so the detector treats this as unsolicited,
+  // and reset the wedge arm so a repeat sim fires cleanly.
+  _wasPausing = false;
+  _wasUserStop = false;
+  _userActionAt = 0;
+  _wedgeArmedAt = 0;
+  clearErrorBanner(true);
+  injectSyntheticState({ xx: 'STOPPING' });
+  setTimeout(() => injectSyntheticState({ xx: 'HOLDING' }), 250);
+}
+
+// Mirror of the ws.onmessage body — merge into state and run updateUI so all
+// existing handlers (wedge detector included) see the synthetic delta.
+function injectSyntheticState(delta) {
+  Object.assign(state, delta);
+  updateUI(delta);
 }
 
 function openErrorLog() {
