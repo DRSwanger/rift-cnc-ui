@@ -1656,6 +1656,8 @@
   }
   .fm-btn:hover { background: var(--surface2); color: var(--text); }
   .fm-btn.load:hover { border-color: var(--green); color: var(--green); }
+  .fm-btn.dl:hover   { border-color: var(--accent); color: var(--accent); }
+  body.kiosk-mode .fm-btn.dl { display: none; }
   .fm-btn.del:hover  { border-color: var(--red); color: var(--red); }
   .fm-empty { padding: 24px; text-align: center; color: var(--muted); font-size: 13px; }
 
@@ -3498,7 +3500,7 @@ function escHtml(s) {
 const WS_URL  = `ws://${location.host}/websocket`; // same-origin always
 const API_URL = ``; // relative URLs — works for both proxy and direct bbctrl
 const SAFE_Z  = 50; // mm to retract before repositioning on resume
-const UI_VERSION             = '1.3.6-nightly.20260531.1'; // Rift by AlienWoodshop LLC
+const UI_VERSION             = '1.3.6'; // Rift by AlienWoodshop LLC
 const ENABLE_RESUME          = false; // set true to re-enable resume-from-stop feature
 const ENABLE_MACROS          = false; // set true to re-enable macro buttons
 const ENABLE_ROTARY          = false; // set true to show rotary axis toggle
@@ -4060,6 +4062,7 @@ let _bannerPr = '';        // the pr value that triggered the current banner (ma
 let _wasActive = false;       // machine was moving/jogging since last idle
 let _wasHoming = false;       // machine was in a home cycle (resets _prDismissed on completion)
 let _homingAxes = null;       // 'all' | 'x' | 'y' | 'z' — cleared after post-home offset reset
+let _startInFlight = false;        // blocks re-entry of machineStart() until WS confirms running
 let _wasPausing = false;          // user clicked Pause — suppress expected "user stop" pr banner
 let _wasUserStop = false;         // user clicked Stop  — suppress expected "user stop" pr banner
 let _wasFileJob = false;          // a file-based gcode run was active (not just MDI/homing) — triggers planner-flush nudge on clean completion
@@ -4356,7 +4359,7 @@ function setMachineState(s) {
   if (s === 'idle' || s === 'estopped' || s === 'error') _wasHoming = false;
 
   // Job start/stop — lastMachineState is still the OLD state here, so the transition is detected correctly.
-  if (s === 'running' && lastMachineState !== 'running') {
+  if (s === 'running' && lastMachineState !== 'running') { _startInFlight = false;
     const fname = state.selected || '';
     // On fresh page load mid-job, restore the persisted start so ETA/elapsed don't reset.
     const persisted = readJobStart();
@@ -6508,6 +6511,8 @@ function checkFileLimits() {
 }
 
 async function machineStart() {
+  if (_startInFlight || lastMachineState === 'running') return;
+  _startInFlight = true;
   if (ENABLE_RESUME) {
     resumeState = null;
     peakResumeState = null;
@@ -6536,7 +6541,7 @@ async function machineStart() {
   try {
     const r = await fetch(`${API_URL}/api/start`, { method: 'PUT' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  } catch(e) { showErrorBanner(`Start failed: ${e.message}`, true); }
+  } catch(e) { showErrorBanner(`Start failed: ${e.message}`, true); _startInFlight = false; }
 }
 
 async function machinePause() {
@@ -7496,6 +7501,7 @@ function fmRender() {
           <span class="fm-name" title="${escHtml(item.name)}">${escHtml(item.name)}</span>
           <div class="fm-actions">
             <button class="fm-btn load" data-fm-action="load">Load</button>
+            <button class="fm-btn dl"   data-fm-action="dl"  title="Download file to this device">💾</button>
             <button class="fm-btn del"  data-fm-action="del">✕</button>
           </div>
         </div>`;
@@ -7518,6 +7524,7 @@ function fmRender() {
           if (action === 'enter')          fmEnter(item.name);
           else if (action === 'delfolder') fmDeleteFolder(item.name);
           else if (action === 'load')      fmLoad(item.name);
+          else if (action === 'dl')        fmDownload(item.name);
           else if (action === 'del')       fmDelete(item.name);
         });
       });
@@ -7601,6 +7608,22 @@ function fmSetStatus(msg) { document.getElementById('fm-status').textContent = m
 async function fmLoad(filepath) {
   await selectFile(filepath);
   closeFileManager();
+}
+
+async function fmDownload(filepath) {
+  try {
+    const res = await fetch(`${API_URL}/api/file/${encodeURIComponent(filepath)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = filepath.split('/').pop();
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch(e) { showToast('Download failed: ' + e.message, 'error'); }
 }
 
 async function fmDelete(filepath) {
