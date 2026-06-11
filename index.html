@@ -1711,7 +1711,9 @@
   .desktop-only { display: inherit; }
 
   .section-title {
-    font-size: 10px;
+    /* 14px ≈ what kiosk mode shows after its CSS zoom (10px × ~1.5 screen fit) —
+       desktop used to render a true 10px, much smaller than the kiosk look. */
+    font-size: 14px;
     color: var(--muted);
     text-transform: uppercase;
     letter-spacing: 1.5px;
@@ -2821,6 +2823,9 @@
   body.kiosk-mode .jog-btn.center { font-size: 13px; }
   /* Step size: desktop height in kiosk motion col */
   body.kiosk-mode #scol-motion .step-btn { padding: 3px 2px; font-size: 11px; }
+  /* Kiosk is a fixed 1280x720 layout scaled by CSS zoom — keep its labels at the
+     original 10px so the desktop .section-title bump doesn't reflow tight columns. */
+  body.kiosk-mode .section-title { font-size: 10px; }
 
   /* ── MOVABLE SECTIONS (drag-to-rearrange, desktop only) ── */
   .movable { position: relative; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
