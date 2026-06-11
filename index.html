@@ -2839,14 +2839,21 @@
   #sidebar > #sec-step,
   #sidebar > #sec-zero,
   #sidebar > #sec-probe { flex: 0 1 auto; }
-  /* Button labels stay vertically centered at min and when stretched */
-  #sidebar > #sec-home  .hz-btn,
-  #sidebar > #sec-zero  .hz-btn,
-  #sidebar > #sec-probe #btn-probe-z {
+  /* Button labels stay vertically centered at min and when stretched —
+     desktop-wide (any zone), but not kiosk, which has its own button sizing */
+  body:not(.kiosk-mode) #sec-home  .hz-btn,
+  body:not(.kiosk-mode) #sec-zero  .hz-btn,
+  body:not(.kiosk-mode) #sec-probe #btn-probe-z {
     display: flex; align-items: center; justify-content: center; min-height: 0;
   }
-  #sidebar > #sec-jogxy { flex: 2 1 140px; }
-  #sidebar > #sec-jogz  { flex: 1 1 168px; }
+  /* Jog grow rules follow the section into any zone (same pattern as #sec-3d) —
+     sidebar-only scoping made these collapse when dropped in the other columns */
+  #sidebar > #sec-jogxy,
+  #gcode-panel > #sec-jogxy,
+  #view-panel > #sec-jogxy { flex: 2 1 140px; }
+  #sidebar > #sec-jogz,
+  #gcode-panel > #sec-jogz,
+  #view-panel > #sec-jogz  { flex: 1 1 168px; }
   /* Min heights are per-section regardless of which zone they live in */
   /* Floor each row at title (~18px) + button (~40px) + breathing (~10px). */
   #sec-home  { min-height: 70px; }
@@ -2943,19 +2950,26 @@
   /* Hide handles in kiosk */
   body.kiosk-mode .movable-handle { display: none; }
 
-  /* Movable wrappers need to participate correctly in their host's flex layout */
-  #gcode-panel > .movable { display: flex; flex-direction: column; min-height: 0; }
-  #gcode-panel > #sec-gcode { flex: 1; min-height: 0; }
-  #gcode-panel > #sec-gcode > #gcode-content { flex: 1; min-height: 0; }
+  /* Movable wrappers need to participate correctly in their host's flex layout.
+     NO min-height:0 here — at (id+class) specificity it would defeat the
+     per-section #sec-* floors above and let flex-stretched sections (jog grids
+     have zero intrinsic height) collapse to nothing when dropped into these
+     zones. The .movable base rule already supplies min-height:0 at class
+     specificity, which the ID floors correctly override — same cascade the
+     sidebar relies on. */
+  #gcode-panel > .movable { display: flex; flex-direction: column; }
+  #view-panel  > .movable { display: flex; flex-direction: column; }
+  /* GCode viewer: fills whichever zone it lives in, floored like its siblings */
+  #sidebar > #sec-gcode,
+  #gcode-panel > #sec-gcode,
+  #view-panel > #sec-gcode { flex: 1 1 0px; }
+  #sec-gcode > #gcode-content { flex: 1; min-height: 0; }
   /* 3D view: fill its host as a movable that competes equally with siblings */
   #sec-3d { display: flex; flex-direction: column; min-height: 0; }
   #sec-3d > #canvas-wrap { flex: 1; min-height: 0; }
   #view-panel > #sec-3d,
   #gcode-panel > #sec-3d,
   #sidebar > #sec-3d { flex: 1 1 0px; min-height: 150px; }
-  /* All three column zones share the same flex behavior so dropped sections
-     compete equally regardless of column. */
-  #view-panel > .movable { display: flex; flex-direction: column; min-height: 0; }
   /* History allows shrinking so the resize grip is never pushed out of view */
   #sec-mdi > #mdi-history-wrap { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 
