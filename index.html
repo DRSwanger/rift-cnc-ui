@@ -1701,7 +1701,8 @@
     flex-direction: column;
     gap: 4px;
     padding: 8px;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto; /* overfilled column scrolls instead of clipping under the bottom bar */
     min-height: 0;
   }
   /* Desktop: sidebar-col is invisible to layout — children participate directly */
@@ -1817,10 +1818,12 @@
 
   /* ── CENTER - 3D VIEW ── */
   #view-panel {
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto; /* overfilled column scrolls instead of clipping under the bottom bar */
     background: var(--surface);
     display: flex;
     flex-direction: column;
+    min-height: 0;
   }
 
   #canvas-wrap {
@@ -1948,7 +1951,9 @@
     border-left: 1px solid var(--border);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto; /* overfilled column scrolls instead of clipping under the bottom bar */
+    min-height: 0;
   }
 
   #gcode-top-bar {
@@ -2921,6 +2926,20 @@
   .movable-handle:hover { color: var(--accent); border-color: var(--accent); }
   .movable.dragging { opacity: 0.4; }
   .movable-handle:active { cursor: grabbing; }
+
+  /* Every drop zone: leftover vertical space goes nowhere visible, and an
+     overfilled column scrolls instead of clipping panels under the bottom bar.
+     (overrides the per-zone `overflow: hidden` on #sidebar/#view-panel/#gcode-panel) */
+  .layout-zone { overflow-y: auto; min-height: 0; }
+  /* Trailing flexible spacer (one per zone, appended in JS, kept last).
+     Tiny grow factor: a real growable panel (jog/3D/gcode, grow 1-2) wins
+     essentially all free space, so the filler is invisible then. When a column
+     has NO growable panel (e.g. all content sections after a rearrange), the
+     filler is the only positive grow, so it silently absorbs the slack and the
+     panels stay top-aligned at their natural size — no dead gap, no stretched
+     buttons. */
+  .zone-fill { flex: 0.0001 1 0px; min-height: 0; align-self: stretch; pointer-events: none; }
+  body.kiosk-mode .zone-fill { display: none; }
 
   .layout-zone.drop-target {
     outline: 2px dashed var(--accent);
@@ -9980,6 +9999,30 @@ function _layoutSet(layout) {
   try { localStorage.setItem(_LAYOUT_KEY, JSON.stringify(layout)); } catch(_) {}
 }
 
+// Each layout zone carries a trailing .zone-fill spacer that absorbs leftover
+// vertical space when the column has no growable panel. Ensure it exists, is the
+// LAST child, and grows ONLY when no real grower is present.
+//
+// Why grow is toggled (not a constant tiny value): a lone flex item with
+// flex-grow < 1 absorbs just that *fraction* of the free space, so a small
+// constant would leave most of the gap behind. So: grow=1 when the column has
+// no growable panel (filler eats all slack, panels stay top-aligned at natural
+// size); grow=0 when a real grower (jog/3D/gcode, or any un-pinned grow panel)
+// is present, so the filler never competes with it.
+function ensureZoneFillers() {
+  ['sidebar', 'view-panel', 'gcode-panel'].forEach(id => {
+    const z = document.getElementById(id);
+    if (!z) return;
+    let fill = z.querySelector(':scope > .zone-fill');
+    if (!fill) { fill = document.createElement('div'); fill.className = 'zone-fill'; z.appendChild(fill); }
+    else if (fill !== z.lastElementChild) z.appendChild(fill); // keep it last
+    const hasGrower = Array.from(z.children).some(c =>
+      c.classList && c.classList.contains('movable') && c.offsetParent !== null &&
+      (parseFloat(getComputedStyle(c).flexGrow) || 0) > 0);
+    fill.style.flexGrow = hasGrower ? '0' : '1';
+  });
+}
+
 function restoreSectionsToHome() {
   // Send each .movable back to its data-movable-home parent. Kiosk view expects this.
   _MOVABLE_IDS.forEach(id => {
@@ -10031,6 +10074,7 @@ function applyDesktopLayout() {
       if (el) container.appendChild(el);
     });
   });
+  ensureZoneFillers();
 }
 
 function saveCurrentLayout() {
@@ -10148,6 +10192,7 @@ function initSectionResize() {
       });
       unpinned = [];
       target = null;
+      ensureZoneFillers(); // pinning may have removed the column's last grower
       window.dispatchEvent(new Event('resize'));
     };
     grip.addEventListener('pointerdown', e => {
@@ -10299,6 +10344,7 @@ function initBottomBarResize() {
       _saveSectionHeight(m.id, rh);
     });
     unpinned = [];
+    ensureZoneFillers(); // pinning may have removed a column's last grower
     window.dispatchEvent(new Event('resize'));
   };
   grip.addEventListener('pointerdown', e => {
@@ -10458,7 +10504,10 @@ function initLayoutDnD() {
         if (before) zone.insertBefore(_dragMovable, target);
         else        zone.insertBefore(_dragMovable, target.nextSibling);
       } else {
-        zone.appendChild(_dragMovable);
+        // No target panel — drop at the end, but keep the .zone-fill spacer last.
+        const fill = zone.querySelector(':scope > .zone-fill');
+        if (fill) zone.insertBefore(_dragMovable, fill);
+        else      zone.appendChild(_dragMovable);
       }
       // If the section moved to a different zone, clear saved/inline heights
       // for the moved section AND all sections in the source and destination
@@ -10474,6 +10523,7 @@ function initLayoutDnD() {
         prevZone.querySelectorAll(':scope > .movable').forEach(reset);
         zone.querySelectorAll(':scope > .movable').forEach(reset);
       }
+      ensureZoneFillers();
       saveCurrentLayout();
       _updateTrayState();
       window.dispatchEvent(new Event('resize'));
@@ -10648,6 +10698,7 @@ initKioskMode();
 _sizeProbeZRetry();
 initColumnSplitters();
 initLayoutDnD();
+ensureZoneFillers();
 if (!document.body.classList.contains('kiosk-mode')) applyDesktopLayout();
 initSectionResize();
 initBottomBarResize();
