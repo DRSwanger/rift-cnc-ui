@@ -3579,6 +3579,8 @@ let scene, camera, renderer, toolpathGroup, posMarker;
 let isDragging = false, isPanning = false, lastMouse = {x:0, y:0};
 let _cutSegData = [];     // {from, to, avgZ, lineNum} per cut segment
 let _cutLineSegs = null;  // THREE.LineSegments with vertex colors for cut moves
+let _cutBaseColors = null; // pristine not-done vertex colors — cheap restore when progress rewinds
+let _cutDoneCount = 0;     // segments currently painted done (always a prefix of _cutSegData)
 let _bboxHelper  = null;  // THREE.Box3Helper for bounding box
 let _colorRefreshAt = 0;  // throttle timestamp for progress color updates
 let camTheta = 0.8, camPhi = 0.6, camRadius = 600, camTarget = new THREE.Vector3(400, 400, 0);
@@ -3691,6 +3693,49 @@ function reset3dColors() {
 // `cnc_host` from localStorage; this is only the fallback for fresh installs.
 const DEFAULT_HOST = 'onefinity.local';
 
+// ── WS DELTA COALESCING ──
+// High-rate deltas (position/line/telemetry, ~4Hz during a job) used to run the
+// full updateUI synchronously inside ws.onmessage. On a slow main thread
+// (Firefox on software WebGL, busy laptops) the handler can take longer than
+// the 250ms message interval — the event queue then grows without bound, the
+// UI drifts further and further behind the real machine, and the tab
+// eventually freezes outright. Coalescing merges deltas and runs updateUI at
+// most once per _uiFlushGap ms; the gap self-tunes to 3x the measured updateUI
+// cost, so a struggling tab degrades to fewer-but-fresher updates instead of a
+// backlog. State-transition keys flush synchronously — they are rare, cheap,
+// and drive safety logic (wedge detector, pr banners) that must not wait out a
+// coalesce window.
+const _UI_CRITICAL_KEYS = ['xx','cycle','pr','selected','gcode_list','macros','0homed','1homed','3homed'];
+let _pendingDelta = null;
+let _uiFlushTimer = null;
+let _uiFlushGap   = 50;   // ms — floor 50, raised to 3x last updateUI duration, cap 1000
+
+function _flushUiDelta() {
+  _uiFlushTimer = null;
+  const d = _pendingDelta;
+  _pendingDelta = null;
+  if (!d) return;
+  const t0 = Date.now();
+  updateUI(d);
+  const dur = Date.now() - t0;
+  _uiFlushGap = Math.min(1000, Math.max(50, dur * 3));
+}
+
+function queueUiUpdate(data) {
+  if (_pendingDelta) Object.assign(_pendingDelta, data);
+  else _pendingDelta = Object.assign({}, data);
+  let critical = false;
+  for (let i = 0; i < _UI_CRITICAL_KEYS.length; i++) {
+    if (_UI_CRITICAL_KEYS[i] in data) { critical = true; break; }
+  }
+  if (critical) {
+    if (_uiFlushTimer) { clearTimeout(_uiFlushTimer); }
+    _flushUiDelta();
+    return;
+  }
+  if (!_uiFlushTimer) _uiFlushTimer = setTimeout(_flushUiDelta, _uiFlushGap);
+}
+
 // ── WEBSOCKET ──
 function connect() {
   if (ws) {
@@ -3737,8 +3782,8 @@ function connect() {
       const pr    = data.pr    !== undefined ? ` pr="${data.pr}"` : '';
       uiLog(`WS [{${keys}}${cycle}${pr}]`, 'DEBUG');
     }
-    Object.assign(state, data);
-    updateUI(data);
+    Object.assign(state, data);   // state is always current, even when display work is coalesced
+    queueUiUpdate(data);
   };
 }
 
@@ -3944,7 +3989,7 @@ function updateUI(data) {
     // Throttled progress color refresh (100ms) for 3D view
     if (viewToggles.progress) {
       const now = Date.now();
-      if (now - _colorRefreshAt > 100) { _colorRefreshAt = now; refreshCutColors(); }
+      if (now - _colorRefreshAt > 100) { _colorRefreshAt = now; refreshCutColors(true); }
     }
   }
 
@@ -4774,6 +4819,7 @@ function renderGCode(lines) {
     _virt.container.removeEventListener('scroll', _virt.onScroll);
   }
   _virt = null;
+  _lastHlLine = -1;  // fresh DOM — highlightLine must not skip as "unchanged"
   container.innerHTML = '';
   if (lines.length <= VIRT_THRESHOLD) {
     container.innerHTML = lines.map((line, i) => _renderLineHtml(line, i)).join('');
@@ -4791,7 +4837,10 @@ function renderGCode(lines) {
   _renderVirtWindow();
 }
 
+let _lastHlLine = -1;  // skip repeat calls for the same line (WS resends line in many deltas)
 function highlightLine(lineNum) {
+  if (lineNum === _lastHlLine) return;
+  _lastHlLine = lineNum;
   const prev = document.querySelector('.gcode-line.current');
   if (prev) prev.classList.remove('current');
 
@@ -4805,8 +4854,16 @@ function highlightLine(lineNum) {
     if (!inView) {
       const dest = Math.max(0, Math.min(lines.length * rowH - viewH, targetTop - viewH / 2));
       container.scrollTop = dest;
+      _virt.start = -1;  // window moved — force re-render
+      _renderVirtWindow();
+      return;
     }
-    _virt.start = -1;  // force re-render so the current-line class lands even if window unchanged
+    // In view and the window didn't move: just move the 'current' class. The
+    // old unconditional rebuild re-parsed ~70 rows of innerHTML on every WS
+    // line delta (4x/sec for a whole job) — a steady main-thread drain.
+    const curRow = document.getElementById('gl-' + lineNum);
+    if (curRow) { curRow.classList.add('current'); return; }
+    _virt.start = -1;  // row not materialized (stale window) — fall back to rebuild
     _renderVirtWindow();
     return;
   }
@@ -4814,7 +4871,19 @@ function highlightLine(lineNum) {
   const cur = document.getElementById(`gl-${lineNum}`);
   if (cur) {
     cur.classList.add('current');
-    cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    // Only scroll when the highlight actually leaves the comfortable band.
+    // Unconditional scrollIntoView({smooth}) restarted the browser's smooth-
+    // scroll animation 4x/sec and forced layout each time — Firefox especially
+    // never finished one scroll before the next began.
+    const c = document.getElementById('gcode-content');
+    if (c) {
+      const cr = c.getBoundingClientRect();
+      const r  = cur.getBoundingClientRect();
+      const inView = r.top >= cr.top + 40 && r.bottom <= cr.bottom - 40;
+      if (!inView) cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    } else {
+      cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
   }
 }
 
@@ -6821,8 +6890,29 @@ function init3D() {
   const canvas = document.getElementById('three-canvas');
   const panel  = document.getElementById('canvas-wrap');
 
+  // Probe for software rasterization BEFORE creating the renderer — a canvas
+  // context's antialias choice is permanent, and MSAA on llvmpipe/SwiftShader
+  // multiplies the per-frame cost (the Firefox "freezes after a while during a
+  // job" failure mode: each render blocked the main thread for 100ms+).
+  let _softGL = false;
   try {
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    const pc = document.createElement('canvas');
+    const pg = pc.getContext('webgl') || pc.getContext('experimental-webgl');
+    if (pg) {
+      let rname = '';
+      const ext = pg.getExtension('WEBGL_debug_renderer_info');
+      if (ext) rname += String(pg.getParameter(ext.UNMASKED_RENDERER_WEBGL));
+      rname += ' ' + String(pg.getParameter(pg.RENDERER));  // newer Firefox unmasks RENDERER itself
+      _softGL = /llvmpipe|softpipe|swiftshader|software|basic render/i.test(rname);
+      window._glRendererName = rname.trim();
+      const lose = pg.getExtension('WEBGL_lose_context');
+      if (lose) lose.loseContext();
+    }
+  } catch (probeErr) { /* probe is best-effort */ }
+  window._softGL = _softGL;
+
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: !_softGL, alpha: true });
   } catch (e) {
     _3dInitialized = false;
     canvas.style.display = 'none';
@@ -6836,8 +6926,15 @@ function init3D() {
     panel.appendChild(msg);
     return;
   }
-  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setPixelRatio(_softGL ? 1 : window.devicePixelRatio);
   renderer.setClearColor(_3dColors.bg, 1);
+  if (_softGL) {
+    uiLog('3D: software WebGL detected (' + (window._glRendererName || 'unknown') + ') — antialias off, pixelRatio 1', 'WARN');
+    // Kiosk Pi may legitimately run soft-GL; only nag desktop/remote users.
+    if (!document.body.classList.contains('kiosk-mode')) {
+      showToast('3D view has no GPU acceleration in this browser — rendering may be slow during jobs. Enable hardware acceleration (Firefox: Settings → General → Performance) for best results.', 'info', 12000);
+    }
+  }
 
   scene = new THREE.Scene();
 
@@ -7051,11 +7148,19 @@ function updateBedGrid() {
   requestRender();
 }
 
+let _nextRenderAt = 0;  // adaptive back-off so slow (software-GL) renders can't saturate the main thread
 function animate() {
   requestAnimationFrame(animate);
   if (!renderer || !_renderDirty) return;
+  const now = Date.now();
+  if (now < _nextRenderAt) return;  // keep _renderDirty set — latest state renders after the gap
   _renderDirty = false;
   renderer.render(scene, camera);
+  const dur = Date.now() - now;
+  // >25ms/frame means the rasterizer can't hold even 40fps (llvmpipe, SwiftShader,
+  // overloaded iGPU). Space renders to 4x their cost so WS/DOM work runs between
+  // frames; fast hardware (a few ms) stays completely unthrottled.
+  _nextRenderAt = dur > 25 ? now + Math.min(1500, dur * 4) : 0;
 }
 
 function arcPoints(x0, y0, z0, x1, y1, z1, i, j, cw, segs = 48) {
@@ -7104,6 +7209,8 @@ function parseAndRender3D(lines) {
   }
   _cutSegData = [];
   _cutLineSegs = null;
+  _cutBaseColors = null;
+  _cutDoneCount = 0;
 
   const rapidPts = [];
   let x = 0, y = 0, z = 0, isRapid = false;
@@ -7177,6 +7284,8 @@ function parseAndRender3D(lines) {
     geo.setAttribute('color',    new THREE.BufferAttribute(colors, 3));
     _cutLineSegs = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ vertexColors: true }));
     toolpathGroup.add(_cutLineSegs);
+    _cutBaseColors = colors.slice(0);  // pristine copy for incremental refreshCutColors
+    _cutDoneCount = 0;
   }
 
   // Bbox helper (if toggled on before file load)
@@ -7275,11 +7384,11 @@ function buildMachineModel() {
 
 function updateMachinePos() {
   if (!_machineRoot || !_machineRoot.visible) return;
-  const wcsX = (+(state.xp||0)) - (+(state.offset_x||0));
-  const wcsY = (+(state.yp||0)) - (+(state.offset_y||0));
-  const wcsZ = (+(state.zp||0)) - (+(state.offset_z||0));
   // X/Y in ABS to match the bed grid; Z in WCS to match the toolpath/marker
-  _machineRoot.position.set(+(state.xp||0), +(state.yp||0), +(state.zp||0) - +(state.offset_z||0));
+  const px = +(state.xp||0), py = +(state.yp||0), pz = +(state.zp||0) - +(state.offset_z||0);
+  const p = _machineRoot.position;
+  if (p.x === px && p.y === py && p.z === pz) return;  // heartbeat delta — don't dirty the scene
+  p.set(px, py, pz);
   requestRender();
 }
 
@@ -7315,19 +7424,55 @@ function _segColor(avgZ, minZ, maxZ, done) {
   return new THREE.Color(_3dColors.cut);
 }
 
-function refreshCutColors() {
+// incremental=true (the per-WS-message hot path) only touches segments whose
+// done-state changed since the last call — the old full O(segments) repass with
+// 1-3 THREE.Color allocations per segment ran up to 10x/sec during a job and
+// was a major GC/CPU drain on long runs. Full repass (default) remains for
+// palette/depth-toggle/theme changes, which actually recolor everything.
+function refreshCutColors(incremental) {
   if (!_cutLineSegs || _cutSegData.length === 0) return;
   const colors = _cutLineSegs.geometry.attributes.color.array;
   const minZ = fileExtents ? fileExtents.minZ : 0;
   const maxZ = fileExtents ? fileExtents.maxZ : 0;
   const curLine = viewToggles.progress ? (state.line || 0) : -1;
-  for (let i = 0; i < _cutSegData.length; i++) {
-    const seg = _cutSegData[i];
-    const done = curLine >= 0 && seg.lineNum <= curLine;
-    const c = _segColor(seg.avgZ, minZ, maxZ, done);
-    colors[i*6]=c.r; colors[i*6+1]=c.g; colors[i*6+2]=c.b;
-    colors[i*6+3]=c.r; colors[i*6+4]=c.g; colors[i*6+5]=c.b;
+  // Segments are stored in file order, so "done" is always a prefix —
+  // binary-search its end instead of scanning every segment.
+  let lo = 0, hi = _cutSegData.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (curLine >= 0 && _cutSegData[mid].lineNum <= curLine) lo = mid + 1; else hi = mid;
   }
+  const doneCount = lo;
+
+  if (incremental && _cutBaseColors) {
+    if (doneCount === _cutDoneCount) return;  // nothing changed — skip GPU re-upload
+    if (doneCount > _cutDoneCount) {
+      const dc = new THREE.Color(_3dColors.done);
+      for (let i = _cutDoneCount; i < doneCount; i++) {
+        colors[i*6]=dc.r; colors[i*6+1]=dc.g; colors[i*6+2]=dc.b;
+        colors[i*6+3]=dc.r; colors[i*6+4]=dc.g; colors[i*6+5]=dc.b;
+      }
+    } else {
+      for (let i = doneCount*6; i < _cutDoneCount*6; i++) colors[i] = _cutBaseColors[i];
+    }
+  } else {
+    for (let i = 0; i < _cutSegData.length; i++) {
+      const seg = _cutSegData[i];
+      const c = _segColor(seg.avgZ, minZ, maxZ, i < doneCount);
+      colors[i*6]=c.r; colors[i*6+1]=c.g; colors[i*6+2]=c.b;
+      colors[i*6+3]=c.r; colors[i*6+4]=c.g; colors[i*6+5]=c.b;
+    }
+    // Re-snapshot base colors (palette/depth mode may have changed) — done
+    // segments get their base color recomputed so a later rewind restores right.
+    if (_cutBaseColors && _cutBaseColors.length === colors.length) {
+      for (let i = 0; i < _cutSegData.length; i++) {
+        const c = _segColor(_cutSegData[i].avgZ, minZ, maxZ, false);
+        _cutBaseColors[i*6]=c.r; _cutBaseColors[i*6+1]=c.g; _cutBaseColors[i*6+2]=c.b;
+        _cutBaseColors[i*6+3]=c.r; _cutBaseColors[i*6+4]=c.g; _cutBaseColors[i*6+5]=c.b;
+      }
+    }
+  }
+  _cutDoneCount = doneCount;
   _cutLineSegs.geometry.attributes.color.needsUpdate = true;
   requestRender();
 }
