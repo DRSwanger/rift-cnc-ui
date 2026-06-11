@@ -10350,10 +10350,12 @@ function setUiLocked(locked) {
 }
 
 function resetUiLayout() {
-  if (!confirm('Reset UI to default layout? This clears your panel arrangement, splitter widths, marker/spindle sizes, and 3D color choices.')) return;
+  if (!confirm('Reset UI to default layout? This clears your panel arrangement, splitter widths, and marker/spindle sizes. 3D colors are not affected (use Reset defaults in the 3D color panel for those).')) return;
+  // Deliberately does NOT touch the 3D color schema (rift_3dColorsDark/Light,
+  // rift_3dMode) — colors have their own reset in the 3D color panel.
   const KEYS = [
     'rift_layout', 'rift_section_h', 'rift_sidebar_w', 'rift_right_w',
-    'rift_markerScale', 'rift_spindleScale', 'rift_3dColors', 'rift_3dLight',
+    'rift_markerScale', 'rift_spindleScale',
     'rift_gcodeWrap', 'rift_bottom_bar_h'
   ];
   KEYS.forEach(k => { try { localStorage.removeItem(k); } catch(_) {} });
@@ -10374,7 +10376,6 @@ function resetUiLayout() {
     applyDesktopLayout();
   }
   applySectionHeights();
-  if (typeof reset3dColors === 'function') { try { reset3dColors(); } catch(_) {} }
   if (typeof setMarkerScale === 'function') setMarkerScale(1);
   if (typeof setSpindleScale === 'function') setSpindleScale(1);
   window.dispatchEvent(new Event('resize'));
