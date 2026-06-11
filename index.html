@@ -6511,7 +6511,7 @@ function checkFileLimits() {
 }
 
 async function machineStart() {
-  if (_startInFlight || lastMachineState === 'running') return;
+  if (_startInFlight || lastMachineState !== 'idle') return;
   _startInFlight = true;
   if (ENABLE_RESUME) {
     resumeState = null;
@@ -6577,8 +6577,6 @@ async function machineStop() {
       resumeState = Object.assign({}, peakResumeState, { wasPaused: false });
       resumeStateLocked = true;
     }
-  } else {
-    if (!await darkConfirm('Stop the machine?', 'Stop')) return;
   }
   _wasUserStop = true; _userActionAt = Date.now();
   uiLog('STOP job — sending M9 (coolant off)');
