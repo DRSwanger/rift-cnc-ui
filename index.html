@@ -3582,7 +3582,6 @@ let _cutLineSegs = null;  // THREE.LineSegments with vertex colors for cut moves
 let _cutBaseColors = null; // pristine not-done vertex colors — cheap restore when progress rewinds
 let _cutDoneCount = 0;     // segments currently painted done (always a prefix of _cutSegData)
 let _bboxHelper  = null;  // THREE.Box3Helper for bounding box
-let _colorRefreshAt = 0;  // throttle timestamp for progress color updates
 let camTheta = 0.8, camPhi = 0.6, camRadius = 600, camTarget = new THREE.Vector3(400, 400, 0);
 
 // ── 3D custom colors (persisted to localStorage) ──
@@ -3986,11 +3985,11 @@ function updateUI(data) {
       highlightLine(data.line);
     }
     // updateProgressLabel() will pick up _jobPct on its next tick
-    // Throttled progress color refresh (100ms) for 3D view
-    if (viewToggles.progress) {
-      const now = Date.now();
-      if (now - _colorRefreshAt > 100) { _colorRefreshAt = now; refreshCutColors(true); }
-    }
+    // Progress color refresh — incremental (O(changed segments)), so no throttle
+    // needed; the WS coalescer already rate-limits updateUI. A time throttle here
+    // can skip the job-end line:0 repaint when it flushes <100ms after the last
+    // progress refresh, leaving the whole toolpath stuck in the 'done' color.
+    if (viewToggles.progress) refreshCutColors(true);
   }
 
   // Keep a live resume snapshot while running/paused — track peak line seen
