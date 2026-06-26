@@ -10353,13 +10353,17 @@ function initBottomBarResize() {
     e.stopPropagation();
     startY = e.clientY;
     startH = bar.offsetHeight; // layout px (zoom-independent)
-    // Convert every pinned movable to a shrinkable flex item so the
-    // columns redistribute as the bar steals their height.
+    // Convert every pinned movable to a grow+shrink flex item so columns
+    // redistribute both ways as the bar changes height: shrinking when the bar
+    // grows (steals column height) AND growing back to fill when the bar shrinks
+    // (returns column height). Using grow:1 (not 0) is what prevents blank space
+    // appearing below the bottom panels when the bar is made smaller — the
+    // panels reclaim the space instead of leaving it to the transparent filler.
     unpinned = [];
     document.querySelectorAll('.movable').forEach(m => {
       if (/^\s*0\s+0\s+/.test(m.style.flex || '')) {
         const h = Math.round(m.offsetHeight); // layout px
-        m.style.flex = '0 1 ' + h + 'px';
+        m.style.flex = '1 1 ' + h + 'px';
         m.style.height = '';
         unpinned.push(m);
       }
