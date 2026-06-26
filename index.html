@@ -1956,6 +1956,13 @@
     min-height: 0;
   }
 
+  /* Consistent gutters: the sidebar pads its panels by 8px (gap 4px); give the
+     middle/right columns the same so a panel looks identical in any column —
+     buttons keep their side padding when moved out of column 1. Desktop only:
+     kiosk's view-panel is hidden and its grid columns are separately tuned. */
+  body:not(.kiosk-mode) #view-panel,
+  body:not(.kiosk-mode) #gcode-panel { padding: 8px; gap: 4px; }
+
   #gcode-top-bar {
     display: flex;
     align-items: center;
