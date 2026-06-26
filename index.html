@@ -10167,7 +10167,6 @@ function initSectionResize() {
     grip.title = 'Drag to resize · double-click to reset';
     movable.appendChild(grip);
     let startY = 0, startH = 0, target = null, minH = 40, maxH = Infinity;
-    let unpinned = []; // siblings temporarily unpinned for the drag
     const onMove = e => {
       const dy = e.clientY - startY;
       let newH = Math.max(minH, Math.min(maxH, startH + dy));
@@ -10182,17 +10181,13 @@ function initSectionResize() {
         const h = Math.round(target.getBoundingClientRect().height);
         _saveSectionHeight(target.id, h);
       }
-      // Re-pin previously-unpinned siblings at their post-drag rendered
-      // heights so the visible layout sticks instead of springing back.
-      unpinned.forEach(el => {
-        const h = Math.round(el.getBoundingClientRect().height);
-        el.style.flex = '0 0 ' + h + 'px';
-        el.style.height = h + 'px';
-        _saveSectionHeight(el.id, h);
-      });
-      unpinned = [];
       target = null;
-      ensureZoneFillers(); // pinning may have removed the column's last grower
+      // Pin only the dragged panel. Siblings keep their natural flex, so a
+      // grower (Files/Jog/3D) stays a grower and reabsorbs/releases the space;
+      // the zone-fill covers the slack only when no grower remains. (The old
+      // code re-pinned every sibling at a fixed height, which froze the
+      // column's grower and let the zone-fill balloon into a big gap.)
+      ensureZoneFillers(); // pinning the target may have removed the last grower
       window.dispatchEvent(new Event('resize'));
     };
     grip.addEventListener('pointerdown', e => {
@@ -10203,20 +10198,10 @@ function initSectionResize() {
       target = movable;
       startY = e.clientY;
       startH = movable.getBoundingClientRect().height;
-      // Make every sibling a shrinkable flex item with its current rendered
-      // height as flex-basis. This lets sibling panels — including the
-      // bottom-most one — shrink proportionally to absorb the dragged
-      // panel's growth, rather than overflowing the column or snapping to a
-      // tiny default. On pointerup we re-pin everyone at rendered heights.
-      unpinned = [];
+      // Only the dragged panel is pinned (in onMove). Siblings are left on
+      // their natural flex: growers shrink/grow to absorb the change, content
+      // panels and the zone-fill take the remainder. No sibling pre-pinning.
       const { lp, siblings } = _layoutSiblings(movable);
-      siblings.forEach(el => {
-        if (el === movable) return;
-        const curH = Math.round(el.getBoundingClientRect().height);
-        el.style.flex = '0 1 ' + curH + 'px';
-        el.style.height = '';
-        unpinned.push(el);
-      });
       const cssMin = parseFloat(getComputedStyle(movable).minHeight);
       minH = _SECTION_MIN[movable.id]
           || ((isFinite(cssMin) && cssMin > 0) ? cssMin : 40);
@@ -10240,11 +10225,10 @@ function initSectionResize() {
         });
         if (parentInner > 0) maxH = Math.max(minH, parentInner - reserved);
       }
-      // NOTE: viewport/floor clamp removed. In a flex column with unpinned
-      // siblings, growing the dragged panel doesn't push it past the column
-      // floor — siblings absorb the change. The parentInner − reserved cap
-      // above is the correct ceiling. The previous clamp froze the bottom-
-      // most panel at its current height (could only shrink, never grow).
+      // maxH = parentInner − (sum of other sections' min heights). This is the
+      // correct ceiling: the dragged panel can grow until its siblings (growers
+      // shrinking, content panels at min) and the zone-fill are exhausted,
+      // without overflowing the column.
       grip.classList.add('dragging');
       window.addEventListener('pointermove', onMove);
       window.addEventListener('pointerup', onUp);
@@ -10255,6 +10239,7 @@ function initSectionResize() {
       _saveSectionHeight(movable.id, null);
       movable.style.flex = '';
       movable.style.height = '';
+      ensureZoneFillers(); // un-pinning may have restored a grower
       window.dispatchEvent(new Event('resize'));
     });
   });
