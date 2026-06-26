@@ -2905,11 +2905,13 @@
   .movable:hover > .movable-resize { opacity: 1; background: var(--border); }
   .movable-resize:hover, .movable-resize.dragging { background: var(--accent); opacity: 1; }
   body.kiosk-mode .movable-resize { display: none; }
-  /* Lock UI: hide handles/grips, disable splitters (keep splitter tracks so the
-     #main grid layout doesn't reflow) */
+  /* Lock UI: hide handles/grips, disable splitters. Keep the splitter VISIBLE
+     (grey divider) — visibility:hidden exposed the dark body bg through the 5px
+     grid track, making the column dividers look black when locked. Just disable
+     interaction so they stay the same grey as unlocked. */
   body.ui-locked .movable-handle,
   body.ui-locked .movable-resize { display: none !important; }
-  body.ui-locked .col-splitter   { visibility: hidden; pointer-events: none; cursor: default; }
+  body.ui-locked .col-splitter   { pointer-events: none; cursor: default; }
   .movable-handle {
     position: absolute;
     top: 2px;
