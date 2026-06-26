@@ -10021,6 +10021,7 @@ function ensureZoneFillers() {
       (parseFloat(getComputedStyle(c).flexGrow) || 0) > 0);
     fill.style.flexGrow = hasGrower ? '0' : '1';
   });
+  if (typeof _updateResizeGrips === 'function') _updateResizeGrips(); // bottom-panel grip hidden as stacks change
 }
 
 function restoreSectionsToHome() {
@@ -10166,6 +10167,22 @@ function _layoutSiblings(el) {
     .filter(m => _layoutParent(m) === lp);
   return { lp, siblings };
 }
+// The .movable directly below el in the same column (document order = stack order).
+// null if el is the bottom-most panel. Used by the splitter-style resize.
+function _nextMovableSibling(el) {
+  const { siblings } = _layoutSiblings(el);
+  const i = siblings.indexOf(el);
+  return (i >= 0 && i < siblings.length - 1) ? siblings[i + 1] : null;
+}
+// Bottom-most panel of a column has nothing below to trade height with, so its
+// resize grip is hidden (you size it via the panel above's grip, or by adding a
+// panel). Re-run whenever the layout changes.
+function _updateResizeGrips() {
+  document.querySelectorAll('.movable').forEach(m => {
+    const grip = m.querySelector(':scope > .movable-resize');
+    if (grip) grip.style.display = _nextMovableSibling(m) ? '' : 'none';
+  });
+}
 
 function initSectionResize() {
   document.querySelectorAll('.movable').forEach(movable => {
@@ -10174,69 +10191,44 @@ function initSectionResize() {
     grip.className = 'movable-resize';
     grip.title = 'Drag to resize · double-click to reset';
     movable.appendChild(grip);
-    let startY = 0, startH = 0, target = null, minH = 40, maxH = Infinity;
+    // Splitter resize: a panel's bottom grip moves the boundary between it (P)
+    // and the panel directly below (Q). P grows by the drag, Q shrinks by the
+    // same amount (clamped to each panel's min) — so P+Q is conserved and the
+    // column total never changes. That structurally guarantees resizing can
+    // neither open empty space nor overflow into a scrollbar. To fill a column,
+    // add a panel (drag-drop); resizing only redistributes existing space.
+    let startY = 0, startP = 0, startQ = 0, P = null, Q = null, minP = 40, minQ = 40;
     const onMove = e => {
       const dy = (e.clientY - startY) / _uiZoom(); // visual delta → layout px
-      let newH = Math.max(minH, Math.min(maxH, startH + dy));
-      target.style.flex = '0 0 ' + newH + 'px';
-      target.style.height = newH + 'px';
+      // P bounded so neither P nor Q drops below its min; total P+Q fixed.
+      const newP = Math.max(minP, Math.min(startP + dy, startP + startQ - minQ));
+      const newQ = startP + startQ - newP;
+      P.style.flex = '0 0 ' + newP + 'px'; P.style.height = newP + 'px';
+      Q.style.flex = '0 0 ' + newQ + 'px'; Q.style.height = newQ + 'px';
     };
     const onUp = () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       grip.classList.remove('dragging');
-      if (target) {
-        const h = Math.round(target.offsetHeight); // layout px
-        _saveSectionHeight(target.id, h);
-      }
-      target = null;
-      // Pin only the dragged panel. Siblings keep their natural flex, so a
-      // grower (Files/Jog/3D) stays a grower and reabsorbs/releases the space;
-      // the zone-fill covers the slack only when no grower remains. (The old
-      // code re-pinned every sibling at a fixed height, which froze the
-      // column's grower and let the zone-fill balloon into a big gap.)
-      ensureZoneFillers(); // pinning the target may have removed the last grower
+      if (P) _saveSectionHeight(P.id, Math.round(P.offsetHeight));
+      if (Q) _saveSectionHeight(Q.id, Math.round(Q.offsetHeight));
+      P = Q = null;
+      ensureZoneFillers();
       window.dispatchEvent(new Event('resize'));
     };
+    const _minOf = el => _SECTION_MIN[el.id]
+      || ((v => (isFinite(v) && v > 0) ? v : 40)(parseFloat(getComputedStyle(el).minHeight)));
     grip.addEventListener('pointerdown', e => {
       if (document.body.classList.contains('kiosk-mode') ||
           document.body.classList.contains('ui-locked')) return;
+      const next = _nextMovableSibling(movable);
+      if (!next) return; // bottom-most panel: nothing below to trade with
       e.preventDefault();
       e.stopPropagation();
-      target = movable;
+      P = movable; Q = next;
       startY = e.clientY;
-      startH = movable.offsetHeight; // layout px (zoom-independent)
-      // Only the dragged panel is pinned (in onMove). Siblings are left on
-      // their natural flex: growers shrink/grow to absorb the change, content
-      // panels and the zone-fill take the remainder. No sibling pre-pinning.
-      const { lp, siblings } = _layoutSiblings(movable);
-      const cssMin = parseFloat(getComputedStyle(movable).minHeight);
-      minH = _SECTION_MIN[movable.id]
-          || ((isFinite(cssMin) && cssMin > 0) ? cssMin : 40);
-      // Cap to layout-parent's available content height minus what other
-      // movable siblings need at minimum. Walks past display:contents
-      // wrappers so the real flex container's height is used.
-      maxH = Infinity;
-      if (lp) {
-        const ps = getComputedStyle(lp);
-        const rowGap = parseFloat(ps.rowGap) || parseFloat(ps.gap) || 0;
-        const totalGap = rowGap * Math.max(0, siblings.length - 1);
-        const parentInner = lp.clientHeight
-                          - (parseFloat(ps.paddingTop) || 0)
-                          - (parseFloat(ps.paddingBottom) || 0)
-                          - totalGap;
-        let reserved = 0;
-        siblings.forEach(el => {
-          if (el === movable) return;
-          reserved += _SECTION_MIN[el.id]
-                   || parseFloat(getComputedStyle(el).minHeight) || 0;
-        });
-        if (parentInner > 0) maxH = Math.max(minH, parentInner - reserved);
-      }
-      // maxH = parentInner − (sum of other sections' min heights). This is the
-      // correct ceiling: the dragged panel can grow until its siblings (growers
-      // shrinking, content panels at min) and the zone-fill are exhausted,
-      // without overflowing the column.
+      startP = P.offsetHeight; startQ = Q.offsetHeight; // layout px (zoom-independent)
+      minP = _minOf(P); minQ = _minOf(Q);
       grip.classList.add('dragging');
       window.addEventListener('pointermove', onMove);
       window.addEventListener('pointerup', onUp);
@@ -10244,13 +10236,18 @@ function initSectionResize() {
     grip.addEventListener('dblclick', e => {
       e.preventDefault();
       e.stopPropagation();
-      _saveSectionHeight(movable.id, null);
-      movable.style.flex = '';
-      movable.style.height = '';
-      ensureZoneFillers(); // un-pinning may have restored a grower
+      // Reset this divider: clear pins on both panels it separates.
+      const next = _nextMovableSibling(movable);
+      [movable, next].forEach(el => {
+        if (!el) return;
+        _saveSectionHeight(el.id, null);
+        el.style.flex = ''; el.style.height = '';
+      });
+      ensureZoneFillers();
       window.dispatchEvent(new Event('resize'));
     });
   });
+  _updateResizeGrips();
   applySectionHeights();
 }
 
