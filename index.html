@@ -10143,6 +10143,14 @@ function applySectionHeights() {
     }
   });
 }
+// scaleUI() applies a CSS `zoom` to <body> to fit the window. getBoundingClientRect()
+// returns VISUAL (zoomed) pixels, but layout properties (offsetHeight, clientHeight)
+// and CSS px we write (flex-basis, --bottom-bar-h) are in UNZOOMED layout px. Drag
+// handlers must convert pointer deltas (visual) to layout px by dividing by the zoom,
+// and read start heights from offsetHeight — not rect — or every resize jumps by the
+// zoom factor.
+function _uiZoom() { return parseFloat(document.body.style.zoom) || 1; }
+
 // .sidebar-col uses display:contents on desktop, so movable.parentElement
 // (e.g. #scol-motion) has no layout box. Walk up past contents-display
 // wrappers to find the real flex/grid parent that controls layout.
@@ -10168,7 +10176,7 @@ function initSectionResize() {
     movable.appendChild(grip);
     let startY = 0, startH = 0, target = null, minH = 40, maxH = Infinity;
     const onMove = e => {
-      const dy = e.clientY - startY;
+      const dy = (e.clientY - startY) / _uiZoom(); // visual delta → layout px
       let newH = Math.max(minH, Math.min(maxH, startH + dy));
       target.style.flex = '0 0 ' + newH + 'px';
       target.style.height = newH + 'px';
@@ -10178,7 +10186,7 @@ function initSectionResize() {
       window.removeEventListener('pointerup', onUp);
       grip.classList.remove('dragging');
       if (target) {
-        const h = Math.round(target.getBoundingClientRect().height);
+        const h = Math.round(target.offsetHeight); // layout px
         _saveSectionHeight(target.id, h);
       }
       target = null;
@@ -10197,7 +10205,7 @@ function initSectionResize() {
       e.stopPropagation();
       target = movable;
       startY = e.clientY;
-      startH = movable.getBoundingClientRect().height;
+      startH = movable.offsetHeight; // layout px (zoom-independent)
       // Only the dragged panel is pinned (in onMove). Siblings are left on
       // their natural flex: growers shrink/grow to absorb the change, content
       // panels and the zone-fill take the remainder. No sibling pre-pinning.
@@ -10296,7 +10304,7 @@ function initBottomBarResize() {
   let unpinned = [];
   const onMove = e => {
     // Grip is at top of bar; dragging up grows the bar.
-    const dy = e.clientY - startY;
+    const dy = (e.clientY - startY) / _uiZoom(); // visual delta → layout px
     let desired = Math.min(maxBarH, startH - dy);
     desired = Math.max(MIN_H, desired);
     apply(desired);
@@ -10308,7 +10316,7 @@ function initBottomBarResize() {
     const overflowAmt = Math.max(0, ...cols.map(z =>
       Math.max(0, z.scrollHeight - z.clientHeight)));
     if (overflowAmt > 0) {
-      const curH = bar.getBoundingClientRect().height;
+      const curH = bar.offsetHeight; // layout px
       const safe = Math.max(MIN_H, curH - overflowAmt - 8);
       apply(safe);
       maxBarH = Math.min(maxBarH, safe);
@@ -10318,12 +10326,12 @@ function initBottomBarResize() {
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', onUp);
     grip.classList.remove('dragging');
-    const h = Math.round(bar.getBoundingClientRect().height);
+    const h = Math.round(bar.offsetHeight); // layout px
     try { localStorage.setItem(KEY, String(h)); } catch(_) {}
     // Re-pin movables that we made shrinkable for the drag, at their
     // post-drag rendered heights, so the layout sticks.
     unpinned.forEach(m => {
-      const rh = Math.round(m.getBoundingClientRect().height);
+      const rh = Math.round(m.offsetHeight); // layout px
       m.style.flex = '0 0 ' + rh + 'px';
       m.style.height = rh + 'px';
       _saveSectionHeight(m.id, rh);
@@ -10338,13 +10346,13 @@ function initBottomBarResize() {
     e.preventDefault();
     e.stopPropagation();
     startY = e.clientY;
-    startH = bar.getBoundingClientRect().height;
+    startH = bar.offsetHeight; // layout px (zoom-independent)
     // Convert every pinned movable to a shrinkable flex item so the
     // columns redistribute as the bar steals their height.
     unpinned = [];
     document.querySelectorAll('.movable').forEach(m => {
       if (/^\s*0\s+0\s+/.test(m.style.flex || '')) {
-        const h = Math.round(m.getBoundingClientRect().height);
+        const h = Math.round(m.offsetHeight); // layout px
         m.style.flex = '0 1 ' + h + 'px';
         m.style.height = '';
         unpinned.push(m);
