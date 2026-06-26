@@ -3544,7 +3544,7 @@
             </select>
           </div>
           <div class="settings-row" id="row-reset-layout">
-            <div><div class="settings-label">Reset UI layout</div><div class="settings-sub" id="sub-reset-layout">Restore default panel order, sidebar/file widths, and 3D color choices</div></div>
+            <div><div class="settings-label">Reset UI layout</div><div class="settings-sub" id="sub-reset-layout">Restore default panel order, sizes, and widths. 3D colors are unaffected.</div></div>
             <button class="settings-btn" id="btn-reset-layout" onclick="resetUiLayout()">Reset to defaults</button>
           </div>
         </div>
@@ -6703,7 +6703,7 @@ async function openSettings() {
     : "Disable drag-to-rearrange and section/column resize so layout can't change accidentally";
   if (_resSub) _resSub.textContent = _kiosk
     ? 'Layout is fixed in kiosk mode.'
-    : 'Restore default panel order, sidebar/file widths, and 3D color choices';
+    : 'Restore default panel order, sizes, and widths. 3D colors are unaffected.';
   document.getElementById('cfg-dev-mode').checked     = !!settings.devMode;
   document.getElementById('cfg-log-level').value      = settings.logLevel || 'info';
   applyDevMode(false); // sync Logs tab visibility without saving
