@@ -10407,6 +10407,12 @@ function resetUiLayout() {
     applyDesktopLayout();
   }
   applySectionHeights();
+  // Re-evaluate fillers AFTER heights are cleared. applyDesktopLayout() above
+  // ran ensureZoneFillers() while panels still carried their stale pinned
+  // heights (grow 0), so it saw no grower and set the filler to grow — leaving
+  // a gap. applySectionHeights() then unpins them (growers restored), so the
+  // filler must be recomputed here or the gap survives until a second reset.
+  ensureZoneFillers();
   if (typeof setMarkerScale === 'function') setMarkerScale(1);
   if (typeof setSpindleScale === 'function') setSpindleScale(1);
   window.dispatchEvent(new Event('resize'));
