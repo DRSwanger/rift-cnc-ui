@@ -2841,6 +2841,18 @@
 
   /* ── MOVABLE SECTIONS (drag-to-rearrange, desktop only) ── */
   .movable { position: relative; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  /* "Delayed resize": the button panels ease to their new height when their
+     splitter sets a new flex-basis — matching the Start/Stop/Pause buttons,
+     whose calc()-driven height transitions. Scoped to the button panels so the
+     3D canvas and Files/MDI viewers still resize crisply (no animated canvas).
+     Grow-driven changes (bottom-bar resize) don't touch flex-basis, so those
+     stay instant; only deliberate panel resizing eases. */
+  body:not(.kiosk-mode) #sec-home,
+  body:not(.kiosk-mode) #sec-step,
+  body:not(.kiosk-mode) #sec-jogxy,
+  body:not(.kiosk-mode) #sec-jogz,
+  body:not(.kiosk-mode) #sec-zero,
+  body:not(.kiosk-mode) #sec-probe { transition: flex-basis 0.15s ease, height 0.15s ease; }
   /* Jog XY/Z fill remaining sidebar height by default; everything else sizes to content */
   /* Default sizing: small sections stay at content height (no auto-shrink past
      button bounds); Jog XY/Z share leftover space and shrink with a floor.
@@ -10206,12 +10218,13 @@ function initSectionResize() {
     // column total never changes. That structurally guarantees resizing can
     // neither open empty space nor overflow into a scrollbar. To fill a column,
     // add a panel (drag-drop); resizing only redistributes existing space.
-    let startY = 0, startP = 0, startQ = 0, P = null, Q = null, minP = 40, minQ = 40;
+    let startY = 0, startP = 0, startQ = 0, P = null, Q = null, minP = 40, minQ = 40, lastP = 0, lastQ = 0;
     const onMove = e => {
       const dy = (e.clientY - startY) / _uiZoom(); // visual delta → layout px
       // P bounded so neither P nor Q drops below its min; total P+Q fixed.
       const newP = Math.max(minP, Math.min(startP + dy, startP + startQ - minQ));
       const newQ = startP + startQ - newP;
+      lastP = newP; lastQ = newQ; // remember the target (offsetHeight may lag the 0.15s ease)
       P.style.flex = '0 0 ' + newP + 'px'; P.style.height = newP + 'px';
       Q.style.flex = '0 0 ' + newQ + 'px'; Q.style.height = newQ + 'px';
     };
@@ -10219,8 +10232,10 @@ function initSectionResize() {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       grip.classList.remove('dragging');
-      if (P) _saveSectionHeight(P.id, Math.round(P.offsetHeight));
-      if (Q) _saveSectionHeight(Q.id, Math.round(Q.offsetHeight));
+      // Save the drag TARGET, not offsetHeight — the panel's 0.15s resize ease
+      // means offsetHeight is still animating toward the target at pointerup.
+      if (P) _saveSectionHeight(P.id, Math.round(lastP));
+      if (Q) _saveSectionHeight(Q.id, Math.round(lastQ));
       P = Q = null;
       ensureZoneFillers();
       window.dispatchEvent(new Event('resize'));
@@ -10237,6 +10252,7 @@ function initSectionResize() {
       P = movable; Q = next;
       startY = e.clientY;
       startP = P.offsetHeight; startQ = Q.offsetHeight; // layout px (zoom-independent)
+      lastP = startP; lastQ = startQ; // targets default to start (no move = no change)
       minP = _minOf(P); minQ = _minOf(Q);
       grip.classList.add('dragging');
       window.addEventListener('pointermove', onMove);
