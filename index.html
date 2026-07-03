@@ -5035,6 +5035,7 @@ function updateUI(data) {
       data.selected ? `File: <span>${escHtml(data.selected)}</span>` : 'No file selected';
     setSelectedFileDisplay(data.selected || null);
     if (data.selected) loadGCode(data.selected, false);  // preserve scale — bbctrl reverts selected after stop
+    else clearLoadedFile();  // controller says nothing selected — drop the ghost viewer/3D
   }
 
 
@@ -5648,6 +5649,46 @@ async function selectFile(filename) {
 // ── GCODE VIEWER ──
 // resetScale=true  → user explicitly picked a new file; clear applied pcts
 // resetScale=false → WS/internal reload; preserve applied pcts (bbctrl reverts selected after stop)
+// Clear every trace of the loaded file: viewer, 3D toolpath, estimates, labels,
+// and scale state. Called when the loaded file is deleted (file manager) or the
+// controller reports it gone (404 on load, empty `selected`). Without this, a
+// deleted file kept rendering in the viewer/3D as a ghost.
+function clearLoadedFile() {
+  gcodeLines = [];
+  _originalGcodeLines = [];
+  totalLines = 0;
+  renderGCode([]);
+  parseAndRender3D([]);   // disposes old toolpath geometry; no-op if 3D unavailable
+  fileExtents = null;
+  _estimatedJobSeconds = 0;
+  _cumulativeTimeByLine = null;
+  _jobPct = 0; _jobLine = 0;
+  _feedScaleSourceFile = '';
+  _feedScaleAppliedPct = 100;
+  _spindleScaleAppliedPct = 100;
+  try { _updateFeedScaleStatus(); } catch(_) {}
+  const bar = document.getElementById('progress-bar');
+  if (bar) bar.style.width = '0%';
+  const li = document.getElementById('gcode-line-info');
+  if (li) li.textContent = '';
+  document.getElementById('selected-file-label').innerHTML = 'No file selected';
+  setSelectedFileDisplay(null);
+  state._lastSelected = null;
+  setProgressTime('', '', '');
+  setProgressETA('');
+  showFileReadyLabel(); // totalLines=0 → "Idle"
+}
+
+// True if `deletedPath` is the file currently loaded in the viewer — matches the
+// raw name, the controller's selected value, and the scaled `_fs_` twin.
+function _isLoadedFile(deletedPath) {
+  const names = [state.selected, state._lastSelected, _currentSelectedFile]
+    .filter(Boolean)
+    .map(n => String(n).replace(/^_fs_/, ''));
+  const d = String(deletedPath).replace(/^_fs_/, '');
+  return names.indexOf(d) !== -1;
+}
+
 function loadGCode(filename, resetScale = true) {
   uiLog(`LOAD FILE: ${filename}`);
   return new Promise((resolve) => {
@@ -5665,6 +5706,16 @@ function loadGCode(filename, resetScale = true) {
       }
     };
     xhr.onload = () => {
+      if (xhr.status >= 400) {
+        // File no longer exists on the controller (e.g. deleted, then page
+        // refreshed while bbctrl's `selected` still points at it). Without this
+        // guard the 404 error body rendered in the viewer as gcode.
+        uiLog(`LOAD FILE failed (${xhr.status}): ${filename} — clearing viewer`, 'WARN');
+        wrap.style.display = 'none';
+        clearLoadedFile();
+        resolve();
+        return;
+      }
       bar.style.width = '100%';
       gcodeLines = xhr.responseText.split('\n');
       totalLines = gcodeLines.length;
@@ -8817,6 +8868,7 @@ async function fmBulkDelete() {
       if (!res.ok) throw new Error();
       _pendingDeletes.add(fp);
       fmRemoveFromState(fp);
+      if (_isLoadedFile(fp)) clearLoadedFile();
       setTimeout(() => _verifyDelete(fp), 3000);
     } catch(e) { failed++; }
   }
@@ -8865,6 +8917,7 @@ async function fmDelete(filepath) {
     uiLog(`FILE DELETE: ${filepath}`, 'INFO');
     _pendingDeletes.add(filepath);
     fmRemoveFromState(filepath);
+    if (_isLoadedFile(filepath)) clearLoadedFile();
     // Save updated gcode_list to bbctrl config — without this, WS keeps sending
     // the old gcode_list (which still has the file) and it reappears after every tick
     try { await fmSaveConfig(); } catch(e) { /* non-fatal */ }
@@ -8917,6 +8970,7 @@ async function fmDeleteFolder(folderName) {
       const r = await fetch(`${API_URL}/api/file/${encodeURIComponent(f)}`, { method: 'DELETE' });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       fmRemoveFromState(f);
+      if (_isLoadedFile(f)) clearLoadedFile();
     } catch(e) {
       deleteErrors++;
       fmSetStatus(`Failed to delete "${f}": ${e.message}`);
