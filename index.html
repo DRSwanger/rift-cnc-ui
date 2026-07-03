@@ -9681,6 +9681,25 @@ function onUpdateChannelChange(value) {
   checkForUpdates();
 }
 
+// Semver compare, prerelease-aware: 1.3.7 > 1.3.7-nightly.* (a nightly is a
+// PRERELEASE of its version, so the plain release outranks it). The old
+// comparator kept only the numeric triplet, so a stable-channel check while
+// running 1.3.7-nightly.* said "up to date" against 1.3.7 stable.
+function _semCmp(a, b) {
+  const norm = v => String(v).replace(/^v/, '');
+  const parse = v => norm(v).split(/[-.]/).slice(0, 3).map(Number);
+  const av = parse(a), bv = parse(b);
+  for (let i = 0; i < 3; i++) {
+    if (av[i] > bv[i]) return 1;
+    if (av[i] < bv[i]) return -1;
+  }
+  // Same x.y.z — release (no prerelease suffix) outranks any prerelease of it.
+  const aPre = norm(a).indexOf('-') !== -1;
+  const bPre = norm(b).indexOf('-') !== -1;
+  if (aPre !== bPre) return aPre ? -1 : 1;
+  return 0;
+}
+
 async function checkForUpdates() {
   const statusEl = document.getElementById('fw-update-status');
   const latestEl = document.getElementById('fw-latest-val');
@@ -9727,9 +9746,8 @@ async function checkForUpdates() {
     if (latestEl) latestEl.textContent = 'v' + latestTag + channelLabel;
 
     // Nightly channel: any tag-mismatch is an update (strict chronological from GitHub).
-    // Stable channel: classic 3-part semver compare.
-    const semCmp = (a, b) => { const parse = v => v.replace(/^v/,'').split(/[-.]/).slice(0,3).map(Number); const av=parse(a), bv=parse(b); for(let i=0;i<3;i++){if(av[i]>bv[i])return 1;if(av[i]<bv[i])return -1;} return 0; };
-    const isNewer = nightly ? (latestTag !== UI_VERSION) : (semCmp(latestTag, UI_VERSION) > 0);
+    // Stable channel: semver compare via _semCmp (prerelease-aware).
+    const isNewer = nightly ? (latestTag !== UI_VERSION) : (_semCmp(latestTag, UI_VERSION) > 0);
 
     const noticeEl = document.getElementById('fw-update-notice');
     if (isNewer) {
