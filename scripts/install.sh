@@ -72,6 +72,23 @@ echo "Custom CNC UI installed successfully"
 # Touch to update mtime — Tornado serves the new file on next request without a restart.
 touch "$HTTP_DIR/index.html"
 
+# ── Static assets (manifest + Rift favicon/icons) ──
+# bbctrl ships an Onefinity favicon.ico at the http root; bookmarks / PWA
+# installs fetch /favicon.ico (not the in-page data-URI), so it must be
+# replaced here too — not just via deploy-ssh. Back up the stock favicon once.
+SRC_HTTP="$(dirname "$SRC_INDEX")"
+if [ -f "$SRC_HTTP/favicon.ico" ] && [ -e "$HTTP_DIR/favicon.ico" ] && [ ! -e "$HTTP_DIR/favicon.ico.orig" ]; then
+    cp "$HTTP_DIR/favicon.ico" "$HTTP_DIR/favicon.ico.orig"
+    echo "Original favicon.ico backed up as favicon.ico.orig"
+fi
+for asset in manifest.json favicon.ico rift-icon-192.png rift-icon-512.png; do
+    if [ -f "$SRC_HTTP/$asset" ]; then
+        cp "$SRC_HTTP/$asset" "$HTTP_DIR/$asset"
+        chmod 644 "$HTTP_DIR/$asset"
+        echo "Installed $asset"
+    fi
+done
+
 # ── Deploy watchdog ──
 WATCHDOG_SRC="$(dirname "$0")/watchdog.sh"
 WATCHDOG_DEST="/home/bbmc/watchdog.sh"

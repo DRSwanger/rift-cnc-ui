@@ -60,6 +60,9 @@ BOOT_PNG="$SCRIPT_DIR/rift-boot.png"
 SHUTDOWN_PNG="$SCRIPT_DIR/rift-shutdown.png"
 XINITRC="$SCRIPT_DIR/xinitrc"
 JOURNALD_CONF="$SCRIPT_DIR/journald-rift.conf"
+FAVICON="$SCRIPT_DIR/favicon.ico"
+ICON192="$SCRIPT_DIR/rift-icon-192.png"
+ICON512="$SCRIPT_DIR/rift-icon-512.png"
 
 # Discover bbctrl http directory on the Pi
 echo "Locating bbctrl http directory on $PI_USER@$PI_HOST..."
@@ -102,6 +105,9 @@ eval "$SCP_CMD -o StrictHostKeyChecking=no $BOOT_PNG $PI_USER@$PI_HOST:/tmp/rift
 eval "$SCP_CMD -o StrictHostKeyChecking=no $SHUTDOWN_PNG $PI_USER@$PI_HOST:/tmp/rift-shutdown.png"
 eval "$SCP_CMD -o StrictHostKeyChecking=no $XINITRC $PI_USER@$PI_HOST:/tmp/rift-xinitrc"
 eval "$SCP_CMD -o StrictHostKeyChecking=no $JOURNALD_CONF $PI_USER@$PI_HOST:/tmp/rift-journald.conf"
+eval "$SCP_CMD -o StrictHostKeyChecking=no $FAVICON $PI_USER@$PI_HOST:/tmp/rift-favicon.ico"
+eval "$SCP_CMD -o StrictHostKeyChecking=no $ICON192 $PI_USER@$PI_HOST:/tmp/rift-icon-192.png"
+eval "$SCP_CMD -o StrictHostKeyChecking=no $ICON512 $PI_USER@$PI_HOST:/tmp/rift-icon-512.png"
 eval "$SSH_CMD -o StrictHostKeyChecking=no $PI_USER@$PI_HOST \
     'echo ${SSH_PASS} | sudo -S bash -c \"
         cp /tmp/rift-index.html \\\"$HTTP_DIR/index.html\\\" &&
@@ -111,6 +117,11 @@ eval "$SSH_CMD -o StrictHostKeyChecking=no $PI_USER@$PI_HOST \
         chmod 644 \\\"$HTTP_DIR/mobile.html\\\" &&
         cp /tmp/rift-manifest.json \\\"$HTTP_DIR/manifest.json\\\" &&
         chmod 644 \\\"$HTTP_DIR/manifest.json\\\" &&
+        [ ! -e \\\"$HTTP_DIR/favicon.ico.orig\\\" ] && [ -e \\\"$HTTP_DIR/favicon.ico\\\" ] && cp \\\"$HTTP_DIR/favicon.ico\\\" \\\"$HTTP_DIR/favicon.ico.orig\\\" || true &&
+        cp /tmp/rift-favicon.ico \\\"$HTTP_DIR/favicon.ico\\\" &&
+        cp /tmp/rift-icon-192.png \\\"$HTTP_DIR/rift-icon-192.png\\\" &&
+        cp /tmp/rift-icon-512.png \\\"$HTTP_DIR/rift-icon-512.png\\\" &&
+        chmod 644 \\\"$HTTP_DIR/favicon.ico\\\" \\\"$HTTP_DIR/rift-icon-192.png\\\" \\\"$HTTP_DIR/rift-icon-512.png\\\" &&
         PLYMOUTH=/usr/share/plymouth/themes/onefinity &&
         [ ! -e \\\"\\\$PLYMOUTH/boot.png.orig\\\" ] && cp \\\"\\\$PLYMOUTH/boot.png\\\" \\\"\\\$PLYMOUTH/boot.png.orig\\\" || true &&
         cp /tmp/rift-boot.png \\\"\\\$PLYMOUTH/boot.png\\\" &&
@@ -125,7 +136,7 @@ eval "$SSH_CMD -o StrictHostKeyChecking=no $PI_USER@$PI_HOST \
         mkdir -p /var/log/journal &&
         systemd-tmpfiles --create --prefix /var/log/journal 2>/dev/null || true &&
         systemctl restart systemd-journald &&
-        rm /tmp/rift-index.html /tmp/rift-mobile.html /tmp/rift-manifest.json /tmp/rift-boot.png /tmp/rift-shutdown.png /tmp/rift-xinitrc /tmp/rift-journald.conf
+        rm /tmp/rift-index.html /tmp/rift-mobile.html /tmp/rift-manifest.json /tmp/rift-boot.png /tmp/rift-shutdown.png /tmp/rift-xinitrc /tmp/rift-journald.conf /tmp/rift-favicon.ico /tmp/rift-icon-192.png /tmp/rift-icon-512.png
     \"'"
 
 echo ""
