@@ -7754,8 +7754,8 @@ async function machineStart() {
   // so a misread must never lock the operator out of their own machine.
   if (settings.warnSpindlePower && !spindleVfdResponding()) {
     const go = await darkConfirm(
-      'Spindle VFD is not responding — the spindle power switch may be OFF.\n\n' +
-      'If you start now and the G-code calls M3, the spindle will not spin and the tool will be dragged through the material.\n\n' +
+      'Spindle VFD not responding — the power switch may be OFF.\n\n' +
+      'The spindle won\'t spin and the tool will drag through the material.\n\n' +
       'Start anyway?',
       'Start anyway', 'Cancel');
     if (!go) { _startInFlight = false; return; }
