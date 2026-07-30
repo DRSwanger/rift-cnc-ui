@@ -1471,6 +1471,9 @@
   .stat-value.speed { color: var(--accent); font-size: 22px; }
   /* Spindle VFD unpowered: red value + red card edge. Colour-only change —
      no size/position change, so nothing in the DRO row shifts. */
+  /* VFD powered: green "SPINDLE RPM" label as a positive confirmation.
+     Value keeps its normal accent colour — only the label highlights. */
+  .stat.vfd-ok .stat-label { color: var(--green); }
   .stat.vfd-dead { border-color: var(--red); }
   .stat.vfd-dead .stat-label { color: var(--red); }
   .stat.vfd-dead .stat-value.speed { color: var(--red); }
@@ -7712,6 +7715,7 @@ function updateSpindlePowerUi() {
   const enabled = !settings || settings.warnSpindlePower !== false;
   const dead    = enabled && !spindleVfdResponding();
   card.classList.toggle('vfd-dead', dead);
+  card.classList.toggle('vfd-ok', enabled && !dead);
   card.title = dead
     ? 'Spindle VFD is NOT responding — check the spindle power switch'
     : 'Click to open run scales';
