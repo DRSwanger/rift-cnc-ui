@@ -3465,7 +3465,7 @@
     </div>
   </div>
   <div id="probe-safety-modal">
-    <div id="probe-safety-inst">Touch the probe block to the tip of your bit.<br>The indicator will turn green when the circuit is detected.</div>
+    <div id="probe-safety-inst">Touch the probe block to your bit — the dot turns green on contact.</div>
     <div id="probe-safety-indicator">⬤</div>
     <div id="probe-safety-status">Waiting for contact…</div>
     <div class="probe-safety-btns">
@@ -3501,7 +3501,7 @@
           </svg>
         </div>
         <div class="probe-ref-label">Zero to Wasteboard</div>
-        <div class="probe-ref-desc">Probe on wasteboard. Z=0 = wasteboard surface. Use when cutting through stock.</div>
+        <div class="probe-ref-desc">Z=0 at the wasteboard. For cutting through stock.</div>
       </div>
       <div class="probe-ref-card" id="probe-ref-top" onclick="probeRefSelectCard('top')">
         <div class="probe-ref-diagram">
@@ -3517,7 +3517,7 @@
           </svg>
         </div>
         <div class="probe-ref-label">Zero to Top of Stock</div>
-        <div class="probe-ref-desc">Probe on top of stock. Z=0 = top of material. Use for V-carving, engraving.</div>
+        <div class="probe-ref-desc">Z=0 at the material top. For V-carving and engraving.</div>
       </div>
     </div>
     <!-- Stock thickness — always visible -->
@@ -7287,7 +7287,7 @@ function _cleanupSafetyCheck() {
 function _probeSafetyDetected() {
   document.getElementById('probe-safety-indicator').classList.add('active');
   document.getElementById('probe-safety-indicator').textContent = '✓';
-  document.getElementById('probe-safety-status').textContent = 'Circuit confirmed — ready to probe';
+  document.getElementById('probe-safety-status').textContent = 'Circuit confirmed';
   document.getElementById('probe-safety-status').className = 'ok';
   document.getElementById('probe-safety-continue').disabled = false;
 }
@@ -7305,7 +7305,7 @@ function runProbeSafetyCheck() {
     const ind = document.getElementById('probe-safety-indicator');
     ind.classList.remove('active');
     ind.textContent = '⬤';
-    document.getElementById('probe-safety-status').textContent = 'Touch probe to bit to verify circuit…';
+    document.getElementById('probe-safety-status').textContent = 'Waiting for contact…';
     document.getElementById('probe-safety-status').className = '';
     document.getElementById('probe-safety-continue').disabled = true;
     const _psa = document.getElementById('probe-safety-overlay');
@@ -7571,7 +7571,7 @@ function showProbeProgress(refLabel) {
           document.getElementById('ppov-title').textContent = 'Done — Z zeroed';
           document.getElementById('ppov-close').style.display = '';
           document.getElementById('ppov-dismiss').style.display = 'none';
-          document.getElementById('ppov-sub').textContent = 'Click Finish when ready.';
+          document.getElementById('ppov-sub').textContent = '';
         }
       } else {
         idleTicks = 0; // still moving, reset counter
