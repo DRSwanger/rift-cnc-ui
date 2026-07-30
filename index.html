@@ -1596,6 +1596,23 @@
     margin-left: auto;
   }
 
+  /* ── SPINDLE VFD POWER PILL (left of the machine-state badge) ── */
+  .spindle-pill {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 30px;
+    font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.6px;
+    border: 1px solid; cursor: pointer; user-select: none; white-space: nowrap;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .spindle-pill-dot { font-size: 9px; line-height: 1; }
+  .spindle-pill.ok  { background: rgba(78,253,113,0.12); color: var(--green);  border-color: var(--green); }
+  .spindle-pill.off { background: rgba(251,255,0,0.12);  color: var(--yellow); border-color: var(--yellow); }
+  /* When the pill is shown it takes over the right-push so it sits snug to the badge */
+  body.spindle-pill-on #spindle-pill  { margin-left: auto; }
+  body.spindle-pill-on #machine-state { margin-left: 10px; }
+  body.kiosk-mode .spindle-pill { padding: 5px 10px; font-size: 11px; letter-spacing: 0.3px; }
+
   /* ── E-STOP ── */
   #btn-estop {
     background: #8b0000;
@@ -3420,6 +3437,7 @@
     </div>
 
     <a id="fw-update-notice" href="#" onclick="openSettings();switchSettingsTab('firmware');return false;" style="display:none;position:absolute;left:50%;transform:translateX(-50%);font-size:11px;color:var(--green);text-decoration:none;font-weight:600;letter-spacing:0.2px;white-space:nowrap;" title="Click to view update details">⬆ Update available</a>
+    <div id="spindle-pill" class="spindle-pill" style="display:none" onclick="openSettings();switchSettingsTab('tool');" title="Spindle VFD power status — click for settings"><span class="spindle-pill-dot">⬤</span><span id="spindle-pill-text">Spindle</span></div>
     <div id="machine-state" class="state-connecting">Connecting</div>
     <button id="btn-force-clear" onclick="forceClearState()" title="Machine appears stuck — force controller back to idle without E-Stop" style="display:none">⚡ Force Clear</button>
     <button id="btn-estop" onclick="machineEStop()">⛔ E-Stop</button>
@@ -3714,6 +3732,19 @@
                       <option value="false">No</option>
                       <option value="true">Yes</option>
                     </select></div>
+                </div>
+              </div>
+              <!-- Rift-side safety option (NOT controller config — saved with UI settings) -->
+              <div class="settings-section">
+                <div class="settings-section-title">Spindle Safety</div>
+                <div class="motor-rows">
+                  <div class="motor-row">
+                    <div><div class="settings-label">Power check</div><div class="settings-sub">Warn on Start if the VFD isn't responding (power switch off), and show a status pill in the header</div></div>
+                    <select id="cfg-warn-spindle-power" class="settings-select">
+                      <option value="1">Enabled</option>
+                      <option value="0">Disabled</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
@@ -4729,7 +4760,7 @@ const DEFAULT_HOST = 'onefinity.local';
 // backlog. State-transition keys flush synchronously — they are rare, cheap,
 // and drive safety logic (wedge detector, pr banners) that must not wait out a
 // coalesce window.
-const _UI_CRITICAL_KEYS = ['xx','cycle','pr','selected','gcode_list','macros','0homed','1homed','3homed'];
+const _UI_CRITICAL_KEYS = ['xx','cycle','pr','selected','gcode_list','macros','0homed','1homed','3homed','mx'];
 let _pendingDelta = null;
 let _uiFlushTimer = null;
 let _uiFlushGap   = 50;   // ms — floor 50, raised to 3x last updateUI duration, cap 1000
@@ -4847,6 +4878,9 @@ function updateUI(data) {
   if ('offset_x' in data || 'offset_y' in data) {
     autoSnapshotXyOffset();
   }
+  // Spindle VFD power state changed -> refresh the header pill
+  if ('mx' in data) updateSpindlePill();
+
   // Resize 3D bed grid when soft-limit config arrives or changes
   if ('0tn' in data || '0tm' in data || '1tn' in data || '1tm' in data) {
     if (typeof updateBedGrid === 'function') updateBedGrid();
@@ -6658,6 +6692,7 @@ const SETTINGS_DEFAULTS = {
   junctionAccel:  200000,  // mm/min²
   probeSafety:    true,    // require circuit check before probing
   warnSoftLimits:     true,   // pre-flight check: warn if file extents exceed soft limits
+  warnSpindlePower:   true,   // pre-flight check: warn on Start if the spindle VFD isn't responding
   warnZeroZ:          true,   // confirm dialog when zeroing Z or all axes
   offerRecoveryOnBoot: true,  // on first load, if a saved XY zero exists, offer to recover it
   advancedMode:       false,  // unlocks feed/spindle scale override buttons
@@ -6798,6 +6833,7 @@ async function openSettings() {
   document.getElementById('cfg-probe-safez').value    = settings.probeSafeZ;
   document.getElementById('cfg-probe-safety').value   = settings.probeSafety ? '1' : '0';
   document.getElementById('cfg-warn-soft-limits').value    = settings.warnSoftLimits !== false ? '1' : '0';
+  document.getElementById('cfg-warn-spindle-power').value  = settings.warnSpindlePower !== false ? '1' : '0';
   document.getElementById('cfg-warn-zero-z').value         = settings.warnZeroZ !== false ? '1' : '0';
   document.getElementById('cfg-offer-recovery-on-boot').value = settings.offerRecoveryOnBoot !== false ? '1' : '0';
   document.getElementById('cfg-advanced-mode').value       = settings.advancedMode ? '1' : '0';
@@ -7000,6 +7036,8 @@ async function saveSettings() {
   settings.probeSafeZ    = parseFloat(document.getElementById('cfg-probe-safez').value)   || SETTINGS_DEFAULTS.probeSafeZ;
   settings.probeSafety     = document.getElementById('cfg-probe-safety').value === '1';
   settings.warnSoftLimits      = document.getElementById('cfg-warn-soft-limits').value === '1';
+  settings.warnSpindlePower    = document.getElementById('cfg-warn-spindle-power').value === '1';
+  setTimeout(updateSpindlePill, 0);   // reflect the toggle in the header pill right away
   settings.warnZeroZ           = document.getElementById('cfg-warn-zero-z').value === '1';
   settings.offerRecoveryOnBoot = document.getElementById('cfg-offer-recovery-on-boot').value === '1';
   settings.advancedMode        = document.getElementById('cfg-advanced-mode').value === '1';
@@ -7145,6 +7183,7 @@ async function resetSettings() {
 // Load settings on startup and apply theme
 loadSettings().then(() => {
   applyTheme(settings.theme || 'dark');
+  updateSpindlePill();
   applyLoadLabel(0, settings.load0Label);
   applyLoadLabel(1, settings.load1Label);
   if (settings.autoCheckUpdates !== false) {
@@ -7654,6 +7693,36 @@ function checkFileLimits() {
   return violations.length ? violations : null;
 }
 
+// Is the spindle VFD powered and answering on the Modbus bus?
+// `mx` comes from the AVR firmware (not the Pi's Python) and is undocumented;
+// empirically 1 = VFD responding, any other value = no response. If the var is
+// absent (non-Modbus tool, older firmware) we return true — never warn on
+// machines where we can't actually tell.
+function spindleVfdResponding() {
+  const mx = state.mx;
+  if (mx === undefined || mx === null) return true;
+  return Number(mx) === 1;
+}
+
+// Header pill showing spindle VFD power. Only rendered when the Tool-tab
+// "Power check" option is enabled, so machines that can't report it (or users
+// who don't want it) see no clutter.
+function updateSpindlePill() {
+  const pill = document.getElementById('spindle-pill');
+  if (!pill) return;
+  const enabled = !settings || settings.warnSpindlePower !== false;
+  document.body.classList.toggle('spindle-pill-on', enabled);
+  if (!enabled) { pill.style.display = 'none'; return; }
+  pill.style.display = '';
+  const ok = spindleVfdResponding();
+  pill.className = 'spindle-pill ' + (ok ? 'ok' : 'off');
+  pill.title = ok
+    ? 'Spindle VFD is powered and responding — click for settings'
+    : 'Spindle VFD is NOT responding — check the spindle power switch. Click for settings';
+  const txt = document.getElementById('spindle-pill-text');
+  if (txt) txt.textContent = ok ? 'Spindle Ready' : 'No Spindle Power';
+}
+
 async function machineStart() {
   if (_startInFlight || lastMachineState !== 'idle') return;
   _startInFlight = true;
@@ -7669,7 +7738,22 @@ async function machineStart() {
       + _limitViolations.map(v => '• ' + v).join('\n')
       + '\n\nThe machine will fault when it hits the limit. To fix this, jog to a better position on the material and re-zero your axes so the file fits within the machine travel, or adjust the GCode origin in your CAM software.';
     await darkConfirm(msg, 'OK', '');
-    return;
+    _startInFlight = false;   // BUGFIX: without this the Start button stays dead
+    return;                   // until the machine runs or the page reloads.
+  }
+  // Spindle power pre-flight. `mx` is an AVR-firmware Modbus status var: 1 = VFD
+  // responding, anything else = no response (verified 5/5 by cycling the shop's
+  // physical spindle switch — powered 1,1,1 / unpowered 2,4). Catches the
+  // forgotten power switch BEFORE the job air-cuts with a dead spindle.
+  // Deliberately a WARNING, not a block: this is undocumented firmware behavior,
+  // so a misread must never lock the operator out of their own machine.
+  if (settings.warnSpindlePower && !spindleVfdResponding()) {
+    const go = await darkConfirm(
+      'Spindle VFD is not responding — the spindle power switch may be OFF.\n\n' +
+      'If you start now and the G-code calls M3, the spindle will not spin and the tool will be dragged through the material.\n\n' +
+      'Start anyway?',
+      'Start anyway', 'Cancel');
+    if (!go) { _startInFlight = false; return; }
   }
   const _selFileLbl = document.getElementById('selected-file-label');
   uiLog('START job: ' + ((_selFileLbl && _selFileLbl.textContent) || 'unknown'));
@@ -9817,6 +9901,13 @@ function updateIndicatorsTab() {
       label: 'E-Stop',
       value: lastMachineState === 'estopped' ? 'TRIPPED' : 'OK',
       cls: lastMachineState === 'estopped' ? 'ind-fault' : '',
+      icon: '⬤',
+    },
+    {
+      id: 'ind-spindle-vfd',
+      label: 'Spindle VFD',
+      value: spindleVfdResponding() ? 'POWERED' : 'NO RESPONSE',
+      cls: spindleVfdResponding() ? 'ind-active' : 'ind-warn',
       icon: '⬤',
     },
     {
