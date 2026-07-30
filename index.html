@@ -1626,6 +1626,12 @@
     transition: all 0.1s;
     box-shadow: 0 0 16px rgba(255,40,40,0.4);
     flex-shrink: 0;
+    /* FIXED width, sized to the longer "Clear E-Stop" label (~247px). The button
+       relabels on estop; letting it resize slid the whole right-hand group
+       (machine-state badge + buttons) ~73px sideways. */
+    width: 252px;
+    box-sizing: border-box;
+    text-align: center;
   }
   #btn-estop:hover { background: #cc0000; box-shadow: 0 0 28px rgba(255,40,40,0.7); }
   #btn-estop:active { transform: scale(0.96); }
@@ -3867,6 +3873,7 @@
           <div class="settings-section-title">Backup &amp; Restore</div>
           <div class="settings-note" style="margin-bottom:8px;">Backup downloads a .zip containing controller config + UI settings — compatible with stock Onefinity backup format. Import restores both from any bbctrl-format backup.</div>
           <div class="admin-action-row">
+            <button class="admin-btn" onclick="resetSettings()" title="Restore Rift's own UI settings to defaults — does not touch the controller">↺ Reset UI Settings</button>
             <button class="admin-btn" onclick="backupSettings()">⬇ Backup (ZIP)</button>
             <label class="admin-btn" style="cursor:pointer;">⬆ Import Backup<input type="file" id="import-settings-input" accept=".zip,.json" style="display:none" onchange="importSettings(this)"></label>
             <button class="admin-btn" onclick="downloadBugReport()" title="Download logs + config bundle for support">🐛 Bug Report</button>
@@ -4111,7 +4118,6 @@
 
     </div>
     <div class="settings-footer">
-      <button class="settings-btn" onclick="resetSettings()">Reset Defaults</button>
       <button class="settings-btn" onclick="closeSettings()">Cancel</button>
       <button class="settings-btn primary" onclick="saveSettings()">Save</button>
     </div>
