@@ -1469,6 +1469,11 @@
   .stat-value.z { color: #6bb5ff; }
   .stat-value.feed { color: var(--yellow); font-size: 22px; }
   .stat-value.speed { color: var(--accent); font-size: 22px; }
+  /* Spindle VFD unpowered: red value + red card edge. Colour-only change —
+     no size/position change, so nothing in the DRO row shifts. */
+  .stat.vfd-dead { border-color: var(--red); }
+  .stat.vfd-dead .stat-label { color: var(--red); }
+  .stat.vfd-dead .stat-value.speed { color: var(--red); }
   .stat-sub { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; letter-spacing: 0.5px; font-family: 'Courier New', monospace; white-space: nowrap; overflow: hidden; }
 
   /* Override controls */
@@ -1594,24 +1599,14 @@
     letter-spacing: 1px;
     border: 1px solid;
     margin-left: auto;
+    /* FIXED width, sized to the longest label ("Connecting" ~182px). The badge
+       swaps Idle/Running/Paused/Error/E-Stop/Connecting; letting it resize
+       shoved the E-Stop button (and the spindle pill) sideways on every state
+       change. Width is now constant — only the text and colour change. */
+    width: 190px;
+    box-sizing: border-box;
+    text-align: center;
   }
-
-  /* ── SPINDLE VFD POWER PILL (left of the machine-state badge) ── */
-  .spindle-pill {
-    display: flex; align-items: center; gap: 6px;
-    padding: 7px 14px; border-radius: 30px;
-    font-size: 12px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.6px;
-    border: 1px solid; cursor: pointer; user-select: none; white-space: nowrap;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
-  }
-  .spindle-pill-dot { font-size: 9px; line-height: 1; }
-  .spindle-pill.ok  { background: rgba(78,253,113,0.12); color: var(--green);  border-color: var(--green); }
-  .spindle-pill.off { background: rgba(251,255,0,0.12);  color: var(--yellow); border-color: var(--yellow); }
-  /* When the pill is shown it takes over the right-push so it sits snug to the badge */
-  body.spindle-pill-on #spindle-pill  { margin-left: auto; }
-  body.spindle-pill-on #machine-state { margin-left: 10px; }
-  body.kiosk-mode .spindle-pill { padding: 5px 10px; font-size: 11px; letter-spacing: 0.3px; }
 
   /* ── E-STOP ── */
   #btn-estop {
@@ -3437,7 +3432,6 @@
     </div>
 
     <a id="fw-update-notice" href="#" onclick="openSettings();switchSettingsTab('firmware');return false;" style="display:none;position:absolute;left:50%;transform:translateX(-50%);font-size:11px;color:var(--green);text-decoration:none;font-weight:600;letter-spacing:0.2px;white-space:nowrap;" title="Click to view update details">⬆ Update available</a>
-    <div id="spindle-pill" class="spindle-pill" style="display:none" onclick="openSettings();switchSettingsTab('tool');" title="Spindle VFD power status — click for settings"><span class="spindle-pill-dot">⬤</span><span id="spindle-pill-text">Spindle</span></div>
     <div id="machine-state" class="state-connecting">Connecting</div>
     <button id="btn-force-clear" onclick="forceClearState()" title="Machine appears stuck — force controller back to idle without E-Stop" style="display:none">⚡ Force Clear</button>
     <button id="btn-estop" onclick="machineEStop()">⛔ E-Stop</button>
@@ -4879,7 +4873,7 @@ function updateUI(data) {
     autoSnapshotXyOffset();
   }
   // Spindle VFD power state changed -> refresh the header pill
-  if ('mx' in data) updateSpindlePill();
+  if ('mx' in data) updateSpindlePowerUi();
 
   // Resize 3D bed grid when soft-limit config arrives or changes
   if ('0tn' in data || '0tm' in data || '1tn' in data || '1tm' in data) {
@@ -4924,7 +4918,10 @@ function updateUI(data) {
   }
   if ('speed' in data || 's' in data) {
     const spd = +(data.speed !== undefined ? data.speed : (data.s !== undefined ? data.s : 0));
-    document.getElementById('stat-speed').textContent = spd.toFixed(0);
+    // Don't clobber the "OFF" indication while the VFD isn't responding —
+    // `s` is the COMMANDED rpm, so it can read non-zero with the VFD unpowered.
+    const _vfdDead = (settings && settings.warnSpindlePower !== false) && !spindleVfdResponding();
+    if (!_vfdDead) document.getElementById('stat-speed').textContent = spd.toFixed(0);
   }
 
   // Load relay states — bbctrl uses {n}oa (output active): 1oa=L1, 2oa=L2
@@ -7037,7 +7034,7 @@ async function saveSettings() {
   settings.probeSafety     = document.getElementById('cfg-probe-safety').value === '1';
   settings.warnSoftLimits      = document.getElementById('cfg-warn-soft-limits').value === '1';
   settings.warnSpindlePower    = document.getElementById('cfg-warn-spindle-power').value === '1';
-  setTimeout(updateSpindlePill, 0);   // reflect the toggle in the header pill right away
+  setTimeout(updateSpindlePowerUi, 0);   // reflect the toggle in the Spindle RPM card right away
   settings.warnZeroZ           = document.getElementById('cfg-warn-zero-z').value === '1';
   settings.offerRecoveryOnBoot = document.getElementById('cfg-offer-recovery-on-boot').value === '1';
   settings.advancedMode        = document.getElementById('cfg-advanced-mode').value === '1';
@@ -7183,7 +7180,7 @@ async function resetSettings() {
 // Load settings on startup and apply theme
 loadSettings().then(() => {
   applyTheme(settings.theme || 'dark');
-  updateSpindlePill();
+  updateSpindlePowerUi();
   applyLoadLabel(0, settings.load0Label);
   applyLoadLabel(1, settings.load1Label);
   if (settings.autoCheckUpdates !== false) {
@@ -7704,23 +7701,27 @@ function spindleVfdResponding() {
   return Number(mx) === 1;
 }
 
-// Header pill showing spindle VFD power. Only rendered when the Tool-tab
-// "Power check" option is enabled, so machines that can't report it (or users
-// who don't want it) see no clutter.
-function updateSpindlePill() {
-  const pill = document.getElementById('spindle-pill');
-  if (!pill) return;
+// Reflect spindle VFD power in the existing Spindle RPM card instead of adding
+// a new badge: value reads "OFF" in red when the VFD isn't responding, and the
+// card keeps its normal accent colour when it is. No new element, no layout
+// shift — .stat-value is tabular-nums and the card has a min-width.
+function updateSpindlePowerUi() {
+  const card = document.getElementById('stat-card-spindle-scale');
+  const val  = document.getElementById('stat-speed');
+  if (!card || !val) return;
   const enabled = !settings || settings.warnSpindlePower !== false;
-  document.body.classList.toggle('spindle-pill-on', enabled);
-  if (!enabled) { pill.style.display = 'none'; return; }
-  pill.style.display = '';
-  const ok = spindleVfdResponding();
-  pill.className = 'spindle-pill ' + (ok ? 'ok' : 'off');
-  pill.title = ok
-    ? 'Spindle VFD is powered and responding — click for settings'
-    : 'Spindle VFD is NOT responding — check the spindle power switch. Click for settings';
-  const txt = document.getElementById('spindle-pill-text');
-  if (txt) txt.textContent = ok ? 'Spindle Ready' : 'No Spindle Power';
+  const dead    = enabled && !spindleVfdResponding();
+  card.classList.toggle('vfd-dead', dead);
+  card.title = dead
+    ? 'Spindle VFD is NOT responding — check the spindle power switch'
+    : 'Click to open run scales';
+  if (dead) {
+    val.textContent = 'OFF';
+  } else if (val.textContent === 'OFF') {
+    // restore the live value once power returns
+    const spd = +(state.speed !== undefined ? state.speed : (state.s || 0));
+    val.textContent = spd.toFixed(0);
+  }
 }
 
 async function machineStart() {
