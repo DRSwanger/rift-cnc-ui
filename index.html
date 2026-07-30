@@ -7357,9 +7357,9 @@ function probeThicknessUpdate() {
   } else if (ref === 'surface') {
     row.style.visibility = '';
     input.disabled = false;
-    const offset = (settings.probeHeight - t).toFixed(3);
-    note.textContent =
-      `Z offset = ${settings.probeHeight}mm − ${t}mm stock = ${offset}mm  ·  Z=0 at wasteboard, stock top at Z=+${t}mm`;
+    // Show the OUTCOME, not the arithmetic — the block-height minus stock sum
+    // read as confusing mid-setup and the operator can't act on it.
+    note.textContent = `Z=0 at the wasteboard  ·  stock top at Z+${t}mm`;
   } else {
     row.style.visibility = '';
     input.disabled = false;
@@ -7755,7 +7755,7 @@ async function machineStart() {
   if (settings.warnSpindlePower && !spindleVfdResponding()) {
     const go = await darkConfirm(
       'Spindle VFD not responding — the power switch may be OFF.\n\n' +
-      'The spindle won\'t spin and the tool will drag through the material.\n\n' +
+      'This can damage the bit and workpiece.\n\n' +
       'Start anyway?',
       'Start anyway', 'Cancel');
     if (!go) { _startInFlight = false; return; }
