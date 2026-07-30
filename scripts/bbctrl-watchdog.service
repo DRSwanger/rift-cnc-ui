@@ -1,0 +1,24 @@
+[Unit]
+# bbctrl watchdog — restarts bbctrl if the web UI stops responding.
+#
+# Replaces the old /etc/rc.local launch, which never actually worked on this
+# controller: install.sh's guard grepped the watchdog script itself (which of
+# course contains the word "watchdog"), so the rc.local line was never appended
+# — and /etc/rc.local did not exist here in the first place. Result: the
+# watchdog was installed but never running. A systemd unit is explicit,
+# survives crashes (Restart=always) and starts on boot without rc.local.
+Description=bbctrl watchdog (restarts bbctrl if unresponsive)
+After=network.target
+
+[Service]
+Type=simple
+# Run the script directly — NO shell wrapper and NO redirect. watchdog.sh
+# appends to /var/log/bbctrl-watchdog.log itself, so it is the single writer.
+# (A `bash -c '... >> log'` wrapper was tried first; ExecStart quoting on the
+# Pi's systemd 232 left the redirect unapplied and the log was never created.)
+ExecStart=/home/bbmc/watchdog.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

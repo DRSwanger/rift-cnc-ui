@@ -43,6 +43,7 @@ cp "$SCRIPT_DIR/xinitrc"              "$BUILD_DIR/$PKG_NAME/xinitrc"
 cp "$SCRIPT_DIR/journald-rift.conf"   "$BUILD_DIR/$PKG_NAME/journald-rift.conf"
 cp "$SCRIPT_DIR/scripts/install.sh"  "$BUILD_DIR/$PKG_NAME/scripts/install.sh"
 cp "$SCRIPT_DIR/scripts/watchdog.sh" "$BUILD_DIR/$PKG_NAME/scripts/watchdog.sh"
+cp "$SCRIPT_DIR/scripts/bbctrl-watchdog.service" "$BUILD_DIR/$PKG_NAME/scripts/bbctrl-watchdog.service"
 chmod +x "$BUILD_DIR/$PKG_NAME/scripts/install.sh"
 chmod +x "$BUILD_DIR/$PKG_NAME/scripts/watchdog.sh"
 

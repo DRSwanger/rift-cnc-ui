@@ -97,21 +97,22 @@ if [ -f "$WATCHDOG_SRC" ]; then
     cp "$WATCHDOG_SRC" "$WATCHDOG_DEST"
     chmod +x "$WATCHDOG_DEST"
 
-    # Add to rc.local for persistence across reboots (only once)
-    if ! grep -q watchdog "$WATCHDOG_DEST" /etc/rc.local 2>/dev/null; then
-        python3 -c "
-with open('/etc/rc.local', 'a') as f:
-    f.write('\n# bbctrl watchdog\n/home/bbmc/watchdog.sh >> /var/log/bbctrl-watchdog.log 2>&1 &\n')
-"
-        echo "Watchdog added to /etc/rc.local"
-    else
-        echo "Watchdog already in /etc/rc.local"
+    # Install as a systemd unit. The old rc.local approach never worked: the
+    # guard grepped $WATCHDOG_DEST (which contains the word "watchdog") as well
+    # as /etc/rc.local, so it always matched and the line was never appended —
+    # and /etc/rc.local does not exist on this controller anyway.
+    UNIT_SRC="$(dirname "$0")/bbctrl-watchdog.service"
+    if [ -f "$UNIT_SRC" ]; then
+        install -m 644 "$UNIT_SRC" /etc/systemd/system/bbctrl-watchdog.service
+        systemctl daemon-reload
+        systemctl enable bbctrl-watchdog.service >/dev/null 2>&1
+        echo "Watchdog systemd unit installed + enabled"
     fi
 
-    # Restart watchdog to pick up any updates
-    pkill -f watchdog.sh 2>/dev/null || true
-    nohup "$WATCHDOG_DEST" >> /var/log/bbctrl-watchdog.log 2>&1 &
-    echo "Watchdog started (pid $!)"
+    # Restart via systemd so the new script is picked up
+    systemctl restart bbctrl-watchdog.service 2>/dev/null \
+        && echo "Watchdog restarted (systemd)" \
+        || echo "WARN: could not restart bbctrl-watchdog.service"
 fi
 
 echo "Install complete — hard-refresh your browser to load the new UI"
