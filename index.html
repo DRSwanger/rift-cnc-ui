@@ -6769,6 +6769,11 @@ function switchSettingsTab(tab) {
 }
 
 let _cachedCfg = null;
+// True only after loadControllerConfig() successfully rendered the settings DOM.
+// Guards saveSettings: on 2026-08-24 Dallas hit Save with the Tool tab never
+// populated — the empty cfg-tool-type select saved tool-type='Disabled' to the
+// controller, silently killing spindle control (Modbus never started, mx=0).
+let _ctrlCfgRendered = false;
 
 // Canonical bbctrl tool list. id = `selected-tool` (string). `tool-type` must be
 // the display name from the firmware's enum (`type` override when set, else `name`)
@@ -6864,7 +6869,9 @@ async function loadControllerConfig() {
     renderToolSettings(_cachedCfg);
     renderIOSettings(_cachedCfg);
     renderGcodeScripts(_cachedCfg);
+    _ctrlCfgRendered = true;   // DOM now reflects real controller values — safe to save from it
   } catch(e) {
+    _ctrlCfgRendered = false;  // tabs show "Could not load" — Save must NOT write from empty controls
     ['motors','motors-yy','tool','io'].forEach(t => {
       var el = document.getElementById(t + '-loading');
       if (el) el.textContent = 'Could not load config from controller.';
@@ -7086,6 +7093,11 @@ async function saveSettings() {
       cfg.probe['probe-ydim']      = settings.probeLength;
       cfg.probe['probe-fast-seek'] = settings.probeFast;
       cfg.probe['probe-slow-seek'] = settings.probeSlow;
+      // Everything below is read from the lazily-rendered settings DOM. Only
+      // write it if that DOM was actually populated from the controller —
+      // otherwise empty selects save garbage (tool-type='Disabled' wiped the
+      // spindle config; empty gcode textareas would blank the user's scripts).
+      if (_ctrlCfgRendered) {
       // Motors — read from .motor-field inputs and selects
       document.querySelectorAll('.motor-field').forEach(inp => {
         const mi = parseInt(inp.dataset.motor);
@@ -7101,6 +7113,7 @@ async function saveSettings() {
       // Tool
       if (cfg.tool) {
         const selId = document.getElementById('cfg-tool-type').value;
+        if (selId) {
         const prevId = cfg.tool['selected-tool'];
         cfg.tool['selected-tool']       = selId;
         cfg.tool['tool-type']           = toolTypeFor(selId);
@@ -7122,6 +7135,7 @@ async function saveSettings() {
         cfg.tool['tool-enable-mode']    = document.getElementById('cfg-tool-enable-mode').value;
         cfg.tool['tool-direction-mode'] = document.getElementById('cfg-tool-dir-mode').value;
         cfg.tool['tool-reversed']       = document.getElementById('cfg-tool-reversed').value === 'true';
+        } // selId guard — empty select means the Tool tab never rendered
       }
       // Modbus
       if (cfg['modbus-spindle'] && document.getElementById('cfg-modbus-baud')) {
@@ -7148,6 +7162,7 @@ async function saveSettings() {
         if (tc) cfg.gcode['tool-change']   = tc.value;
         if (pe) cfg.gcode['program-end']   = pe.value;
       }
+      } // end _ctrlCfgRendered guard
       const saveRes = await fetch(`${API_URL}/api/config/save`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
