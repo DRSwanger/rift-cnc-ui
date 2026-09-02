@@ -24,18 +24,32 @@ Rift runs in two modes depending on how you access it:
 
 ## Features
 
+### Control
 - **Full DRO** — WCS + ABS positions for X, Y, Z at a glance
-- **Jog controls** — XY pad + Z column with configurable step sizes
-- **3D toolpath viewer** — G0/G1/G2/G3 arc support via Three.js *(remote browsers only — disabled in kiosk mode)*
-- **GCode viewer** — syntax highlighting with live line tracking during a job
-- **File manager** — upload, drag-and-drop, folder support
-- **Start / Pause / Stop / E-Stop** — with confirmation dialogs where it counts
-- **Progress bar** — time remaining and ETA during a job
+- **Jog controls** — XY pad + Z column with configurable step sizes; every jog is unit-safe (explicit G21/G20)
+- **Start / Pause / Stop / E-Stop** — with confirmation dialogs where it counts, and a header that never shifts under your finger (fixed-width state badge + E-Stop)
 - **Water pump + vacuum toggles** — relay control from the DRO bar
+- **Progress bar** — time remaining and ETA during a job
+
+### Safety
+- **Spindle power detection** *(optional, Settings → Tool)* — Rift watches the VFD's Modbus status and warns on Start when the spindle has no power (e.g. a physical spindle switch left off), instead of letting a job dry-run the tool through your material. Live indicator on the Spindle RPM card: green when the VFD responds, red **OFF** when it doesn't.
+- **Soft-limit pre-flight** — before Start, the loaded file's extents are checked against machine travel (WCS-aware); jobs that would hit a limit are blocked with the numbers shown
+- **Guarded settings** — Save writes controller config only from tabs that actually loaded; a UI-only save can never silently wipe motor or tool settings
+
+### Visualize
+- **3D toolpath viewer** — G0/G1/G2/G3 arc support via Three.js, live position tracking, cut-progress coloring, configurable color schemes *(remote browsers only — disabled in kiosk mode)*
+- **GCode viewer** — syntax highlighting with live line tracking, virtualized so 100k-line trochoidal files scroll smoothly
+- **Built for long jobs** — WebSocket updates are coalesced and rendering adapts to the tab's real speed, so hours-long carves don't freeze the browser (even on machines without GPU acceleration)
+
+### Workflow
+- **File manager** — upload, drag-and-drop, folder support
+- **Movable panels** — drag panels between columns, resize sections with splitters; layout persists per browser with one-click reset
 - **Settings modal** — motor tuning, tool config, I/O indicators, WiFi, network, system clock, and more
-- **Update manager** — checks GitHub for new releases and links directly to the download
+- **Update manager** — stable and nightly channels, checks GitHub for new releases and links directly to the download
 - **Kiosk mode** — optimized layout for a Pi-connected touchscreen
 - **Dark + light theme** — persisted per browser
+- **Controller watchdog** — a background service restarts bbctrl if the web UI ever stops responding (installed automatically with the firmware package)
+- **Rift branding end-to-end** — favicon and app icons served from the controller, so bookmarks and home-screen installs look right
 - **Revert to stock anytime** — one button, no tools required
 
 ---
@@ -75,7 +89,7 @@ Once Rift is installed, you can restore your config any time via **Settings → 
 No SSH, no tools. Done in under a minute.
 
 1. **Download** the latest Rift firmware package:
-   👉 **[rift-cnc-ui-v1.3.3.tar.bz2](https://github.com/DRSwanger/rift-cnc-ui/releases/download/v1.3.3/rift-cnc-ui-v1.3.3.tar.bz2)**
+   👉 **[rift-cnc-ui-v1.3.8.tar.bz2](https://github.com/DRSwanger/rift-cnc-ui/releases/download/v1.3.8/rift-cnc-ui-v1.3.8.tar.bz2)**
 
 2. Open your Onefinity controller in a browser (usually `http://onefinity.local` or your machine's IP)
 
@@ -130,7 +144,7 @@ If the in-UI updater fails (CORS issue on older builds, browser quirks, frozen U
 **Install or update Rift:**
 
 ```bash
-curl -X PUT -F "firmware=@rift-cnc-ui-v1.3.3.tar.bz2" http://<pi-ip>/api/firmware/update
+curl -X PUT -F "firmware=@rift-cnc-ui-v1.3.8.tar.bz2" http://<pi-ip>/api/firmware/update
 ```
 
 **Revert to stock Onefinity 1.6.6:**
@@ -159,7 +173,7 @@ If that matches what you tried to install, it's just a browser cache — hard-re
 
 ```bash
 sudo bash -c '
-TAG=v1.3.2  # or any release tag
+TAG=v1.3.8  # or any release tag
 URL="https://github.com/DRSwanger/rift-cnc-ui/releases/download/${TAG}/rift-cnc-ui-${TAG}.tar.bz2"
 WORK=/tmp/rift-debug
 rm -rf "$WORK" && mkdir -p "$WORK" && cd "$WORK"
@@ -191,9 +205,11 @@ proxy.py            — Local WebSocket + HTTP proxy for cross-origin access
 deploy-ssh.sh       — SSH-based deploy to Pi (no bbctrl restart needed)
 build_firmware.sh   — Packages index.html as a bbctrl-compatible .tar.bz2
 manifest.json       — PWA manifest
+favicon.ico         — Rift favicon (served from the controller root)
+rift-icon-*.png     — App icons for PWA / home-screen installs
 rift-boot.png       — Boot splash screen
 rift-shutdown.png   — Shutdown splash screen
-scripts/            — Pi install helpers
+scripts/            — Pi install helpers + bbctrl watchdog service
 ```
 
 ---
