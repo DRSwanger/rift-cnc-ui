@@ -8668,14 +8668,47 @@ function viewIso()     { camTheta = 0.8; camPhi = 0.6; updateCamera(); }
 
 function zoomToFit() {
   if (!toolpathGroup || toolpathGroup.children.length === 0) return;
-  const box = new THREE.Box3();
-  toolpathGroup.traverse(obj => { if (obj.geometry) box.expandByObject(obj); });
-  if (!box.isEmpty()) {
-    box.getCenter(camTarget);
-    const size = box.getSize(new THREE.Vector3());
-    camRadius = Math.max(size.x, size.y, size.z) * 2.0;
-    updateCamera();
+  // Frame the SAME box the BBox toggle draws (fileExtents, WCS + ABS shift),
+  // not a loose union of every object. Fall back to geometry union if no file.
+  let box;
+  if (fileExtents) {
+    box = new THREE.Box3(
+      new THREE.Vector3(fileExtents.minX, fileExtents.minY, fileExtents.minZ),
+      new THREE.Vector3(fileExtents.maxX, fileExtents.maxY, fileExtents.maxZ));
+    box.translate(toolpathGroup.position);
+  } else {
+    box = new THREE.Box3();
+    toolpathGroup.traverse(obj => { if (obj.geometry) box.expandByObject(obj); });
+    if (box.isEmpty()) return;
   }
+  box.getCenter(camTarget);
+  // Tight fit for the CURRENT view angle: project the 8 corners onto the
+  // camera basis (mirrors three.js lookAt with default up (0,1,0)) and solve
+  // the minimal orbit distance where every corner is inside both FOVs.
+  const dir = new THREE.Vector3(            // camTarget -> camera
+    Math.sin(camPhi) * Math.cos(camTheta),
+    Math.sin(camPhi) * Math.sin(camTheta),
+    Math.cos(camPhi));
+  const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), dir);
+  if (right.lengthSq() < 1e-8) right.set(1,0,0);
+  right.normalize();
+  const up = new THREE.Vector3().crossVectors(dir, right).normalize();
+  const vT = Math.tan((camera.fov * Math.PI / 180) / 2);
+  const hT = vT * (camera.aspect || 1);
+  const c = box.getCenter(new THREE.Vector3());
+  let need = 0;
+  for (let i = 0; i < 8; i++) {
+    const corner = new THREE.Vector3(
+      (i & 1 ? box.max.x : box.min.x) - c.x,
+      (i & 2 ? box.max.y : box.min.y) - c.y,
+      (i & 4 ? box.max.z : box.min.z) - c.z);
+    const px = Math.abs(corner.dot(right));
+    const py = Math.abs(corner.dot(up));
+    const pz = corner.dot(dir);
+    need = Math.max(need, pz + px / hT, pz + py / vT);
+  }
+  camRadius = Math.max(need * 1.05, 10);
+  updateCamera();
 }
 
 // ── FAT LINES (screen-space width) ──
