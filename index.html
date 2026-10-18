@@ -4605,6 +4605,10 @@ let _jobLine = 0;         // last known running line number (for time-based ETA)
 let _cumulativeTimeByLine = null; // Float32Array: cumByLine[i] = est. seconds to reach line i
 let _progressTimer = null;
 let _estimatedJobSeconds = 0; // pre-computed time estimate from loaded GCode
+let _planTotalSec = 0;    // bbctrl preplanner total seconds (authoritative; 0 = unavailable)
+let _lastPlanTime = -1;   // last WS plan_time value, for 1s-smoothing between updates
+let _lastPlanTimeAt = 0;
+let _planMetaLastTry = 0; // throttle for lazy /api/path retries while running
 
 // Persist job start across page refresh so ETA doesn't reset when the tab reloads mid-job.
 const JOB_START_KEY = 'rift_job_start';
@@ -5731,6 +5735,7 @@ function clearLoadedFile() {
   parseAndRender3D([]);   // disposes old toolpath geometry; no-op if 3D unavailable
   fileExtents = null;
   _estimatedJobSeconds = 0;
+  _planTotalSec = 0; _lastPlanTime = -1;
   _cumulativeTimeByLine = null;
   _jobPct = 0; _jobLine = 0;
   _feedScaleSourceFile = '';
@@ -5801,6 +5806,7 @@ function loadGCode(filename, resetScale = true) {
         if (lastMachineState !== 'running') showFileReadyLabel();
         _fetchBbctrlPlannerTime(filename).then(t => {
           if (t && t > 0) {
+            _planTotalSec = t;
             // Rescale cumByLine so its total matches the planner's authoritative
             // estimate while preserving the per-line distribution shape (which
             // is what makes multi-tool ETA work).
@@ -9283,7 +9289,7 @@ function estimateJobTime(lines) {
 // keeps the client-side estimate in that case.
 async function _fetchBbctrlPlannerTime(filename) {
   const url = `${API_URL}/api/path/${encodeURIComponent(filename)}`;
-  const deadline = Date.now() + 30000;
+  const deadline = Date.now() + 120000;
   while (Date.now() < deadline) {
     try {
       const r = await fetch(url);
@@ -9371,6 +9377,38 @@ function updateProgressLabel() {
 
   const labelEl     = document.getElementById('progress-label');
   const stripEl     = null; // removed gcode-progress-strip
+
+  // ── Controller-authoritative path ──
+  // bbctrl's preplanner total (/api/path meta.time) minus the planner's live
+  // plan_time (WS) is the same remaining for EVERY client — no per-tab
+  // jobStartTime, no pace projection. Fo override scales planned→wall seconds.
+  const _pt = state.plan_time;
+  if (_planTotalSec > 0 && typeof _pt === 'number' && _pt > 0) {
+    const now = Date.now();
+    if (_pt !== _lastPlanTime) { _lastPlanTime = _pt; _lastPlanTimeAt = now; }
+    const fo = (typeof state.fo === 'number' && state.fo > 0) ? state.fo / 1000 : 1;
+    // Smooth between bbctrl's whole-second updates; clamp so a stalled WS can
+    // never run the clock ahead of the controller by more than 2s.
+    const extra = Math.min(((now - _lastPlanTimeAt) / 1000) * fo, 2);
+    const planElapsed = Math.min(_pt + extra, _planTotalSec);
+    const remaining = Math.max(0, (_planTotalSec - planElapsed) / fo);
+    const pct = Math.min(100, (planElapsed / _planTotalSec) * 100);
+    if (labelEl) labelEl.textContent = `Running  ${pct.toFixed(0)}%`;
+    setProgressTime('', fmtTime(remaining), 'remaining');
+    setProgressETA(fmtETA(remaining));
+    const bar = document.getElementById('progress-bar');
+    if (bar) bar.style.width = pct + '%';
+    return;
+  }
+  // Plan meta wasn't ready at load (or tab joined mid-job and the fetch timed
+  // out) — keep retrying lazily so this tab upgrades to planner truth.
+  if (!_planTotalSec && state.selected && lastMachineState === 'running' &&
+      Date.now() - _planMetaLastTry > 30000) {
+    _planMetaLastTry = Date.now();
+    _fetchBbctrlPlannerTime(state.selected).then(t => {
+      if (t && t > 0) _planTotalSec = t;
+    });
+  }
 
   if (_jobPct > 1) {
     // Time-based projection using the cumulative seconds-per-line table built
