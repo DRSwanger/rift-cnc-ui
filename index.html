@@ -1893,6 +1893,9 @@
   }
   .view-btn:hover { background: var(--accent); color: var(--bg); border-color: var(--accent); }
   .view-toggle { color: var(--muted); }
+  /* 🎨 button stays highlighted while its menu is open — ties the floating
+     popover back to its anchor visually */
+  #view-overlay #btn-3d-colors.menu-open { border-color: var(--accent); box-shadow: 0 0 5px var(--accent); }
   .view-toggle.on { color: var(--accent); border-color: var(--accent); }
 
   /* ── 3D color picker panel ──
@@ -1903,7 +1906,7 @@
     position: fixed;
     z-index: 9000;
     background: rgba(22,25,35,0.97);
-    border: 1px solid var(--border);
+    border: 1px solid var(--accent);
     border-radius: 10px;
     padding: 10px 12px;
     display: none;
@@ -4711,7 +4714,12 @@ function toggle3dColorPanel() {
     if (lw) { lw.value = _lineWidthPx; const lbl = document.getElementById('cp-linewidth-val'); if (lbl) lbl.textContent = _lineWidthPx.toFixed(1).replace(/\.0$/, '') + ' px'; }
   }
   p.classList.toggle('open');
+  _sync3dColorBtn(p);
   if (p.classList.contains('open')) _position3dColorPanel();
+}
+function _sync3dColorBtn(p) {
+  const b = document.getElementById('btn-3d-colors');
+  if (b) b.classList.toggle('menu-open', p.classList.contains('open'));
 }
 // Floating popover: right-align under the 🎨 button, clamped to the viewport.
 // Zoom-proof by self-calibration: park the menu at style (0,0), measure where
@@ -4749,6 +4757,7 @@ document.addEventListener('mousedown', function (e) {
   const btn = document.getElementById('btn-3d-colors');
   if (p.contains(e.target) || (btn && btn.contains(e.target))) return;
   p.classList.remove('open');
+  _sync3dColorBtn(p);
 });
 function apply3dColor(key, val) {
   _3dColors[key] = val;
