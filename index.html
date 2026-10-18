@@ -3612,6 +3612,14 @@
             <div><div class="settings-label">Reset UI layout</div><div class="settings-sub" id="sub-reset-layout">Restore default panel order, sizes, and widths. 3D colors are unaffected.</div></div>
             <button class="settings-btn" id="btn-reset-layout" onclick="resetUiLayout()">Reset layout</button>
           </div>
+          <div class="settings-row" id="row-layout-transfer" style="display:none;">
+            <div><div class="settings-label">Layout file</div><div class="settings-sub">Export this machine's layout, or import one from another. Import applies immediately (page reloads).</div></div>
+            <div style="display:flex;gap:6px;">
+              <button class="settings-btn" onclick="exportUiLayout()">Export</button>
+              <button class="settings-btn" onclick="document.getElementById('layout-import-file').click()">Import</button>
+              <input type="file" id="layout-import-file" accept=".json,application/json" style="display:none;" onchange="importUiLayout(this)">
+            </div>
+          </div>
         </div>
         <div class="settings-section">
           <div class="settings-section-title">Motion</div>
@@ -10163,6 +10171,8 @@ function applyDevMode(save = true) {
   const enabled = (_devEl && _devEl.checked !== undefined) ? _devEl.checked : (settings.devMode || false);
   const tab = document.getElementById('stab-logs-tab');
   if (tab) tab.classList.toggle('dev-visible', enabled);
+  const ltRow = document.getElementById('row-layout-transfer');
+  if (ltRow) ltRow.style.display = enabled ? '' : 'none';
   // Toggle slider color
   const slider = document.getElementById('dev-mode-slider');
   if (slider) slider.style.background = enabled ? 'var(--accent)' : 'var(--border)';
@@ -10740,16 +10750,55 @@ function setUiLocked(locked) {
   if (sel) sel.value = locked ? '1' : '0';
 }
 
+// The single definition of “layout” — shared by reset and export/import so the
+// three can never drift. Deliberately excludes the 3D color schema
+// (rift_3dColorsDark/Light, rift_3dMode): colors have their own reset.
+const _LAYOUT_KEYS = [
+  'rift_layout', 'rift_section_h', 'rift_sidebar_w', 'rift_right_w',
+  'rift_markerScale', 'rift_spindleScale',
+  'rift_gcodeWrap', 'rift_bottom_bar_h'
+];
+function exportUiLayout() {
+  const data = {};
+  _LAYOUT_KEYS.forEach(k => { try { const v = localStorage.getItem(k); if (v !== null) data[k] = v; } catch(_) {} });
+  const payload = { rift: 'layout', exported: new Date().toISOString(), ui: UI_VERSION, data: data };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'rift-layout-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  if (typeof uiLog === 'function') uiLog('Layout exported');
+}
+function importUiLayout(input) {
+  const file = input.files && input.files[0];
+  input.value = '';  // allow picking the same file again later
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function () {
+    let obj = null;
+    try { obj = JSON.parse(reader.result); } catch (_) {}
+    if (!obj || obj.rift !== 'layout' || typeof obj.data !== 'object' || obj.data === null) {
+      alert('Not a Rift layout file.'); return;
+    }
+    if (!confirm('Apply this layout? Your current panel arrangement, sizes, and widths will be replaced, then the page reloads.')) return;
+    // Whitelisted: ONLY layout keys are read from the file — an imported file
+    // cannot write settings, colors, or anything else. Keys absent in the file
+    // are cleared so this machine mirrors the source machine's defaults too.
+    _LAYOUT_KEYS.forEach(k => {
+      try {
+        if (typeof obj.data[k] === 'string') localStorage.setItem(k, obj.data[k]);
+        else localStorage.removeItem(k);
+      } catch (_) {}
+    });
+    if (typeof uiLog === 'function') uiLog('Layout imported — reloading');
+    location.reload();
+  };
+  reader.readAsText(file);
+}
 function resetUiLayout() {
   if (!confirm('Reset UI to default layout? This clears your panel arrangement, splitter widths, and marker/spindle sizes. 3D colors are not affected (use Reset defaults in the 3D color panel for those).')) return;
-  // Deliberately does NOT touch the 3D color schema (rift_3dColorsDark/Light,
-  // rift_3dMode) — colors have their own reset in the 3D color panel.
-  const KEYS = [
-    'rift_layout', 'rift_section_h', 'rift_sidebar_w', 'rift_right_w',
-    'rift_markerScale', 'rift_spindleScale',
-    'rift_gcodeWrap', 'rift_bottom_bar_h'
-  ];
-  KEYS.forEach(k => { try { localStorage.removeItem(k); } catch(_) {} });
+  _LAYOUT_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch(_) {} });
   // Drop any inline width overrides on #main
   const main = document.getElementById('main');
   if (main) {
@@ -11044,6 +11093,8 @@ function initColumnSplitters() {
 (function() {
   const logsTab = document.getElementById('stab-logs-tab');
   if (logsTab && settings.devMode) logsTab.classList.add('dev-visible');
+  const ltRow = document.getElementById('row-layout-transfer');
+  if (ltRow && settings.devMode) ltRow.style.display = '';
 })();
 initKioskMode();
 _sizeProbeZRetry();
