@@ -1256,7 +1256,7 @@
     position: fixed; z-index: 3000;
     /* Pure CSS centering — drag offsets compose via calc() in makeDraggable. */
     left: 50%; top: 50%; transform: translate(-50%, -50%);
-    background: var(--surface); border: 1px solid var(--border);
+    background: var(--surface); border: 1px solid var(--accent);
     border-radius: 8px; width: 880px; max-width: 95vw;
     height: 78vh; max-height: 660px; display: flex; flex-direction: column;
     box-shadow: 0 8px 32px rgba(0,0,0,0.5);
@@ -5995,6 +5995,17 @@ function renderGCode(lines) {
 }
 
 let _lastHlLine = -1;  // skip repeat calls for the same line (WS resends line in many deltas)
+let _gcodeHoldUntil = 0; // user is reading the gcode — auto-follow pauses until this time
+(function () {
+  // Any pointer interaction with the gcode panel holds auto-follow for 5s
+  // (refreshed per interaction). Programmatic scrolls don't trigger these.
+  const c = document.getElementById('gcode-content');
+  if (!c) return;
+  const hold = function () { _gcodeHoldUntil = Date.now() + 5000; };
+  c.addEventListener('wheel', hold, { passive: true });
+  c.addEventListener('touchstart', hold, { passive: true });
+  c.addEventListener('mousedown', hold);
+})();
 function highlightLine(lineNum) {
   if (lineNum === _lastHlLine) return;
   _lastHlLine = lineNum;
@@ -6009,6 +6020,13 @@ function highlightLine(lineNum) {
     const curTop = container.scrollTop;
     const inView = targetTop >= curTop + 40 && targetTop + rowH <= curTop + viewH - 40;
     if (!inView) {
+      if (Date.now() < _gcodeHoldUntil) {
+        // User is reading — keep highlighting but don't yank the view.
+        // Follow resumes on the next line delta after the hold expires.
+        const heldRow = document.getElementById('gl-' + lineNum);
+        if (heldRow) heldRow.classList.add('current');
+        return;
+      }
       const dest = Math.max(0, Math.min(lines.length * rowH - viewH, targetTop - viewH / 2));
       container.scrollTop = dest;
       _virt.start = -1;  // window moved — force re-render
@@ -6037,8 +6055,8 @@ function highlightLine(lineNum) {
       const cr = c.getBoundingClientRect();
       const r  = cur.getBoundingClientRect();
       const inView = r.top >= cr.top + 40 && r.bottom <= cr.bottom - 40;
-      if (!inView) cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    } else {
+      if (!inView && Date.now() >= _gcodeHoldUntil) cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    } else if (Date.now() >= _gcodeHoldUntil) {
       cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
   }
