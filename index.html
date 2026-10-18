@@ -1893,9 +1893,9 @@
   }
   .view-btn:hover { background: var(--accent); color: var(--bg); border-color: var(--accent); }
   .view-toggle { color: var(--muted); }
-  /* 🎨 button stays highlighted while its menu is open — ties the floating
-     popover back to its anchor visually */
-  #view-overlay #btn-3d-colors.menu-open { border-color: var(--accent); box-shadow: 0 0 5px var(--accent); }
+  /* 🎨 button stays fully highlighted while its menu is open — same look
+     as :hover, so the anchor reads as “pressed” the whole time */
+  #view-overlay #btn-3d-colors.menu-open { background: var(--accent); color: var(--bg); border-color: var(--accent); }
   .view-toggle.on { color: var(--accent); border-color: var(--accent); }
 
   /* ── 3D color picker panel ──
@@ -3157,6 +3157,7 @@
     background: rgba(240,242,245,0.92); color: var(--text); border-color: var(--border);
   }
   [data-theme="light"] .view-btn:hover { background: var(--accent); color: #000; }
+  [data-theme="light"] #view-overlay #btn-3d-colors.menu-open { background: var(--accent); color: #000; }
   [data-theme="light"] .view-toggle.on { background: rgba(0,153,204,0.15); }
   /* GCode viewer — replace neon green cut lines with a readable teal in light mode */
   [data-theme="light"] .gcode-line.cut     { color: #007a55; }
