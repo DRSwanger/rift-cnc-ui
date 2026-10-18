@@ -1873,12 +1873,15 @@
     position: absolute;
     top: 10px;
     right: 10px;
+    /* Cap at the 3D panel's live height so popovers (color menu) can never
+       clip out of the panel — tracks splitter/panel resizes with no JS. */
+    max-height: calc(100% - 20px);
     display: flex;
     flex-direction: column;
     gap: 5px;
     align-items: flex-end;
   }
-  .vob-row { display: flex; flex-direction: row; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+  .vob-row { display: flex; flex-direction: row; gap: 4px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; }
 
   .view-btn {
     background: rgba(28,31,39,0.85);
@@ -1908,8 +1911,15 @@
     min-width: 180px;
   }
   #color-panel.open { display: flex; }
+  /* When the panel is shorter than the menu, the menu scrolls inside itself
+     instead of clipping — bottom sliders stay reachable at any panel size. */
+  #color-panel { min-height: 0; overflow-y: auto; }
+  #color-panel > * { flex-shrink: 0; }
+  #color-panel::-webkit-scrollbar { width: 8px; }
+  #color-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
   [data-theme="light"] #color-panel { background: rgba(255,255,255,0.97); }
   #bbox-dims {
+    flex-shrink: 0;
     font-size: 11px;
     color: var(--accent);
     text-align: right;
