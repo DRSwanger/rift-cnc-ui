@@ -29,7 +29,7 @@ Rift runs in two modes depending on how you access it:
 - **Jog controls** — XY pad + Z column with configurable step sizes; every jog is unit-safe (explicit G21/G20)
 - **Start / Pause / Stop / E-Stop** — with confirmation dialogs where it counts, and a header that never shifts under your finger (fixed-width state badge + E-Stop)
 - **Water pump + vacuum toggles** — relay control from the DRO bar
-- **Progress bar** — time remaining and ETA during a job
+- **Progress bar** — remaining time, ETA, and progress come straight from the controller's motion planner, so every connected screen shows the same (accurate) numbers
 
 ### Safety
 - **Spindle power detection** *(optional, Settings → Tool)* — Rift watches the VFD's Modbus status and warns on Start when the spindle has no power (e.g. a physical spindle switch left off), instead of letting a job dry-run the tool through your material. Live indicator on the Spindle RPM card: green when the VFD responds, red **OFF** when it doesn't.
@@ -37,13 +37,17 @@ Rift runs in two modes depending on how you access it:
 - **Guarded settings** — Save writes controller config only from tabs that actually loaded; a UI-only save can never silently wipe motor or tool settings
 
 ### Visualize
-- **3D toolpath viewer** — G0/G1/G2/G3 arc support via Three.js, live position tracking, cut-progress coloring, configurable color schemes *(remote browsers only — disabled in kiosk mode)*
-- **GCode viewer** — syntax highlighting with live line tracking, virtualized so 100k-line trochoidal files scroll smoothly
+- **3D toolpath viewer** — G0/G1/G2/G3 arc support via Three.js, live position tracking, cut-progress coloring, configurable color schemes, and a Fit that frames the job's bounding box tight to the screen *(remote browsers only — disabled in kiosk mode)*
+- **GCode viewer** — syntax highlighting with live line tracking, virtualized so 100k-line trochoidal files scroll smoothly; auto-follow politely pauses while you scroll and resumes on its own
 - **Built for long jobs** — WebSocket updates are coalesced and rendering adapts to the tab's real speed, so hours-long carves don't freeze the browser (even on machines without GPU acceleration)
 
 ### Workflow
 - **File manager** — upload, drag-and-drop, folder support
 - **Movable panels** — drag panels between columns, resize sections with splitters; layout persists per browser with one-click reset
+
+  ![Resizable interface — drag panels between columns, resize sections and column widths](docs/resize-demo.gif)
+
+- **Layout export/import** — save your exact panel arrangement to a file and load it on another machine (Settings → Display), so every shop screen can share one view
 - **Settings modal** — motor tuning, tool config, I/O indicators, WiFi, network, system clock, and more
 - **Update manager** — stable and nightly channels, checks GitHub for new releases and links directly to the download
 - **Kiosk mode** — optimized layout for a Pi-connected touchscreen
