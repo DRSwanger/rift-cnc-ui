@@ -5067,7 +5067,12 @@ function updateUI(data) {
     const pct = Math.min(100, (data.line / totalLines) * 100);
     _jobPct = pct;
     _jobLine = data.line | 0;
-    document.getElementById('progress-bar').style.width = pct + '%';
+    // Bar width: only when plan-based progress is unavailable. Otherwise the
+    // ticker owns the bar (plan_time pct) and writing line-pct here too makes
+    // the bar twitch between two disagreeing values several times a second.
+    if (!(_planTotalSec > 0 && typeof state.plan_time === 'number' && state.plan_time > 0)) {
+      document.getElementById('progress-bar').style.width = pct + '%';
+    }
     // Homing/jogging cycles emit line deltas that would yank the cursor around awkwardly.
     const _cyc = state.cycle || '';
     if (_cyc !== 'homing' && _cyc !== 'jogging') {
