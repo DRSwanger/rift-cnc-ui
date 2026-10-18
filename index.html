@@ -1873,15 +1873,12 @@
     position: absolute;
     top: 10px;
     right: 10px;
-    /* Cap at the 3D panel's live height so popovers (color menu) can never
-       clip out of the panel — tracks splitter/panel resizes with no JS. */
-    max-height: calc(100% - 20px);
     display: flex;
     flex-direction: column;
     gap: 5px;
     align-items: flex-end;
   }
-  .vob-row { display: flex; flex-direction: row; gap: 4px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; }
+  .vob-row { display: flex; flex-direction: row; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 
   .view-btn {
     background: rgba(28,31,39,0.85);
@@ -1898,8 +1895,13 @@
   .view-toggle { color: var(--muted); }
   .view-toggle.on { color: var(--accent); border-color: var(--accent); }
 
-  /* ── 3D color picker panel ── */
+  /* ── 3D color picker panel ──
+     Floats over the page (position:fixed, anchored to the 🎨 button by JS)
+     so a short 3D panel can never clip it. The viewport cap + scroll is a
+     backstop only — in practice the menu always fits the window. */
   #color-panel {
+    position: fixed;
+    z-index: 9000;
     background: rgba(22,25,35,0.97);
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -1908,18 +1910,17 @@
     flex-direction: column;
     gap: 7px;
     backdrop-filter: blur(6px);
-    min-width: 180px;
+    width: 224px;
+    max-height: calc(100vh - 20px);
+    overflow-y: auto;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.45);
   }
   #color-panel.open { display: flex; }
-  /* When the panel is shorter than the menu, the menu scrolls inside itself
-     instead of clipping — bottom sliders stay reachable at any panel size. */
-  #color-panel { min-height: 0; overflow-y: auto; }
   #color-panel > * { flex-shrink: 0; }
   #color-panel::-webkit-scrollbar { width: 8px; }
   #color-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
   [data-theme="light"] #color-panel { background: rgba(255,255,255,0.97); }
   #bbox-dims {
-    flex-shrink: 0;
     font-size: 11px;
     color: var(--accent);
     text-align: right;
@@ -4382,7 +4383,7 @@
           <button class="view-btn" onclick="viewIso()">Iso</button>
           <button class="view-btn" onclick="zoomToFit()" title="Zoom to fit toolpath">⊡ Fit</button>
           <button class="view-btn" id="vt-lightmode" onclick="toggle3dLightMode()" title="Toggle 3D panel dark/light">🌙 Dark</button>
-          <button class="view-btn" onclick="toggle3dColorPanel()" title="Customize colors">🎨</button>
+          <button class="view-btn" id="btn-3d-colors" onclick="toggle3dColorPanel()" title="Customize colors">🎨</button>
         </div>
         <div class="vob-row">
           <button class="view-btn view-toggle" id="vt-grid"     onclick="toggleView('grid')"     title="Toggle grid">Grid</button>
@@ -4394,35 +4395,7 @@
           <button class="view-btn view-toggle" id="vt-machine"  onclick="toggleView('machine')"  title="Show 1F machine model">1F</button>
         </div>
         <div id="bbox-dims" style="display:none;"></div>
-        <!-- 3D color picker panel -->
-        <div id="color-panel">
-          <div id="color-panel-title">3D Colors</div>
-          <div class="cp-row"><label>Cut lines</label><input type="color" id="cp-cut"      oninput="apply3dColor('cut',this.value)"></div>
-          <div class="cp-row"><label>Rapids</label>   <input type="color" id="cp-rapid"    oninput="apply3dColor('rapid',this.value)"></div>
-          <div class="cp-row"><label>Depth hi (top)</label><input type="color" id="cp-depthHi" oninput="apply3dColor('depthHi',this.value)"></div>
-          <div class="cp-row"><label>Depth lo (deep)</label><input type="color" id="cp-depthLo" oninput="apply3dColor('depthLo',this.value)"></div>
-          <div class="cp-row"><label>Completed</label><input type="color" id="cp-done"     oninput="apply3dColor('done',this.value)"></div>
-          <div class="cp-row"><label>Background</label><input type="color" id="cp-bg"      oninput="apply3dColor('bg',this.value)"></div>
-          <div class="cp-row"><label>Grid</label>     <input type="color" id="cp-grid"     oninput="apply3dColor('grid',this.value)"></div>
-          <div class="cp-row"><label>Spindle</label>  <input type="color" id="cp-spindle"  oninput="apply3dColor('spindle',this.value)"></div>
-          <div class="cp-row" style="flex-direction:column;align-items:stretch;gap:3px;">
-            <label style="font-size:11px;color:var(--text);">Spindle opacity <span id="cp-opacity-val">—</span></label>
-            <input type="range" id="cp-opacity" min="0.05" max="1" step="0.05" style="width:100%;accent-color:var(--accent);" oninput="setSpindleOpacity(+this.value)">
-          </div>
-          <div class="cp-row" style="flex-direction:column;align-items:stretch;gap:3px;">
-            <label style="font-size:11px;color:var(--text);">Spindle size <span id="cp-scale-val">—</span></label>
-            <input type="range" id="cp-scale" min="0.2" max="2" step="0.05" style="width:100%;accent-color:var(--accent);" oninput="setSpindleScale(+this.value)">
-          </div>
-          <div class="cp-row" style="flex-direction:column;align-items:stretch;gap:3px;">
-            <label style="font-size:11px;color:var(--text);">Marker size <span id="cp-marker-val">—</span></label>
-            <input type="range" id="cp-marker" min="0.2" max="3" step="0.05" style="width:100%;accent-color:var(--accent);" oninput="setMarkerScale(+this.value)">
-          </div>
-          <div class="cp-row" style="flex-direction:column;align-items:stretch;gap:3px;">
-            <label style="font-size:11px;color:var(--text);">Line width <span id="cp-linewidth-val">—</span></label>
-            <input type="range" id="cp-linewidth" min="1" max="5" step="0.5" style="width:100%;accent-color:var(--accent);" oninput="setLineWidth(+this.value)">
-          </div>
-          <button class="cp-reset" onclick="reset3dColors()">Reset defaults</button>
-        </div>
+        <!-- 3D color picker panel markup lives at body level (floating popover) -->
       </div>
       <div id="file-load-bar-wrap"><div id="file-load-bar"></div></div>
       <div id="selected-file-label">No file selected</div>
@@ -4734,7 +4707,45 @@ function toggle3dColorPanel() {
     if (lw) { lw.value = _lineWidthPx; const lbl = document.getElementById('cp-linewidth-val'); if (lbl) lbl.textContent = _lineWidthPx.toFixed(1).replace(/\.0$/, '') + ' px'; }
   }
   p.classList.toggle('open');
+  if (p.classList.contains('open')) _position3dColorPanel();
 }
+// Floating popover: right-align under the 🎨 button, clamped to the viewport.
+// Zoom-proof by self-calibration: park the menu at style (0,0), measure where
+// that lands in visual px, and derive the style↔visual scale from the menu's
+// own rect — engines disagree on how body zoom maps fixed-position coords.
+function _position3dColorPanel() {
+  const p = document.getElementById('color-panel');
+  const btn = document.getElementById('btn-3d-colors');
+  if (!p || !btn || !p.classList.contains('open')) return;
+  p.style.left = '0px'; p.style.top = '0px';
+  let pr = p.getBoundingClientRect();
+  const scale = (p.offsetWidth ? pr.width / p.offsetWidth : 1) || 1;
+  // 100vh in CSS doesn't account for body zoom (UI scale) — cap in style px
+  // so the menu may use the FULL visual viewport, then re-measure.
+  p.style.maxHeight = ((window.innerHeight - 20) / scale) + 'px';
+  pr = p.getBoundingClientRect();
+  const br = btn.getBoundingClientRect();
+  let leftV = br.right - pr.width;
+  let topV  = br.bottom + 6;
+  if (leftV < 10) leftV = 10;
+  const maxTopV = window.innerHeight - 10 - pr.height;
+  if (topV > maxTopV) topV = Math.max(10, maxTopV);
+  p.style.left = ((leftV - pr.left) / scale) + 'px';
+  p.style.top  = ((topV  - pr.top ) / scale) + 'px';
+}
+window.addEventListener('resize', function () {
+  // Defer one frame: scaleUI's own resize handler may change body zoom, and
+  // the popover must calibrate against the FINAL zoom, not a stale one.
+  const p = document.getElementById('color-panel');
+  if (p && p.classList.contains('open')) requestAnimationFrame(_position3dColorPanel);
+});
+document.addEventListener('mousedown', function (e) {
+  const p = document.getElementById('color-panel');
+  if (!p || !p.classList.contains('open')) return;
+  const btn = document.getElementById('btn-3d-colors');
+  if (p.contains(e.target) || (btn && btn.contains(e.target))) return;
+  p.classList.remove('open');
+});
 function apply3dColor(key, val) {
   _3dColors[key] = val;
   _save3dColors();
@@ -11445,4 +11456,33 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft')                       tourPrev();
 });
 </script>
+<!-- 3D color picker panel — floating popover anchored to #btn-3d-colors (see _position3dColorPanel) -->
+        <div id="color-panel">
+          <div id="color-panel-title">3D Colors</div>
+          <div class="cp-row"><label>Cut lines</label><input type="color" id="cp-cut"      oninput="apply3dColor('cut',this.value)"></div>
+          <div class="cp-row"><label>Rapids</label>   <input type="color" id="cp-rapid"    oninput="apply3dColor('rapid',this.value)"></div>
+          <div class="cp-row"><label>Depth hi (top)</label><input type="color" id="cp-depthHi" oninput="apply3dColor('depthHi',this.value)"></div>
+          <div class="cp-row"><label>Depth lo (deep)</label><input type="color" id="cp-depthLo" oninput="apply3dColor('depthLo',this.value)"></div>
+          <div class="cp-row"><label>Completed</label><input type="color" id="cp-done"     oninput="apply3dColor('done',this.value)"></div>
+          <div class="cp-row"><label>Background</label><input type="color" id="cp-bg"      oninput="apply3dColor('bg',this.value)"></div>
+          <div class="cp-row"><label>Grid</label>     <input type="color" id="cp-grid"     oninput="apply3dColor('grid',this.value)"></div>
+          <div class="cp-row"><label>Spindle</label>  <input type="color" id="cp-spindle"  oninput="apply3dColor('spindle',this.value)"></div>
+          <div class="cp-row" style="flex-direction:column;align-items:stretch;gap:3px;">
+            <label style="font-size:11px;color:var(--text);">Spindle opacity <span id="cp-opacity-val">—</span></label>
+            <input type="range" id="cp-opacity" min="0.05" max="1" step="0.05" style="width:100%;accent-color:var(--accent);" oninput="setSpindleOpacity(+this.value)">
+          </div>
+          <div class="cp-row" style="flex-direction:column;align-items:stretch;gap:3px;">
+            <label style="font-size:11px;color:var(--text);">Spindle size <span id="cp-scale-val">—</span></label>
+            <input type="range" id="cp-scale" min="0.2" max="2" step="0.05" style="width:100%;accent-color:var(--accent);" oninput="setSpindleScale(+this.value)">
+          </div>
+          <div class="cp-row" style="flex-direction:column;align-items:stretch;gap:3px;">
+            <label style="font-size:11px;color:var(--text);">Marker size <span id="cp-marker-val">—</span></label>
+            <input type="range" id="cp-marker" min="0.2" max="3" step="0.05" style="width:100%;accent-color:var(--accent);" oninput="setMarkerScale(+this.value)">
+          </div>
+          <div class="cp-row" style="flex-direction:column;align-items:stretch;gap:3px;">
+            <label style="font-size:11px;color:var(--text);">Line width <span id="cp-linewidth-val">—</span></label>
+            <input type="range" id="cp-linewidth" min="1" max="5" step="0.5" style="width:100%;accent-color:var(--accent);" oninput="setLineWidth(+this.value)">
+          </div>
+          <button class="cp-reset" onclick="reset3dColors()">Reset defaults</button>
+        </div>
 </body>
