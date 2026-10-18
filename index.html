@@ -1920,8 +1920,6 @@
   }
   #color-panel.open { display: flex; }
   #color-panel > * { flex-shrink: 0; }
-  #color-panel::-webkit-scrollbar { width: 8px; }
-  #color-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
   [data-theme="light"] #color-panel { background: rgba(255,255,255,0.97); }
   #bbox-dims {
     font-size: 11px;
@@ -2703,11 +2701,10 @@
   }
 
   /* Scrollbar */
-  ::-webkit-scrollbar { width: 4px; }
+  /* 8px: the few scrollbars that exist are there on purpose — make them grabbable */
+  ::-webkit-scrollbar { width: 8px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-  /* GCode panel: easier scrollbar target — 50% wider than the global 4px */
-  #gcode-content::-webkit-scrollbar { width: 6px; }
 
   /* ── KIOSK MODE (720p local display, no 3D view) ── */
   body.kiosk-mode {
