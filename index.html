@@ -8274,7 +8274,9 @@ function init3D() {
     updateCamera();
   });
   canvas.addEventListener('wheel', e => {
-    camRadius = Math.max(18, Math.min(1500, camRadius + e.deltaY * 0.8));
+    // Proportional zoom — same perceptual step at every scale (additive steps
+      // made the last stretch near the floor jump 80mm per notch).
+      camRadius = Math.max(8, Math.min(1500, camRadius * (1 + (e.deltaY > 0 ? 0.08 : -0.08) * Math.min(Math.abs(e.deltaY) / 100, 3))));
     updateCamera();
     e.preventDefault();
   }, { passive: false });
@@ -8294,7 +8296,7 @@ function init3D() {
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY);
-      if (lastPinchDist > 0) camRadius = Math.max(18, Math.min(1500, camRadius * (lastPinchDist / dist)));
+      if (lastPinchDist > 0) camRadius = Math.max(8, Math.min(1500, camRadius * (lastPinchDist / dist)));
       lastPinchDist = dist;
       updateCamera();
       e.preventDefault();
@@ -8707,9 +8709,9 @@ function zoomToFit() {
     const pz = corner.dot(dir);
     need = Math.max(need, pz + px / hT, pz + py / vT);
   }
-  // Same [18, 1500] clamp as wheel/pinch zoom — a tiny file stops at the
+  // Same [8, 1500] clamp as wheel/pinch zoom — a tiny file stops at the
   // manual zoom-in limit instead of diving past where scroll can follow.
-  camRadius = Math.min(1500, Math.max(18, need * 1.05));
+  camRadius = Math.min(1500, Math.max(8, need * 1.05));
   updateCamera();
 }
 
