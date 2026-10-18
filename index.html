@@ -3612,11 +3612,11 @@
             <div><div class="settings-label">Reset UI layout</div><div class="settings-sub" id="sub-reset-layout">Restore default panel order, sizes, and widths. 3D colors are unaffected.</div></div>
             <button class="settings-btn" id="btn-reset-layout" onclick="resetUiLayout()">Reset layout</button>
           </div>
-          <div class="settings-row" id="row-layout-transfer" style="display:none;">
+          <div class="settings-row" id="row-layout-transfer">
             <div><div class="settings-label">Layout file</div><div class="settings-sub">Export this machine's layout, or import one from another. Import applies immediately (page reloads).</div></div>
-            <div style="display:flex;gap:6px;">
-              <button class="settings-btn" onclick="exportUiLayout()">Export</button>
-              <button class="settings-btn" onclick="document.getElementById('layout-import-file').click()">Import</button>
+            <div id="layout-transfer-btns" style="display:flex;gap:6px;">
+              <button class="settings-btn" style="flex:1 1 0;min-width:0;padding:5px 0;font-size:11px;overflow:hidden;" onclick="exportUiLayout()">Export</button>
+              <button class="settings-btn" style="flex:1 1 0;min-width:0;padding:5px 0;font-size:11px;overflow:hidden;" onclick="document.getElementById('layout-import-file').click()">Import</button>
               <input type="file" id="layout-import-file" accept=".json,application/json" style="display:none;" onchange="importUiLayout(this)">
             </div>
           </div>
@@ -6888,6 +6888,12 @@ async function openSettings() {
   const _kiosk = document.body.classList.contains('kiosk-mode');
   const _lockSel = document.getElementById('cfg-ui-locked');
   const _resetBtn = document.getElementById('btn-reset-layout');
+  // Export+gap+Import spans exactly the Reset layout button's width —
+  // measured live (needs the modal visible), so it tracks font/scale.
+  requestAnimationFrame(() => {
+    const pair = document.getElementById('layout-transfer-btns');
+    if (pair && _resetBtn && _resetBtn.offsetWidth > 0) pair.style.width = _resetBtn.offsetWidth + 'px';
+  });
   if (_lockSel)  _lockSel.disabled  = _kiosk;
   if (_resetBtn) _resetBtn.disabled = _kiosk;
   const _lockSub = document.getElementById('sub-ui-locked');
@@ -10171,8 +10177,6 @@ function applyDevMode(save = true) {
   const enabled = (_devEl && _devEl.checked !== undefined) ? _devEl.checked : (settings.devMode || false);
   const tab = document.getElementById('stab-logs-tab');
   if (tab) tab.classList.toggle('dev-visible', enabled);
-  const ltRow = document.getElementById('row-layout-transfer');
-  if (ltRow) ltRow.style.display = enabled ? '' : 'none';
   // Toggle slider color
   const slider = document.getElementById('dev-mode-slider');
   if (slider) slider.style.background = enabled ? 'var(--accent)' : 'var(--border)';
@@ -10762,10 +10766,24 @@ function exportUiLayout() {
   const data = {};
   _LAYOUT_KEYS.forEach(k => { try { const v = localStorage.getItem(k); if (v !== null) data[k] = v; } catch(_) {} });
   const payload = { rift: 'layout', exported: new Date().toISOString(), ui: UI_VERSION, data: data };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const json = JSON.stringify(payload, null, 2);
+  const fname = 'rift-layout-' + new Date().toISOString().slice(0, 10) + '.json';
+  // Navigable save dialog where the browser has one (Chromium's
+  // showSaveFilePicker). Firefox has no save-picker API — fall back to a
+  // download, which still prompts if the browser is set to ask per file.
+  if (window.showSaveFilePicker) {
+    window.showSaveFilePicker({
+      suggestedName: fname,
+      types: [{ description: 'Rift layout', accept: { 'application/json': ['.json'] } }]
+    }).then(h => h.createWritable()).then(w => w.write(json).then(() => w.close()))
+      .then(() => { if (typeof uiLog === 'function') uiLog('Layout exported'); })
+      .catch(e => { if (e && e.name !== 'AbortError') alert('Export failed: ' + e); });
+    return;
+  }
+  const blob = new Blob([json], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'rift-layout-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.download = fname;
   document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   if (typeof uiLog === 'function') uiLog('Layout exported');
@@ -11093,8 +11111,6 @@ function initColumnSplitters() {
 (function() {
   const logsTab = document.getElementById('stab-logs-tab');
   if (logsTab && settings.devMode) logsTab.classList.add('dev-visible');
-  const ltRow = document.getElementById('row-layout-transfer');
-  if (ltRow && settings.devMode) ltRow.style.display = '';
 })();
 initKioskMode();
 _sizeProbeZRetry();
