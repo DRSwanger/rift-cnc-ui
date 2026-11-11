@@ -4620,6 +4620,8 @@ let _planTotalSec = 0;    // bbctrl preplanner total seconds (authoritative; 0 =
 let _lastPlanTime = -1;   // last WS plan_time value, for 1s-smoothing between updates
 let _lastPlanTimeAt = 0;
 let _planMetaLastTry = 0; // throttle for lazy /api/path retries while running
+let _planFetchGen = 0;    // bumped on every file load/clear; stale planner polls abandon
+let _planFetchActive = false; // true while a planner-time poll loop is running
 
 // Persist job start across page refresh so ETA doesn't reset when the tab reloads mid-job.
 const JOB_START_KEY = 'rift_job_start';
@@ -5758,6 +5760,7 @@ function clearLoadedFile() {
   fileExtents = null;
   _estimatedJobSeconds = 0;
   _planTotalSec = 0; _lastPlanTime = -1;
+  _planFetchGen++;        // abandon any in-flight planner-time poll
   _cumulativeTimeByLine = null;
   _jobPct = 0; _jobLine = 0;
   _feedScaleSourceFile = '';
@@ -5788,6 +5791,7 @@ function _isLoadedFile(deletedPath) {
 
 function loadGCode(filename, resetScale = true) {
   uiLog(`LOAD FILE: ${filename}`);
+  const _gen = ++_planFetchGen; // new load — abandon any older planner poll
   return new Promise((resolve) => {
     const wrap = document.getElementById('file-load-bar-wrap');
     const bar  = document.getElementById('file-load-bar');
@@ -5826,8 +5830,8 @@ function loadGCode(filename, resetScale = true) {
         // planner time (chord vs arc length, accel modeling, dwells) once ready.
         _estimatedJobSeconds = estimateJobTime(gcodeLines);
         if (lastMachineState !== 'running') showFileReadyLabel();
-        _fetchBbctrlPlannerTime(filename).then(t => {
-          if (t && t > 0) {
+        if (_gen === _planFetchGen) _fetchBbctrlPlannerTime(filename).then(t => {
+          if (t && t > 0 && _gen === _planFetchGen) {
             _planTotalSec = t;
             // Rescale cumByLine so its total matches the planner's authoritative
             // estimate while preserving the per-line distribution shape (which
@@ -9371,20 +9375,34 @@ function estimateJobTime(lines) {
 // `time` field appears. Falls back to null on error or timeout — the caller
 // keeps the client-side estimate in that case.
 async function _fetchBbctrlPlannerTime(filename) {
+  const gen = _planFetchGen;
   const url = `${API_URL}/api/path/${encodeURIComponent(filename)}`;
-  const deadline = Date.now() + 120000;
-  while (Date.now() < deadline) {
-    try {
-      const r = await fetch(url);
-      if (!r.ok) return null;
-      const data = await r.json();
-      if (typeof data.time === 'number' && data.time > 0) return data.time;
-    } catch (e) {
-      return null;
+  // bbctrl's preplanner legitimately takes several minutes on big files (Pi 3,
+  // ~90k lines) and /api/path returns progress-only JSON until it finishes, so
+  // there is no fixed deadline here. The loop ends when: the planner answers,
+  // the file changes (gen bump), 20 consecutive network errors (~40s hard
+  // outage), the controller 404s the file, or a 15-minute hard cap.
+  const hardStop = Date.now() + 15 * 60 * 1000;
+  let polls = 0, errors = 0;
+  _planFetchActive = true;
+  try {
+    while (Date.now() < hardStop && gen === _planFetchGen) {
+      try {
+        const r = await fetch(url);
+        if (!r.ok) return null;
+        const data = await r.json();
+        if (typeof data.time === 'number' && data.time > 0) return data.time;
+        errors = 0;
+      } catch (e) {
+        if (++errors >= 20) return null;
+      }
+      polls++;
+      await new Promise(res => setTimeout(res, polls < 20 ? 500 : 2000));
     }
-    await new Promise(res => setTimeout(res, 500));
+    return null;
+  } finally {
+    _planFetchActive = false;
   }
-  return null;
 }
 
 // Helper: set time remaining display without moving the numeric value
@@ -9411,7 +9429,10 @@ function showFileReadyLabel() {
   if (totalLines > 0) {
     labelEl.textContent = `Ready · ${totalLines.toLocaleString()} lines`;
     if (_estimatedJobSeconds > 0) {
-      setProgressTime('Est.', fmtTime(_estimatedJobSeconds), '');
+      // "~" while this is still the rough client-side guess; dropped once the
+      // controller's preplanner total replaces it.
+      const approx = _planTotalSec > 0 ? '' : '~';
+      setProgressTime('Est.', approx + fmtTime(_estimatedJobSeconds), '');
       setProgressETA(fmtETA(_estimatedJobSeconds));
     }
   } else {
@@ -9486,10 +9507,11 @@ function updateProgressLabel() {
   // Plan meta wasn't ready at load (or tab joined mid-job and the fetch timed
   // out) — keep retrying lazily so this tab upgrades to planner truth.
   if (!_planTotalSec && state.selected && lastMachineState === 'running' &&
-      Date.now() - _planMetaLastTry > 30000) {
+      !_planFetchActive && Date.now() - _planMetaLastTry > 30000) {
     _planMetaLastTry = Date.now();
+    const _gen = _planFetchGen;
     _fetchBbctrlPlannerTime(state.selected).then(t => {
-      if (t && t > 0) _planTotalSec = t;
+      if (t && t > 0 && _gen === _planFetchGen) _planTotalSec = t;
     });
   }
 
