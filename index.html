@@ -4622,6 +4622,7 @@ let _lastPlanTimeAt = 0;
 let _planMetaLastTry = 0; // throttle for lazy /api/path retries while running
 let _planFetchGen = 0;    // bumped on every file load/clear; stale planner polls abandon
 let _planFetchActive = false; // true while a planner-time poll loop is running
+let _planFetchFailed = false; // true when the planner poll gave up (controller unreachable)
 
 // Persist job start across page refresh so ETA doesn't reset when the tab reloads mid-job.
 const JOB_START_KEY = 'rift_job_start';
@@ -5761,6 +5762,7 @@ function clearLoadedFile() {
   _estimatedJobSeconds = 0;
   _planTotalSec = 0; _lastPlanTime = -1;
   _planFetchGen++;        // abandon any in-flight planner-time poll
+  _planFetchFailed = false;
   _cumulativeTimeByLine = null;
   _jobPct = 0; _jobLine = 0;
   _feedScaleSourceFile = '';
@@ -5792,6 +5794,7 @@ function _isLoadedFile(deletedPath) {
 function loadGCode(filename, resetScale = true) {
   uiLog(`LOAD FILE: ${filename}`);
   const _gen = ++_planFetchGen; // new load — abandon any older planner poll
+  _planFetchFailed = false;
   return new Promise((resolve) => {
     const wrap = document.getElementById('file-load-bar-wrap');
     const bar  = document.getElementById('file-load-bar');
@@ -5843,6 +5846,11 @@ function loadGCode(filename, resetScale = true) {
               }
             }
             _estimatedJobSeconds = Math.ceil(t);
+            if (lastMachineState !== 'running') showFileReadyLabel();
+          } else if (!t && _gen === _planFetchGen) {
+            // Poll gave up (controller unreachable / planner wedged) — unlock
+            // the rough-guess fallback so the label isn't stuck "Calculating".
+            _planFetchFailed = true;
             if (lastMachineState !== 'running') showFileReadyLabel();
           }
         });
@@ -9428,12 +9436,19 @@ function showFileReadyLabel() {
   if (!labelEl) return;
   if (totalLines > 0) {
     labelEl.textContent = `Ready · ${totalLines.toLocaleString()} lines`;
-    if (_estimatedJobSeconds > 0) {
-      // "~" while this is still the rough client-side guess; dropped once the
-      // controller's preplanner total replaces it.
-      const approx = _planTotalSec > 0 ? '' : '~';
-      setProgressTime('Est.', approx + fmtTime(_estimatedJobSeconds), '');
+    if (_planTotalSec > 0) {
+      setProgressTime('Est.', fmtTime(_planTotalSec), '');
+      setProgressETA(fmtETA(_planTotalSec));
+    } else if (_planFetchFailed && _estimatedJobSeconds > 0) {
+      // Planner total unavailable (controller unreachable / planner wedged) —
+      // the rough client guess marked "~" beats showing nothing at all.
+      setProgressTime('Est.', '~' + fmtTime(_estimatedJobSeconds), '');
       setProgressETA(fmtETA(_estimatedJobSeconds));
+    } else {
+      // The client-side guess can be off by >2x — never show it as if it were
+      // real. Hold here until bbctrl's preplanner answers.
+      setProgressTime('', 'Calculating…', '');
+      setProgressETA('');
     }
   } else {
     labelEl.textContent = 'Idle';
@@ -9455,8 +9470,8 @@ function tickBottomClock() {
     dateEl.textContent = now.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
   }
   // Also refresh idle ETA so it stays accurate as time passes
-  if (lastMachineState === 'idle' && _estimatedJobSeconds > 0) {
-    setProgressETA(fmtETA(_estimatedJobSeconds));
+  if (lastMachineState === 'idle' && totalLines > 0) {
+    showFileReadyLabel(); // idempotent; owns the Est./Calculating/fallback states
   }
 }
 setInterval(tickBottomClock, 10000);
@@ -9512,8 +9527,22 @@ function updateProgressLabel() {
     const _gen = _planFetchGen;
     _fetchBbctrlPlannerTime(state.selected).then(t => {
       if (t && t > 0 && _gen === _planFetchGen) _planTotalSec = t;
+      else if (!t && _gen === _planFetchGen) _planFetchFailed = true;
     });
   }
+
+  // Planner total not known yet (poll still working on it) — show truthful
+  // elapsed only. The rough client-side guess can be off by >2x; never present
+  // it as a real countdown. If the poll gave up (_planFetchFailed), the rough
+  // projection below is unlocked as a last resort, marked "~".
+  if (!_planTotalSec && !_planFetchFailed) {
+    const pctStr = _jobPct > 1 ? `  ${_jobPct.toFixed(0)}%` : '';
+    if (labelEl) labelEl.textContent = `Running${pctStr}`;
+    setProgressTime('', fmtTime(elapsed), 'elapsed');
+    setProgressETA('Calculating…');
+    return;
+  }
+  const _rough = _planTotalSec > 0 ? '' : '~';
 
   if (_jobPct > 1) {
     // Time-based projection using the cumulative seconds-per-line table built
@@ -9541,15 +9570,15 @@ function updateProgressLabel() {
       : timeRemaining;
     const pctStr    = _jobPct.toFixed(0);
     if (labelEl) labelEl.textContent = `Running  ${pctStr}%`;
-    setProgressTime('', fmtTime(remaining), 'remaining');
-    setProgressETA(fmtETA(remaining));
+    setProgressTime('', _rough + fmtTime(remaining), 'remaining');
+    setProgressETA(_rough + fmtETA(remaining));
     if (stripEl) stripEl.textContent = `${pctStr}%  ·  ${fmtTime(remaining)} left`;
   } else if (_estimatedJobSeconds > 0) {
     // Not enough progress yet — show estimate minus elapsed, counting down
     const remaining = Math.max(0, _estimatedJobSeconds - elapsed);
     if (labelEl) labelEl.textContent = 'Running';
-    setProgressTime('', fmtTime(remaining), 'remaining');
-    setProgressETA(fmtETA(remaining));
+    setProgressTime('', _rough + fmtTime(remaining), 'remaining');
+    setProgressETA(_rough + fmtETA(remaining));
     if (stripEl) stripEl.textContent = fmtTime(remaining) + ' left';
   } else {
     if (labelEl) labelEl.textContent = 'Running';
