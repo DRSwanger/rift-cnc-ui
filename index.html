@@ -5795,6 +5795,13 @@ function loadGCode(filename, resetScale = true) {
   uiLog(`LOAD FILE: ${filename}`);
   const _gen = ++_planFetchGen; // new load — abandon any older planner poll
   _planFetchFailed = false;
+  // The previous file's planner total must not survive into this file — it
+  // would display as this file's time until the new plan finishes.
+  _planTotalSec = 0; _lastPlanTime = -1;
+  if (lastMachineState !== 'running') {
+    setProgressTime('', 'Calculating…', '');
+    setProgressETA('');
+  }
   return new Promise((resolve) => {
     const wrap = document.getElementById('file-load-bar-wrap');
     const bar  = document.getElementById('file-load-bar');
